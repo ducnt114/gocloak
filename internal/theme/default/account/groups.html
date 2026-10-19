@@ -1,0 +1,4 @@
+{{template "header" .}}
+{{if .Groups}}<table><tr><th>{{.T "name"}}</th><th>{{.T "path"}}</th></tr>{{range .Groups}}<tr><td>{{.name}}</td><td>{{.path}}</td></tr>{{end}}</table>
+{{else}}<p class="muted">{{.T "noGroups"}}</p>{{end}}
+{{template "footer" .}}

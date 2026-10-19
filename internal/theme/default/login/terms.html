@@ -1,0 +1,7 @@
+{{template "header" .}}
+<p>{{.T "termsText"}}</p>
+<form method="post" action="{{.Action}}">
+  <button type="submit" name="accept" value="accept" id="kc-accept">{{.T "doAccept"}}</button>
+  <button type="submit" name="cancel" value="cancel" class="secondary" id="kc-decline">{{.T "doDecline"}}</button>
+</form>
+{{template "footer" .}}

@@ -1,0 +1,12 @@
+{{template "header" .}}
+{{if .Applications}}
+<table>
+  <tr><th>{{.T "application"}}</th><th>{{.T "status"}}</th><th></th></tr>
+  {{range .Applications}}<tr>
+    <td>{{if .EffectiveURL}}<a href="{{.EffectiveURL}}">{{.ClientName}}</a>{{else}}{{.ClientName}}{{end}}{{if .Description}}<br><span class="muted">{{.Description}}</span>{{end}}</td>
+    <td>{{if .InUse}}<span class="badge">{{$.T "inUse"}}</span>{{end}} {{if .OfflineAccess}}<span class="badge">{{$.T "offlineAccess"}}</span>{{end}}</td>
+    <td>{{if .OfflineAccess}}<form method="post" action="{{$.BaseURL}}/applications/{{.ClientID}}/revoke"><input type="hidden" name="stateChecker" value="{{$.StateChecker}}"><button class="link" type="submit">{{$.T "removeAccess"}}</button></form>{{end}}</td>
+  </tr>{{end}}
+</table>
+{{else}}<p class="muted">{{.T "noApplications"}}</p>{{end}}
+{{template "footer" .}}

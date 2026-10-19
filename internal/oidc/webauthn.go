@@ -177,7 +177,7 @@ func (h *Handler) renderWebAuthnLogin(fc *flowContext, passwordless bool, errMsg
 		return 0, err
 	}
 	options, _ := json.Marshal(assertion.Response)
-	h.render(fc.w, status, "webauthn-authenticate", pageData{Realm: realmTitle(fc.realm), Title: "Passkey login", Error: errMsg,
+	h.render(fc.w, status, "webauthn-authenticate", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "webauthn-login-title", Error: errMsg,
 		Action: fc.actionURL(), WebAuthn: &webauthnPage{Options: string(options)}})
 	if err := fc.save(); err != nil {
 		return 0, err
@@ -195,7 +195,7 @@ func webauthnAction(passwordless bool) func(*flowContext) (result, error) {
 			}
 			ev.err = "invalid_user_credentials"
 			h.event(fc.r, fc.realm, "LOGIN_ERROR", ev)
-			return h.renderWebAuthnLogin(fc, passwordless, "Failed to authenticate by the Security key.", http.StatusUnauthorized)
+			return h.renderWebAuthnLogin(fc, passwordless, "webauthn-error-auth-verification", http.StatusUnauthorized)
 		}
 		session, ok := fc.loadSession(keyChallenge)
 		if !ok {
@@ -325,7 +325,7 @@ func (h *Handler) renderWebAuthnRegister(fc *flowContext, passwordless bool, err
 	if passwordless {
 		alias = service.ActionWebAuthnPasswordles
 	}
-	h.render(fc.w, status, "webauthn-register", pageData{Realm: realmTitle(fc.realm), Title: "Security key registration",
+	h.render(fc.w, status, "webauthn-register", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "webauthn-registration-title",
 		Error: errMsg, Action: fc.requiredActionURL(alias), WebAuthn: &webauthnPage{Options: string(options)}})
 	return resChallenge, nil
 }
@@ -336,7 +336,7 @@ func webauthnRegisterAction(passwordless bool) func(*flowContext) (result, error
 		fail := func() (result, error) {
 			h.event(fc.r, fc.realm, "UPDATE_CREDENTIAL_ERROR", &eventInfo{client: fc.client, userID: fc.user.ID, err: "invalid_registration",
 				details: map[string]string{"credential_type": credentialType(passwordless)}})
-			return h.renderWebAuthnRegister(fc, passwordless, "Failed to register your Security key.", http.StatusBadRequest)
+			return h.renderWebAuthnRegister(fc, passwordless, "webauthn-error-registration", http.StatusBadRequest)
 		}
 		session, ok := fc.loadSession(keyChallenge)
 		if !ok {

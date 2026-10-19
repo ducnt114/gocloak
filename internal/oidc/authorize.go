@@ -38,26 +38,26 @@ func (h *Handler) authorizeWith(w http.ResponseWriter, r *http.Request, binding 
 	ctx := r.Context()
 	realm, err := h.realm(r)
 	if err != nil {
-		h.errorPage(w, r, http.StatusNotFound, "Realm does not exist.")
+		h.errorPage(w, r, http.StatusNotFound, "realmNotFoundMessage")
 		return
 	}
 	if binding == "registration" && !realm.RegistrationAllowed {
-		h.errorPage(w, r, http.StatusBadRequest, "Registration not allowed")
+		h.errorPage(w, r, http.StatusBadRequest, "registrationNotAllowedMessage")
 		return
 	}
 	q := func(k string) string { return r.FormValue(k) }
 
 	client, err := h.Svc.Store.GetClientByClientID(ctx, realm.ID, q("client_id"))
 	if err != nil {
-		h.errorPage(w, r, http.StatusBadRequest, "Client not found.")
+		h.errorPage(w, r, http.StatusBadRequest, "clientNotFoundMessage")
 		return
 	}
 	if !client.Enabled {
-		h.errorPage(w, r, http.StatusBadRequest, "Client disabled.")
+		h.errorPage(w, r, http.StatusBadRequest, "clientDisabledMessage")
 		return
 	}
 	if client.BearerOnly {
-		h.errorPage(w, r, http.StatusBadRequest, "Bearer-only applications are not allowed to initiate browser login.")
+		h.errorPage(w, r, http.StatusBadRequest, "bearerOnlyMessage")
 		return
 	}
 	redirectURI := q("redirect_uri")
@@ -65,7 +65,7 @@ func (h *Handler) authorizeWith(w http.ResponseWriter, r *http.Request, binding 
 		redirectURI = soleRedirectURI(h.URLs.Base(r), client)
 	}
 	if redirectURI == "" || !matchRedirectURI(h.URLs.Base(r), client, redirectURI) {
-		h.errorPage(w, r, http.StatusBadRequest, "Invalid parameter: redirect_uri")
+		h.errorPage(w, r, http.StatusBadRequest, "invalidRedirectUriMessage")
 		return
 	}
 
@@ -74,7 +74,7 @@ func (h *Handler) authorizeWith(w http.ResponseWriter, r *http.Request, binding 
 	switch mode {
 	case "", "query", "fragment", "form_post":
 	default:
-		h.errorPage(w, r, http.StatusBadRequest, "Invalid parameter: response_mode")
+		h.errorPage(w, r, http.StatusBadRequest, "invalidResponseModeMessage")
 		return
 	}
 	fail := func(code, desc string) {
@@ -200,12 +200,12 @@ func (h *Handler) authenticateEndpoint(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) authSessionOf(w http.ResponseWriter, r *http.Request) (*model.Realm, *model.AuthSession, *model.Client, bool) {
 	realm, err := h.realm(r)
 	if err != nil {
-		h.errorPage(w, r, http.StatusNotFound, "Realm does not exist.")
+		h.errorPage(w, r, http.StatusNotFound, "realmNotFoundMessage")
 		return nil, nil, nil, false
 	}
 	as, client, err := h.loadAuthSession(r, realm)
 	if err != nil {
-		h.errorPage(w, r, http.StatusBadRequest, "Your login attempt timed out. Login will start from the beginning.")
+		h.errorPage(w, r, http.StatusBadRequest, "loginTimeout")
 		return nil, nil, nil, false
 	}
 	return realm, as, client, true
@@ -218,7 +218,7 @@ func (h *Handler) registrationEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !realm.RegistrationAllowed {
-		h.errorPage(w, r, http.StatusBadRequest, "Registration not allowed")
+		h.errorPage(w, r, http.StatusBadRequest, "registrationNotAllowedMessage")
 		return
 	}
 	as.UserID = ""
@@ -232,7 +232,7 @@ func (h *Handler) resetCredentialsEndpoint(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if !realm.Settings.ResetPasswordAllowed {
-		h.errorPage(w, r, http.StatusBadRequest, "Reset password not allowed")
+		h.errorPage(w, r, http.StatusBadRequest, "resetCredentialNotAllowedMessage")
 		return
 	}
 	as.UserID = ""
@@ -306,7 +306,7 @@ func (h *Handler) redirectResult(w http.ResponseWriter, r *http.Request, redirec
 	}
 	switch mode {
 	case "form_post":
-		h.render(w, http.StatusOK, "form-post", pageData{Action: redirectURI, Fields: v})
+		h.render(w, http.StatusOK, "form-post", pageData{Action: redirectURI, Fields: v, r: r})
 	case "fragment":
 		http.Redirect(w, r, redirectURI+"#"+v.Encode(), http.StatusFound)
 	default:
@@ -378,7 +378,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	realm, err := h.realm(r)
 	if err != nil {
-		h.errorPage(w, r, http.StatusNotFound, "Realm does not exist.")
+		h.errorPage(w, r, http.StatusNotFound, "realmNotFoundMessage")
 		return
 	}
 	if r.Method == http.MethodPost && r.PostFormValue("refresh_token") != "" {
@@ -391,25 +391,25 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 		// Expired ID tokens are acceptable as hints, so only the signature is checked.
 		claims, err := jwt.Verify(hint, func(kid, alg string) *jwt.Key { return h.Svc.VerificationKey(ctx, realm.ID, kid, alg) })
 		if err != nil || claims.String("iss") != h.URLs.Issuer(r, realm.Name) {
-			h.errorPage(w, r, http.StatusBadRequest, "Invalid parameter: id_token_hint")
+			h.errorPage(w, r, http.StatusBadRequest, "invalidIdTokenHintMessage")
 			return
 		}
 		if client, err = h.Svc.Store.GetClientByClientID(ctx, realm.ID, claims.String("azp")); err != nil {
-			h.errorPage(w, r, http.StatusBadRequest, "Invalid parameter: id_token_hint")
+			h.errorPage(w, r, http.StatusBadRequest, "invalidIdTokenHintMessage")
 			return
 		}
 	}
 	if cid := r.FormValue("client_id"); cid != "" {
 		c, err := h.Svc.Store.GetClientByClientID(ctx, realm.ID, cid)
 		if err != nil || (client != nil && c.ID != client.ID) {
-			h.errorPage(w, r, http.StatusBadRequest, "Invalid parameter: client_id")
+			h.errorPage(w, r, http.StatusBadRequest, "invalidClientIdMessage")
 			return
 		}
 		client = c
 	}
 	redirect := r.FormValue("post_logout_redirect_uri")
 	if redirect != "" && (client == nil || !postLogoutRedirectAllowed(h.URLs.Base(r), client, redirect)) {
-		h.errorPage(w, r, http.StatusBadRequest, "Invalid redirect uri")
+		h.errorPage(w, r, http.StatusBadRequest, "invalidPostLogoutRedirectMessage")
 		return
 	}
 
@@ -424,7 +424,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 				fields.Set(k, v)
 			}
 		}
-		h.render(w, http.StatusOK, "logout-confirm", pageData{Realm: realmTitle(realm), Title: "Logging out",
+		h.render(w, http.StatusOK, "logout-confirm", pageData{realm: realm, r: r, Title: "logoutConfirmTitle",
 			Action: h.URLs.Issuer(r, realm.Name) + "/protocol/openid-connect/logout", Fields: fields})
 		return
 	}
@@ -445,7 +445,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 		h.redirectResult(w, r, redirect, "query", v)
 		return
 	}
-	h.render(w, http.StatusOK, "info", pageData{Realm: realmTitle(realm), Title: "You are logged out"})
+	h.render(w, http.StatusOK, "info", pageData{realm: realm, r: r, Title: "loggedOut"})
 }
 
 func confirmToken(cookie string) string {
@@ -502,4 +502,19 @@ func realmTitle(r *model.Realm) string {
 		return r.DisplayName
 	}
 	return r.Name
+}
+
+// SSOSession returns the browser's valid SSO session and its user, if any.
+func (h *Handler) SSOSession(r *http.Request, realm *model.Realm) (*model.UserSession, *model.User) {
+	return h.ssoSession(r, realm)
+}
+
+// StateChecker is a CSRF token bound to the browser's SSO cookie, for forms
+// of pages served to logged in users (the account console).
+func StateChecker(r *http.Request) string {
+	ck, err := r.Cookie(identityCookie)
+	if err != nil {
+		return ""
+	}
+	return confirmToken("state:" + ck.Value)
 }

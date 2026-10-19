@@ -102,12 +102,13 @@ func (fc *flowContext) actionURL() string {
 
 // fail ends the flow: in a direct grant with err, in a browser with an
 // error page.
-func (fc *flowContext) fail(err *oauthError, page string) (result, error) {
+func (fc *flowContext) fail(err *oauthError, page string, args ...any) (result, error) {
 	if fc.direct {
 		fc.directErr = err
 		return resFailed, nil
 	}
-	fc.h.render(fc.w, http.StatusBadRequest, "error", pageData{Realm: realmTitle(fc.realm), Title: "We are sorry...", Error: page})
+	fc.h.render(fc.w, http.StatusBadRequest, "error", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "errorTitle",
+		Error: page, ErrorArgs: args})
 	return resFailed, nil
 }
 
@@ -247,10 +248,10 @@ func (h *Handler) runExecution(fc *flowContext, ex *model.AuthExecution) (result
 			return resAttempted, nil
 		}
 		return fc.fail(&oauthError{http.StatusBadRequest, "invalid_request", "Authenticator " + ex.Authenticator + " is not supported"},
-			fmt.Sprintf("The authenticator %q is not supported.", ex.Authenticator))
+			"unsupportedAuthenticatorMessage", ex.Authenticator)
 	}
 	if a.requiresUser && fc.user == nil {
-		return fc.fail(&oauthError{http.StatusBadRequest, "invalid_request", "Invalid flow"}, "Invalid authentication flow: no user identified.")
+		return fc.fail(&oauthError{http.StatusBadRequest, "invalid_request", "Invalid flow"}, "invalidFlowMessage")
 	}
 	res, err := fn(fc)
 	if err == nil && res == resSuccess {
@@ -332,7 +333,7 @@ func (h *Handler) runForm(fc *flowContext, ex *model.AuthExecution, form *model.
 	fc.exec = ex
 	posted := fc.postedExecution == ex.ID && fc.r.Method == http.MethodPost
 	if fc.direct {
-		return fc.fail(&oauthError{http.StatusBadRequest, "invalid_request", "Invalid flow"}, "Invalid flow.")
+		return fc.fail(&oauthError{http.StatusBadRequest, "invalid_request", "Invalid flow"}, "invalidFlowMessage")
 	}
 	switch ex.Authenticator {
 	case "registration-page-form":
@@ -342,7 +343,7 @@ func (h *Handler) runForm(fc *flowContext, ex *model.AuthExecution, form *model.
 		fc.postedExecution = ""
 		return h.register(fc, actions)
 	}
-	return fc.fail(&oauthError{http.StatusBadRequest, "invalid_request", "Invalid flow"}, fmt.Sprintf("The form %q is not supported.", ex.Authenticator))
+	return fc.fail(&oauthError{http.StatusBadRequest, "invalid_request", "Invalid flow"}, "unsupportedAuthenticatorMessage", ex.Authenticator)
 }
 
 // ---------------------------------------------------------------- entry points
@@ -394,7 +395,7 @@ func (h *Handler) continueFlow(w http.ResponseWriter, r *http.Request, realm *mo
 	case resSuccess:
 		h.afterAuthentication(fc)
 	case resAttempted:
-		h.errorPage(w, r, http.StatusBadRequest, "No authentication method succeeded.")
+		h.errorPage(w, r, http.StatusBadRequest, "noAuthenticationMethodMessage")
 	}
 }
 

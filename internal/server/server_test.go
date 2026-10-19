@@ -30,10 +30,20 @@ type env struct {
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
-	app, err := New(context.Background(), Config{
+	return newEnvWith(t, nil)
+}
+
+// newEnvWith starts a server whose configuration is adjusted by configure.
+func newEnvWith(t *testing.T, configure func(*Config)) *env {
+	t.Helper()
+	cfg := Config{
 		DB: testDB(t), AdminUser: "admin", AdminPassword: "admin",
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
-	})
+	}
+	if configure != nil {
+		configure(&cfg)
+	}
+	app, err := New(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

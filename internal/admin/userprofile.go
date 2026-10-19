@@ -229,9 +229,13 @@ func (h *Handler) sendActionEmail(w http.ResponseWriter, r *http.Request, realm 
 	if err != nil {
 		return err
 	}
-	msg := service.VerifyEmailMessage(realm, u.Email, link, lifespan)
+	kind := service.EmailVerification
 	if typ == "execute-actions" {
-		msg = service.ExecuteActionsMessage(realm, u.Email, link, lifespan, actions)
+		kind = service.ExecuteActions
+	}
+	msg, err := h.Svc.EmailMessage(realm, u, kind, link, lifespan, actions)
+	if err != nil {
+		return err
 	}
 	if err := h.Svc.SendEmail(r.Context(), realm, msg); err != nil {
 		h.Log.Warn("send email", "realm", realm.Name, "type", typ, "err", err)
@@ -256,7 +260,11 @@ func (h *Handler) testSMTPConnection(w http.ResponseWriter, r *http.Request, p *
 	if cfg["password"] == "**********" {
 		cfg["password"] = realm.Settings.SMTPServer["password"]
 	}
-	if err := service.SendWith(r.Context(), cfg, service.TestMessage(realm, p.user.Email)); err != nil {
+	msg, err := h.Svc.EmailMessage(realm, p.user, service.EmailTest, "", 0, nil)
+	if err != nil {
+		return err
+	}
+	if err := service.SendWith(r.Context(), cfg, msg); err != nil {
 		h.Log.Warn("SMTP test", "realm", realm.Name, "err", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"errorMessage": "Failed to send email"})
 		return nil

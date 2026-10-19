@@ -147,14 +147,14 @@ func (fc *flowContext) loginEvent(username string) *eventInfo {
 }
 
 func (fc *flowContext) renderLogin(page, username, errMsg string, status int) (result, error) {
-	label := "Username"
+	label := "username"
 	if fc.realm.LoginWithEmailAllowed {
-		label = "Username or email"
+		label = "usernameOrEmail"
 	}
 	if fc.realm.Settings.RegistrationEmailAsUsername {
-		label = "Email"
+		label = "email"
 	}
-	d := pageData{Realm: realmTitle(fc.realm), Title: "Sign in to your account", Error: errMsg, Username: username,
+	d := pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "loginAccountTitle", Error: errMsg, Username: username,
 		UsernameLabel: label, Action: fc.actionURL(), RememberMe: fc.realm.Settings.RememberMe,
 		Remembered: fc.as.Params[keyRemember] == "true"}
 	if fc.realm.RegistrationAllowed {
@@ -190,18 +190,18 @@ func (fc *flowContext) identify(page, username string) (*model.User, result, err
 		return nil, 0, err
 	}
 	if user == nil {
-		return fail("user_not_found", "Invalid username or password.")
+		return fail("user_not_found", "invalidUserMessage")
 	}
 	ev.userID = user.ID
 	if !user.Enabled {
-		return fail("user_disabled", "Account is disabled, contact your administrator.")
+		return fail("user_disabled", "accountDisabledMessage")
 	}
 	locked, err := fc.h.Svc.TemporarilyLocked(fc.ctx(), fc.realm, user)
 	if err != nil {
 		return nil, 0, err
 	}
 	if locked {
-		return fail("user_temporarily_disabled", "Invalid username or password.")
+		return fail("user_temporarily_disabled", "invalidUserMessage")
 	}
 	return user, resSuccess, nil
 }
@@ -220,7 +220,7 @@ func (fc *flowContext) checkPassword(page string, user *model.User, pw string) (
 		ev := fc.loginEvent(user.Username)
 		ev.userID, ev.err = user.ID, "invalid_user_credentials"
 		fc.h.event(fc.r, fc.realm, "LOGIN_ERROR", ev)
-		return fc.renderLogin(page, user.Username, "Invalid username or password.", http.StatusUnauthorized)
+		return fc.renderLogin(page, user.Username, "invalidUserMessage", http.StatusUnauthorized)
 	}
 	if err := fc.h.Svc.LoginSucceeded(fc.ctx(), fc.realm, user); err != nil {
 		return 0, err
@@ -274,7 +274,7 @@ func passwordAction(fc *flowContext) (result, error) {
 		return 0, err
 	}
 	if locked || !fc.user.Enabled {
-		return fc.renderLogin("login-password", "", "Invalid username or password.", http.StatusUnauthorized)
+		return fc.renderLogin("login-password", "", "invalidUserMessage", http.StatusUnauthorized)
 	}
 	return fc.checkPassword("login-password", fc.user, fc.r.PostFormValue("password"))
 }
@@ -311,7 +311,7 @@ func otpForm(fc *flowContext) (result, error) {
 }
 
 func (fc *flowContext) renderOTP(errMsg string, status int) (result, error) {
-	fc.h.render(fc.w, status, "login-otp", pageData{Realm: realmTitle(fc.realm), Title: "Sign in to your account",
+	fc.h.render(fc.w, status, "login-otp", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "loginAccountTitle",
 		Error: errMsg, Action: fc.actionURL()})
 	return resChallenge, nil
 }
@@ -373,7 +373,7 @@ func otpAction(fc *flowContext) (result, error) {
 		ev := fc.loginEvent(fc.user.Username)
 		ev.userID, ev.err = fc.user.ID, "invalid_user_credentials"
 		fc.h.event(fc.r, fc.realm, "LOGIN_ERROR", ev)
-		return fc.renderOTP("Invalid authenticator code.", http.StatusUnauthorized)
+		return fc.renderOTP("invalidTotpMessage", http.StatusUnauthorized)
 	}
 	return resSuccess, nil
 }
@@ -448,13 +448,13 @@ func directOTP(fc *flowContext) (result, error) {
 // ---------------------------------------------------------------- reset credentials
 
 func (fc *flowContext) renderReset(errMsg string, status int) (result, error) {
-	label := "Username or email"
+	label := "usernameOrEmail"
 	if fc.realm.Settings.RegistrationEmailAsUsername {
-		label = "Email"
+		label = "email"
 	}
-	fc.h.render(fc.w, status, "login-reset-password", pageData{Realm: realmTitle(fc.realm), Title: "Forgot Your Password?",
+	fc.h.render(fc.w, status, "login-reset-password", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "emailForgotTitle",
 		Error: errMsg, UsernameLabel: label, Action: fc.actionURL(),
-		Message:  "Enter your username or email address and we will send you instructions on how to create a new password.",
+		Message:  "emailInstruction",
 		LoginURL: fc.h.loginActionURL(fc.r, fc.realm, "restart", fc.as.ID)})
 	return resChallenge, nil
 }
@@ -469,7 +469,7 @@ func resetChooseUserForm(fc *flowContext) (result, error) {
 func resetChooseUserAction(fc *flowContext) (result, error) {
 	ident := strings.TrimSpace(fc.r.PostFormValue("username"))
 	if ident == "" {
-		return fc.renderReset("Please specify username.", http.StatusBadRequest)
+		return fc.renderReset("missingUsernameMessage", http.StatusBadRequest)
 	}
 	user, err := fc.h.Svc.Store.GetUserByUsername(fc.ctx(), fc.realm.ID, ident)
 	if errors.Is(err, store.ErrNotFound) {
@@ -490,9 +490,9 @@ func resetChooseUserAction(fc *flowContext) (result, error) {
 }
 
 func (fc *flowContext) emailSentPage() (result, error) {
-	fc.h.render(fc.w, http.StatusOK, "info", pageData{Realm: realmTitle(fc.realm), Title: "Forgot Your Password?",
-		Message: "You should receive an email shortly with further instructions.",
-		LinkURL: fc.h.loginActionURL(fc.r, fc.realm, "restart", fc.as.ID), LinkText: "« Back to Login"})
+	fc.h.render(fc.w, http.StatusOK, "info", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "emailForgotTitle",
+		Message: "emailSentMessage",
+		LinkURL: fc.h.loginActionURL(fc.r, fc.realm, "restart", fc.as.ID), LinkText: "backToLogin"})
 	return resChallenge, nil
 }
 
@@ -507,7 +507,7 @@ func resetSendEmail(fc *flowContext) (result, error) {
 		return fc.emailSentPage()
 	}
 	if fc.user.Email == "" {
-		return fc.fail(errInvalidRequest("no email"), "Failed to send email, please try again later.")
+		return fc.fail(errInvalidRequest("no email"), "emailSendErrorMessage")
 	}
 	lifespan := fc.realm.Settings.ActionTokenGeneratedByUser
 	link, err := fc.h.actionTokenLink(fc.r, fc.realm, fc.client, fc.user, actionTokenClaims{typ: tokenResetCredentials,
@@ -515,10 +515,14 @@ func resetSendEmail(fc *flowContext) (result, error) {
 	if err != nil {
 		return 0, err
 	}
-	if err := fc.h.Svc.SendEmail(fc.ctx(), fc.realm, service.ResetPasswordMessage(fc.realm, fc.user.Email, link, lifespan)); err != nil {
+	msg, err := fc.h.Svc.EmailMessage(fc.realm, fc.user, service.PasswordReset, link, lifespan, nil)
+	if err != nil {
+		return 0, err
+	}
+	if err := fc.h.Svc.SendEmail(fc.ctx(), fc.realm, msg); err != nil {
 		fc.h.Log.Warn("send reset password email", "realm", fc.realm.Name, "err", err)
 		fc.h.event(fc.r, fc.realm, "SEND_RESET_PASSWORD_ERROR", &eventInfo{client: fc.client, userID: fc.user.ID, err: "email_send_failed"})
-		return fc.fail(errInvalidRequest("email"), "Failed to send email, please try again later.")
+		return fc.fail(errInvalidRequest("email"), "emailSendErrorMessage")
 	}
 	fc.as.Params[keyEmailSent] = "true"
 	fc.h.event(fc.r, fc.realm, "SEND_RESET_PASSWORD", &eventInfo{client: fc.client, userID: fc.user.ID,
@@ -527,22 +531,22 @@ func resetSendEmail(fc *flowContext) (result, error) {
 }
 
 func resetPasswordForm(fc *flowContext) (result, error) {
-	return fc.renderUpdatePassword("", "", http.StatusOK)
+	return fc.renderUpdatePassword("", nil, http.StatusOK)
 }
 
-func (fc *flowContext) renderUpdatePassword(errMsg, msg string, status int) (result, error) {
-	fc.h.render(fc.w, status, "update-password", pageData{Realm: realmTitle(fc.realm), Title: "Update password",
-		Error: errMsg, Message: msg, Action: fc.actionURL()})
+func (fc *flowContext) renderUpdatePassword(errMsg string, errArgs []any, status int) (result, error) {
+	fc.h.render(fc.w, status, "update-password", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "updatePasswordTitle",
+		Error: errMsg, ErrorArgs: errArgs, Action: fc.actionURL()})
 	return resChallenge, nil
 }
 
 func resetPasswordAction(fc *flowContext) (result, error) {
-	msg, err := fc.h.updatePassword(fc)
+	msg, args, err := fc.h.updatePassword(fc)
 	if err != nil {
 		return 0, err
 	}
 	if msg != "" {
-		return fc.renderUpdatePassword(msg, "", http.StatusBadRequest)
+		return fc.renderUpdatePassword(msg, args, http.StatusBadRequest)
 	}
 	return resSuccess, nil
 }
@@ -565,7 +569,7 @@ func resetOTP(fc *flowContext) (result, error) {
 func denyAccess(fc *flowContext) (result, error) {
 	msg := fc.config["denyErrorMessage"]
 	if msg == "" {
-		msg = "Access denied"
+		return fc.fail(&oauthError{http.StatusUnauthorized, "access_denied", "Access denied"}, "accessDeniedMessage")
 	}
 	return fc.fail(&oauthError{http.StatusUnauthorized, "access_denied", msg}, msg)
 }

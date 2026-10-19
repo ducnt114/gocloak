@@ -1,0 +1,16 @@
+{{template "header" .}}
+<ol class="steps">
+  <li>{{.T "loginTotpStep1"}}</li>
+  <li>{{.T "loginTotpStep2"}}<br><img class="qr" id="kc-totp-secret-qr-code" src="{{.OTP.QR}}" alt="QR code">
+    <br>{{.T "loginTotpUnableToScan"}} <code id="kc-totp-secret-key">{{.OTP.Secret}}</code>
+    <br><small>{{.T "loginTotpType"}}: {{.OTP.Type}} · {{.T "loginTotpAlgorithm"}}: {{.OTP.Algorithm}} · {{.T "loginTotpDigits"}}: {{.OTP.Digits}}{{if eq .OTP.Type "totp"}} · {{.T "loginTotpInterval"}}: {{.OTP.Period}}{{else}} · {{.T "loginTotpCounter"}}: {{.OTP.Counter}}{{end}}</small></li>
+  <li>{{.T "loginTotpStep3"}}</li>
+</ol>
+<form id="kc-totp-settings-form" method="post" action="{{.Action}}">
+  <label for="totp">{{.T "loginOtpOneTime"}} *</label>
+  <input id="totp" name="totp" type="text" inputmode="numeric" autocomplete="off" autofocus>
+  <label for="userLabel">{{.T "loginTotpDeviceName"}}</label>
+  <input id="userLabel" name="userLabel" type="text" autocomplete="off">
+  <button type="submit">{{.T "doSubmit"}}</button>
+</form>
+{{template "footer" .}}

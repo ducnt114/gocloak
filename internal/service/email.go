@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/ducnt114/gocloak/internal/model"
+	"github.com/ducnt114/gocloak/internal/theme"
 )
 
 // Email is a message to send.
@@ -155,6 +156,15 @@ func buildMessage(cfg map[string]string, e Email) ([]byte, error) {
 
 // ---------------------------------------------------------------- templates
 
+// Email kinds, the prefix of their messages in the email theme
+// (<kind>Subject, <kind>Body, optionally <kind>BodyHtml).
+const (
+	EmailVerification = "emailVerification"
+	PasswordReset     = "passwordReset"
+	ExecuteActions    = "executeActions"
+	EmailTest         = "emailTest"
+)
+
 func realmDisplay(r *model.Realm) string {
 	if r.DisplayName != "" {
 		return r.DisplayName
@@ -162,70 +172,83 @@ func realmDisplay(r *model.Realm) string {
 	return r.Name
 }
 
-func lifespanText(seconds int) string {
+// emailLocale is the user's locale when the realm supports it, else the
+// realm's default locale.
+func emailLocale(realm *model.Realm, u *model.User) string {
+	def := realm.Settings.DefaultLocale
+	if def == "" {
+		def = "en"
+	}
+	if !realm.Settings.InternationalizationEnabled || u == nil {
+		return def
+	}
+	if v := u.Attributes["locale"]; len(v) > 0 {
+		for _, l := range realm.Settings.SupportedLocales {
+			if strings.EqualFold(l, v[0]) {
+				return l
+			}
+		}
+	}
+	return def
+}
+
+// EmailMessage builds an email of the realm's email theme, in the user's
+// language. The body messages get Keycloak's arguments: {0} link, {1}
+// lifespan in minutes, {2} realm name, {3} lifespan as text, {4} actions.
+func (s *Service) EmailMessage(realm *model.Realm, u *model.User, kind, link string, lifespan int, actions []string) (Email, error) {
+	th, err := s.Themes.Get(theme.Email, realm.Settings.EmailTheme)
+	if err != nil {
+		return Email{}, err
+	}
+	locale := emailLocale(realm, u)
+	names := make([]string, len(actions))
+	for i, a := range actions {
+		names[i] = th.Message(locale, "requiredAction."+a)
+	}
+	args := []any{link, lifespan / 60, realmDisplay(realm), lifespanText(th, locale, lifespan), strings.Join(names, ", ")}
+	e := Email{To: u.Email, Subject: th.Message(locale, kind+"Subject", args...), Text: th.Message(locale, kind+"Body", args...)}
+	if th.HasMessage(locale, kind+"BodyHtml") {
+		e.HTML = th.Message(locale, kind+"BodyHtml", args...)
+	} else {
+		e.HTML = textToHTML(e.Text, link, th.Message(locale, kind+"Link"))
+	}
+	return e, nil
+}
+
+func lifespanText(th *theme.Theme, locale string, seconds int) string {
+	unit := func(n int, one, many string) string {
+		if n == 1 {
+			return "1 " + th.Message(locale, "linkExpirationFormatter.timePeriodUnit."+one)
+		}
+		return fmt.Sprintf("%d %s", n, th.Message(locale, "linkExpirationFormatter.timePeriodUnit."+many))
+	}
 	switch {
 	case seconds%86400 == 0:
-		return plural(seconds/86400, "day")
+		return unit(seconds/86400, "day", "days")
 	case seconds%3600 == 0:
-		return plural(seconds/3600, "hour")
-	case seconds%60 == 0:
-		return plural(seconds/60, "minute")
+		return unit(seconds/3600, "hour", "hours")
 	}
-	return plural(seconds, "second")
+	return unit((seconds+59)/60, "minute", "minutes")
 }
 
-func plural(n int, unit string) string {
-	if n == 1 {
-		return "1 " + unit
-	}
-	return fmt.Sprintf("%d %ss", n, unit)
-}
-
-func htmlEmail(paragraphs []string, link, linkText string) string {
+// textToHTML turns a text body into HTML paragraphs, with the link as an anchor.
+func textToHTML(text, link, linkText string) string {
 	var b strings.Builder
 	b.WriteString("<html><body>")
-	for i, p := range paragraphs {
-		if i == 1 && link != "" {
-			fmt.Fprintf(&b, `<p><a href="%s">%s</a></p>`, html.EscapeString(link), html.EscapeString(linkText))
+	for _, p := range strings.Split(text, "\n\n") {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
 		}
-		fmt.Fprintf(&b, "<p>%s</p>", html.EscapeString(p))
+		if p == link {
+			if linkText == "" || linkText == link {
+				linkText = link
+			}
+			fmt.Fprintf(&b, `<p><a href="%s">%s</a></p>`, html.EscapeString(link), html.EscapeString(linkText))
+			continue
+		}
+		fmt.Fprintf(&b, "<p>%s</p>", strings.ReplaceAll(html.EscapeString(p), "\n", "<br>"))
 	}
 	b.WriteString("</body></html>")
 	return b.String()
-}
-
-// VerifyEmailMessage is Keycloak's email-verification email.
-func VerifyEmailMessage(realm *model.Realm, to, link string, lifespan int) Email {
-	name, exp := realmDisplay(realm), lifespanText(lifespan)
-	text := fmt.Sprintf("Someone has created a %s account with this email address. If this was you, click the link below to verify your email address\n\n%s\n\nThis link will expire within %s.\n\nIf you didn't create this account, just ignore this message.", name, link, exp)
-	return Email{To: to, Subject: "Verify email", Text: text, HTML: htmlEmail([]string{
-		fmt.Sprintf("Someone has created a %s account with this email address. If this was you, click the link below to verify your email address", name),
-		fmt.Sprintf("This link will expire within %s.", exp),
-		"If you didn't create this account, just ignore this message."}, link, "Link to e-mail address verification")}
-}
-
-// ResetPasswordMessage is Keycloak's password-reset email.
-func ResetPasswordMessage(realm *model.Realm, to, link string, lifespan int) Email {
-	name, exp := realmDisplay(realm), lifespanText(lifespan)
-	text := fmt.Sprintf("Someone just requested to change your %s account's credentials. If this was you, click on the link below to reset them.\n\n%s\n\nThis link and code will expire within %s.\n\nIf you don't want to reset your credentials, just ignore this message and nothing will be changed.", name, link, exp)
-	return Email{To: to, Subject: "Reset password", Text: text, HTML: htmlEmail([]string{
-		fmt.Sprintf("Someone just requested to change your %s account's credentials. If this was you, click on the link below to reset them.", name),
-		fmt.Sprintf("This link and code will expire within %s.", exp),
-		"If you don't want to reset your credentials, just ignore this message and nothing will be changed."}, link, "Link to reset credentials")}
-}
-
-// ExecuteActionsMessage is Keycloak's executeActions email.
-func ExecuteActionsMessage(realm *model.Realm, to, link string, lifespan int, actions []string) Email {
-	name, exp := realmDisplay(realm), lifespanText(lifespan)
-	text := fmt.Sprintf("Your administrator has just requested that you update your %s account by performing the following action(s): %s. Click on the link below to start this process.\n\n%s\n\nThis link will expire within %s.\n\nIf you are unaware that your administrator has requested this, just ignore this message and nothing will be changed.",
-		name, strings.Join(actions, ", "), link, exp)
-	return Email{To: to, Subject: "Update Your Account", Text: text, HTML: htmlEmail([]string{
-		fmt.Sprintf("Your administrator has just requested that you update your %s account by performing the following action(s): %s. Click on the link below to start this process.", name, strings.Join(actions, ", ")),
-		fmt.Sprintf("This link will expire within %s.", exp),
-		"If you are unaware that your administrator has requested this, just ignore this message and nothing will be changed."}, link, "Link to account update")}
-}
-
-// TestMessage is Keycloak's SMTP test email.
-func TestMessage(realm *model.Realm, to string) Email {
-	return Email{To: to, Subject: "[KEYCLOAK] - SMTP test message", Text: "This is a test message", HTML: "<p>This is a test message</p>"}
 }

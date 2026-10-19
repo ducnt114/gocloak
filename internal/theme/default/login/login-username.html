@@ -1,0 +1,9 @@
+{{template "header" .}}
+<form id="kc-form-login" method="post" action="{{.Action}}">
+  <label for="username">{{.T .UsernameLabel}}</label>
+  <input id="username" name="username" type="text" value="{{.Username}}" autocomplete="username" autofocus required>
+  {{if .RememberMe}}<label class="check"><input type="checkbox" name="rememberMe"{{if .Remembered}} checked{{end}}> {{.T "rememberMe"}}</label>{{end}}
+  <button type="submit" id="kc-login">{{.T "doLogIn"}}</button>
+</form>
+{{if .RegisterURL}}<p class="center">{{.T "noAccount"}} <a href="{{.RegisterURL}}">{{.T "doRegister"}}</a></p>{{end}}
+{{template "footer" .}}

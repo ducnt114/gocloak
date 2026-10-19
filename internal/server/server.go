@@ -14,10 +14,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ducnt114/gocloak/internal/account"
 	"github.com/ducnt114/gocloak/internal/admin"
 	"github.com/ducnt114/gocloak/internal/oidc"
 	"github.com/ducnt114/gocloak/internal/service"
 	"github.com/ducnt114/gocloak/internal/store"
+	"github.com/ducnt114/gocloak/internal/theme"
 )
 
 // Config configures a Server.
@@ -29,6 +31,10 @@ type Config struct {
 	AdminPassword string
 	ImportDir     string
 	Log           *slog.Logger
+	// ThemesDir holds custom themes; NoThemeCache reloads them on every
+	// request (development).
+	ThemesDir    string
+	NoThemeCache bool
 	// RateLimit is the sustained number of requests per second allowed per
 	// client IP on the protocol and admin endpoints (0 disables limiting).
 	RateLimit float64
@@ -60,6 +66,8 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 	}
 	svc := service.New(st)
 	svc.Log = cfg.Log
+	themes := &theme.Manager{Dir: cfg.ThemesDir, Cache: !cfg.NoThemeCache, Funcs: oidc.TemplateFuncs}
+	svc.Themes = themes
 	s := &Server{Svc: svc, Log: cfg.Log}
 
 	createdMaster, err := svc.Bootstrap(ctx, cfg.AdminUser, cfg.AdminPassword)
@@ -87,7 +95,9 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 
 	urls := oidc.URLs{Hostname: cfg.Hostname, ProxyHeaders: cfg.ProxyHeaders}
 	mux := http.NewServeMux()
-	(&oidc.Handler{Svc: svc, URLs: urls, Log: cfg.Log}).Register(mux)
+	oh := &oidc.Handler{Svc: svc, URLs: urls, Log: cfg.Log, Themes: themes}
+	oh.Register(mux)
+	(&account.Handler{Svc: svc, URLs: urls, Log: cfg.Log, Themes: themes, OIDC: oh}).Register(mux)
 	(&admin.Handler{Svc: svc, URLs: urls, Log: cfg.Log}).Register(mux)
 	mux.HandleFunc("GET /health", s.health)
 	mux.HandleFunc("GET /health/live", s.health)

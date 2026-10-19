@@ -1,10 +1,10 @@
 {{define "header"}}<!doctype html>
-<html lang="en">
+<html lang="{{.Locale}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>{{.Title}}{{if .Realm}} | {{.Realm}}{{end}}</title>
+<title>{{.TitleText}}{{if .Realm}} | {{.Realm}}{{end}}</title>
 <style>
 :root{--bg:#f0f0f0;--card:#fff;--text:#151515;--muted:#6a6e73;--accent:#0066cc;--accent-hover:#004080;--border:#d2d2d2;--error-bg:#faeae8;--error:#a30000;--info-bg:#e7f1fa}
 @media (prefers-color-scheme:dark){:root{--bg:#1b1d21;--card:#26292d;--text:#e0e0e0;--muted:#a3a3a3;--accent:#4d9cf0;--accent-hover:#73b1f5;--border:#444548;--error-bg:#3b1f1f;--error:#ff8f8f;--info-bg:#1f2f3f}}
@@ -33,19 +33,23 @@ button.secondary{background:transparent;color:var(--accent);border:1px solid var
 img.qr{margin:10px 0;background:#fff;padding:6px}
 input[type=email]{width:100%;padding:9px 10px;font:inherit;color:var(--text);background:var(--card);border:1px solid var(--border);border-bottom-color:var(--muted);border-radius:2px;margin-bottom:18px}
 input[readonly]{opacity:.7}
+.locales{position:absolute;top:12px;right:16px;font-size:13px}.locales a{margin-left:8px;color:var(--muted)}.locales a.current{color:var(--text);font-weight:600}
 </style>
+{{range .Styles}}<link rel="stylesheet" href="{{.}}">
+{{end}}
 </head>
 <body>
+{{if .Locales}}<nav class="locales" aria-label="{{.T "locale"}}">{{range .Locales}}<a href="{{.URL}}"{{if .Current}} class="current"{{end}} lang="{{.Code}}">{{.Label}}</a>{{end}}</nav>{{end}}
 {{if .Realm}}<div class="realm">{{.Realm}}</div>{{end}}
 <main class="card">
-<h1>{{.Title}}</h1>
-{{if .Error}}<div class="alert alert-error" role="alert">{{.Error}}</div>{{end}}
-{{if .Message}}<div class="alert alert-info">{{.Message}}</div>{{end}}
+<h1>{{.TitleText}}</h1>
+{{if .Error}}<div class="alert alert-error" role="alert">{{.ErrorText}}</div>{{end}}
+{{if .Message}}<div class="alert alert-info">{{.MessageText}}</div>{{end}}
 {{end}}
 
 {{define "footer"}}
 </main>
-<p class="muted">Powered by gocloak</p>
+<p class="muted">{{.T "poweredBy"}}</p>
 </body>
 </html>
 {{end}}

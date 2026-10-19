@@ -85,11 +85,11 @@ func (h *Handler) pendingActions(fc *flowContext) ([]string, error) {
 // user: required actions first, then the redirect back to the client.
 func (h *Handler) afterAuthentication(fc *flowContext) {
 	if fc.user == nil {
-		h.errorPage(fc.w, fc.r, http.StatusBadRequest, "Invalid authentication flow: no user identified.")
+		h.errorPage(fc.w, fc.r, http.StatusBadRequest, "invalidFlowMessage")
 		return
 	}
 	if !fc.user.Enabled {
-		h.errorPage(fc.w, fc.r, http.StatusBadRequest, "Account is disabled, contact your administrator.")
+		h.errorPage(fc.w, fc.r, http.StatusBadRequest, "accountDisabledMessage")
 		return
 	}
 	if fc.as.Params[keyActions] == "" {
@@ -183,7 +183,7 @@ func (h *Handler) finishAuthentication(fc *flowContext) {
 			http.Redirect(fc.w, fc.r, redirect, http.StatusFound)
 			return
 		}
-		h.render(fc.w, http.StatusOK, "info", pageData{Realm: realmTitle(fc.realm), Title: "Your account has been updated."})
+		h.render(fc.w, http.StatusOK, "info", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "accountUpdatedMessage"})
 		return
 	}
 	h.finishLogin(fc.w, fc.r, fc.realm, fc.client, fc.user, fc.sso, fc.as.Params)
@@ -193,17 +193,17 @@ func (h *Handler) finishAuthentication(fc *flowContext) {
 func (h *Handler) requiredActionEndpoint(w http.ResponseWriter, r *http.Request) {
 	realm, err := h.realm(r)
 	if err != nil {
-		h.errorPage(w, r, http.StatusNotFound, "Realm does not exist.")
+		h.errorPage(w, r, http.StatusNotFound, "realmNotFoundMessage")
 		return
 	}
 	as, client, err := h.loadAuthSession(r, realm)
 	if err != nil || as.UserID == "" {
-		h.errorPage(w, r, http.StatusBadRequest, "Your login attempt timed out. Login will start from the beginning.")
+		h.errorPage(w, r, http.StatusBadRequest, "loginTimeout")
 		return
 	}
 	user, err := h.Svc.Store.GetUser(r.Context(), realm.ID, as.UserID)
 	if err != nil {
-		h.errorPage(w, r, http.StatusBadRequest, "User not found.")
+		h.errorPage(w, r, http.StatusBadRequest, "userNotFoundMessage")
 		return
 	}
 	fc := &flowContext{h: h, w: w, r: r, realm: realm, client: client, as: as, user: user}
@@ -241,41 +241,41 @@ func init() {
 }
 
 // updatePassword applies the password-new / password-confirm form and
-// returns the message to show when it is rejected.
-func (h *Handler) updatePassword(fc *flowContext) (string, error) {
+// returns the message key (and arguments) to show when it is rejected.
+func (h *Handler) updatePassword(fc *flowContext) (string, []any, error) {
 	pw, confirm := fc.r.PostFormValue("password-new"), fc.r.PostFormValue("password-confirm")
 	switch {
 	case pw == "":
-		return "Please specify password.", nil
+		return "missingPasswordMessage", nil, nil
 	case pw != confirm:
-		return "Passwords don't match.", nil
+		return "notMatchPasswordMessage", nil, nil
 	}
 	if err := h.Svc.SetPassword(fc.ctx(), h.Svc.Store, fc.user, pw, false); err != nil {
 		var pe *policy.Error
 		if errors.As(err, &pe) {
 			h.event(fc.r, fc.realm, "UPDATE_PASSWORD_ERROR", &eventInfo{client: fc.client, userID: fc.user.ID, err: "password_rejected"})
-			return pe.Message, nil
+			return pe.Key, pe.Args, nil
 		}
-		return "", err
+		return "", nil, err
 	}
 	h.event(fc.r, fc.realm, "UPDATE_PASSWORD", &eventInfo{client: fc.client, userID: fc.user.ID})
-	return "", nil
+	return "", nil, nil
 }
 
 func updatePasswordPage(fc *flowContext) (result, error) {
-	fc.h.render(fc.w, http.StatusOK, "update-password", pageData{Realm: realmTitle(fc.realm), Title: "Update password",
-		Message: "You need to change your password to activate your account.", Action: fc.requiredActionURL(service.ActionUpdatePassword)})
+	fc.h.render(fc.w, http.StatusOK, "update-password", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "updatePasswordTitle",
+		Message: "updatePasswordMessage", Action: fc.requiredActionURL(service.ActionUpdatePassword)})
 	return resChallenge, nil
 }
 
 func updatePasswordAction(fc *flowContext) (result, error) {
-	msg, err := fc.h.updatePassword(fc)
+	msg, args, err := fc.h.updatePassword(fc)
 	if err != nil {
 		return 0, err
 	}
 	if msg != "" {
-		fc.h.render(fc.w, http.StatusBadRequest, "update-password", pageData{Realm: realmTitle(fc.realm), Title: "Update password",
-			Error: msg, Action: fc.requiredActionURL(service.ActionUpdatePassword)})
+		fc.h.render(fc.w, http.StatusBadRequest, "update-password", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "updatePasswordTitle",
+			Error: msg, ErrorArgs: args, Action: fc.requiredActionURL(service.ActionUpdatePassword)})
 		return resChallenge, nil
 	}
 	return resSuccess, nil
@@ -283,16 +283,17 @@ func updatePasswordAction(fc *flowContext) (result, error) {
 
 // ---------------------------------------------------------------- profile
 
-var coreLabels = map[string]string{"username": "Username", "email": "Email", "firstName": "First name", "lastName": "Last name"}
+// coreLabels are the message keys of the core attributes.
+var coreLabels = map[string]string{"username": "username", "email": "email", "firstName": "firstName", "lastName": "lastName"}
 
 // profileFields builds the form fields of the user profile in the user
 // context; values come from the user or a submitted form.
 func (h *Handler) profileFields(fc *flowContext, cfg *userprofile.Config, values map[string][]string, errs userprofile.Errors, registration bool) []profileField {
 	var fields []profileField
-	errBy := map[string]string{}
+	errBy := map[string]userprofile.FieldError{}
 	for _, e := range errs {
 		if _, ok := errBy[e.Field]; !ok {
-			errBy[e.Field] = profileMessage(e)
+			errBy[e.Field] = e
 		}
 	}
 	for _, a := range cfg.Attributes {
@@ -305,7 +306,9 @@ func (h *Handler) profileFields(fc *flowContext, cfg *userprofile.Config, values
 		label := coreLabels[a.Name]
 		if label == "" {
 			label = a.DisplayName
-			if label == "" || strings.HasPrefix(label, "${") {
+			if strings.HasPrefix(label, "${") && strings.HasSuffix(label, "}") {
+				label = label[2 : len(label)-1] // a message key
+			} else if label == "" {
 				label = a.Name
 			}
 		}
@@ -320,32 +323,11 @@ func (h *Handler) profileFields(fc *flowContext, cfg *userprofile.Config, values
 		if v := values[a.Name]; len(v) > 0 {
 			val = v[0]
 		}
-		fields = append(fields, profileField{Name: a.Name, Label: label, Type: typ, Value: val, Error: errBy[a.Name],
+		fe := errBy[a.Name]
+		fields = append(fields, profileField{Name: a.Name, Label: label, Type: typ, Value: val, Error: fe.ErrorMessage, ErrorArgs: fe.Params,
 			Required: required || a.Name == "username", ReadOnly: readOnly})
 	}
 	return fields
-}
-
-// profileMessage turns a validation error into the text Keycloak shows.
-func profileMessage(e userprofile.FieldError) string {
-	switch e.ErrorMessage {
-	case "error-user-attribute-required":
-		return "Please specify this field."
-	case "error-invalid-email":
-		return "Invalid email address."
-	case "error-invalid-length":
-		return "Invalid length."
-	case "error-person-name-invalid-character", "error-username-invalid-character":
-		return "Invalid value: contains invalid characters."
-	case "usernameExistsMessage":
-		return "Username already exists."
-	case "emailExistsMessage":
-		return "Email already exists."
-	}
-	if strings.HasPrefix(e.ErrorMessage, "error-") {
-		return "Invalid value."
-	}
-	return e.ErrorMessage
 }
 
 func profilePage(verify bool) func(*flowContext) (result, error) {
@@ -364,8 +346,8 @@ func profilePage(verify bool) func(*flowContext) (result, error) {
 			alias = service.ActionVerifyProfile
 			errs = nil // do not show errors before the user edits the form
 		}
-		fc.h.render(fc.w, http.StatusOK, "update-profile", pageData{Realm: realmTitle(fc.realm), Title: "Update Account Information",
-			Message: "You need to update your user profile to activate your account.", Action: fc.requiredActionURL(alias),
+		fc.h.render(fc.w, http.StatusOK, "update-profile", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "loginProfileTitle",
+			Message: "updateProfileMessage", Action: fc.requiredActionURL(alias),
 			Profile: fc.h.profileFields(fc, cfg, values, errs, false)})
 		return resChallenge, nil
 	}
@@ -453,7 +435,7 @@ func profileAction(fc *flowContext) (result, error) {
 		}
 	}
 	alias := fc.r.URL.Query().Get("execution")
-	fc.h.render(fc.w, http.StatusBadRequest, "update-profile", pageData{Realm: realmTitle(fc.realm), Title: "Update Account Information",
+	fc.h.render(fc.w, http.StatusBadRequest, "update-profile", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "loginProfileTitle",
 		Action: fc.requiredActionURL(alias), Profile: fc.h.profileFields(fc, cfg, values, errs, false)})
 	return resChallenge, nil
 }
@@ -472,19 +454,23 @@ func verifyEmailPage(fc *flowContext) (result, error) {
 		if err != nil {
 			return 0, err
 		}
-		if err := fc.h.Svc.SendEmail(fc.ctx(), fc.realm, service.VerifyEmailMessage(fc.realm, fc.user.Email, link, lifespan)); err != nil {
+		msg, err := fc.h.Svc.EmailMessage(fc.realm, fc.user, service.EmailVerification, link, lifespan, nil)
+		if err != nil {
+			return 0, err
+		}
+		if err := fc.h.Svc.SendEmail(fc.ctx(), fc.realm, msg); err != nil {
 			fc.h.Log.Warn("send verification email", "realm", fc.realm.Name, "err", err)
 			fc.h.event(fc.r, fc.realm, "SEND_VERIFY_EMAIL_ERROR", &eventInfo{client: fc.client, userID: fc.user.ID, err: "email_send_failed"})
-			return fc.fail(errInvalidRequest("email"), "Failed to send email, please try again later.")
+			return fc.fail(errInvalidRequest("email"), "emailSendErrorMessage")
 		}
 		fc.as.Params[keyEmailSent] = "verify"
 		fc.h.event(fc.r, fc.realm, "SEND_VERIFY_EMAIL", &eventInfo{client: fc.client, userID: fc.user.ID,
 			details: map[string]string{"email": fc.user.Email}})
 	}
-	fc.h.render(fc.w, http.StatusOK, "info", pageData{Realm: realmTitle(fc.realm), Title: "Email verification",
-		Message:  "You need to verify your email address to activate your account. An email with instructions to verify your email address has been sent to you.",
+	fc.h.render(fc.w, http.StatusOK, "info", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "emailVerifyTitle",
+		Message:  "emailVerifyInstruction1",
 		LinkURL:  fc.requiredActionURL(service.ActionVerifyEmail) + "&resend=true",
-		LinkText: "Click here to re-send the email."})
+		LinkText: "emailVerifyResend"})
 	return resChallenge, nil
 }
 
@@ -521,7 +507,7 @@ func (fc *flowContext) renderConfigureTOTP(errMsg string, status int) (result, e
 	if err != nil {
 		return 0, err
 	}
-	fc.h.render(fc.w, status, "configure-totp", pageData{Realm: realmTitle(fc.realm), Title: "Mobile Authenticator Setup",
+	fc.h.render(fc.w, status, "configure-totp", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "loginTotpTitle",
 		Error: errMsg, Action: fc.requiredActionURL(service.ActionConfigureTOTP),
 		OTP: &otpSetup{QR: template.URL(img), Secret: spaced(otp.Base32(secret)), Type: p.Type, Algorithm: strings.TrimPrefix(p.Algorithm, "Hmac"),
 			Digits: p.Digits, Period: p.Period, Counter: p.Counter}})
@@ -548,7 +534,7 @@ func configureTOTPAction(fc *flowContext) (result, error) {
 		return fc.renderConfigureTOTP("", http.StatusOK)
 	}
 	if code == "" {
-		return fc.renderConfigureTOTP("Please specify authenticator code.", http.StatusBadRequest)
+		return fc.renderConfigureTOTP("missingTotpMessage", http.StatusBadRequest)
 	}
 	p := fc.otpPolicy()
 	cd := otp.CredentialData{SubType: p.Type, Digits: p.Digits, Counter: p.Counter, Period: p.Period, Algorithm: p.Algorithm}
@@ -563,7 +549,7 @@ func configureTOTPAction(fc *flowContext) (result, error) {
 	}
 	if !ok {
 		fc.h.event(fc.r, fc.realm, "UPDATE_TOTP_ERROR", &eventInfo{client: fc.client, userID: fc.user.ID, err: "invalid_totp"})
-		return fc.renderConfigureTOTP("Invalid authenticator code.", http.StatusBadRequest)
+		return fc.renderConfigureTOTP("invalidTotpMessage", http.StatusBadRequest)
 	}
 	sd, cdJSON := otp.Credential(secret, p)
 	if err := fc.h.Svc.Store.CreateCredential(fc.ctx(), &model.Credential{ID: service.NewID(), UserID: fc.user.ID, Type: credentialOTP,
@@ -579,14 +565,14 @@ func configureTOTPAction(fc *flowContext) (result, error) {
 // ---------------------------------------------------------------- terms
 
 func termsPage(fc *flowContext) (result, error) {
-	fc.h.render(fc.w, http.StatusOK, "terms", pageData{Realm: realmTitle(fc.realm), Title: "Terms and Conditions",
-		Message: "Terms and conditions to be defined", Action: fc.requiredActionURL(service.ActionTermsAndConditions)})
+	fc.h.render(fc.w, http.StatusOK, "terms", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "termsTitle",
+		Message: "termsText", Action: fc.requiredActionURL(service.ActionTermsAndConditions)})
 	return resChallenge, nil
 }
 
 func termsAction(fc *flowContext) (result, error) {
 	if fc.r.PostFormValue("cancel") != "" {
-		return fc.fail(&oauthError{http.StatusBadRequest, "access_denied", "terms declined"}, "You need to accept the Terms and Conditions.")
+		return fc.fail(&oauthError{http.StatusBadRequest, "access_denied", "terms declined"}, "termsDeclinedMessage")
 	}
 	if fc.user.Attributes == nil {
 		fc.user.Attributes = map[string][]string{}
@@ -598,7 +584,7 @@ func termsAction(fc *flowContext) (result, error) {
 // ---------------------------------------------------------------- update email
 
 func updateEmailPage(fc *flowContext) (result, error) {
-	fc.h.render(fc.w, http.StatusOK, "update-email", pageData{Realm: realmTitle(fc.realm), Title: "Update email",
+	fc.h.render(fc.w, http.StatusOK, "update-email", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "emailUpdateTitle",
 		Username: fc.user.Email, Action: fc.requiredActionURL(service.ActionUpdateEmail)})
 	return resChallenge, nil
 }
@@ -612,20 +598,20 @@ func updateEmailAction(fc *flowContext) (result, error) {
 	values := service.ProfileValues(fc.user)
 	values["email"] = []string{email}
 	errs := cfg.Validate(values, userprofile.ContextUser, nil)
-	msg := ""
+	msg, var_args := "", []any(nil)
 	for _, e := range errs {
 		if e.Field == "email" {
-			msg = profileMessage(e)
+			msg, var_args = e.ErrorMessage, e.Params
 		}
 	}
 	if email == "" {
-		msg = "Please specify email."
+		msg = "missingEmailMessage"
 	}
 	if msg == "" {
 		u := *fc.user
 		u.Email, u.EmailVerified = email, false
 		if err := fc.h.Svc.UpdateUser(fc.ctx(), fc.h.Svc.Store, &u); errors.Is(err, store.ErrConflict) {
-			msg = "Email already exists."
+			msg = "emailExistsMessage"
 		} else if err != nil {
 			return 0, err
 		} else {
@@ -637,8 +623,8 @@ func updateEmailAction(fc *flowContext) (result, error) {
 			return resSuccess, nil
 		}
 	}
-	fc.h.render(fc.w, http.StatusBadRequest, "update-email", pageData{Realm: realmTitle(fc.realm), Title: "Update email",
-		Username: email, Error: msg, Action: fc.requiredActionURL(service.ActionUpdateEmail)})
+	fc.h.render(fc.w, http.StatusBadRequest, "update-email", pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "emailUpdateTitle",
+		Username: email, Error: msg, ErrorArgs: var_args, Action: fc.requiredActionURL(service.ActionUpdateEmail)})
 	return resChallenge, nil
 }
 
@@ -650,15 +636,15 @@ func (h *Handler) renderRegistration(fc *flowContext, actions []string, values m
 	if err != nil {
 		return 0, err
 	}
-	d := pageData{Realm: realmTitle(fc.realm), Title: "Register", Action: fc.actionURL(),
+	d := pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "registerTitle", Action: fc.actionURL(),
 		Profile:     h.profileFields(fc, cfg, values, errs, true),
 		LoginURL:    h.loginActionURL(fc.r, fc.realm, "restart", fc.as.ID),
 		Password:    slices.Contains(actions, "registration-password-action"),
 		Terms:       slices.Contains(actions, "registration-terms-and-conditions"),
-		FieldErrors: map[string]string{}}
+		FieldErrors: map[string]profileField{}}
 	for _, e := range errs {
 		if e.Field == "password" || e.Field == "password-confirm" || e.Field == "termsAccepted" {
-			d.FieldErrors[e.Field] = e.ErrorMessage
+			d.FieldErrors[e.Field] = profileField{Error: e.ErrorMessage, ErrorArgs: e.Params}
 		}
 	}
 	status := http.StatusOK
@@ -702,21 +688,21 @@ func (h *Handler) register(fc *flowContext, actions []string) (result, error) {
 	if slices.Contains(actions, "registration-password-action") {
 		switch {
 		case pw == "":
-			errs = append(errs, userprofile.FieldError{Field: "password", ErrorMessage: "Please specify password."})
+			errs = append(errs, userprofile.FieldError{Field: "password", ErrorMessage: "missingPasswordMessage"})
 		case pw != fc.r.PostFormValue("password-confirm"):
-			errs = append(errs, userprofile.FieldError{Field: "password-confirm", ErrorMessage: "Password confirmation doesn't match."})
+			errs = append(errs, userprofile.FieldError{Field: "password-confirm", ErrorMessage: "invalidPasswordConfirmMessage"})
 		default:
 			pol, err := policy.Parse(fc.realm.Settings.PasswordPolicy)
 			if err == nil {
 				if pe := pol.Validate(pw, policy.Subject{Username: first(values["username"]), Email: first(values["email"])}); pe != nil {
-					errs = append(errs, userprofile.FieldError{Field: "password", ErrorMessage: pe.Message})
+					errs = append(errs, userprofile.FieldError{Field: "password", ErrorMessage: pe.Key, Params: pe.Args})
 				}
 			}
 		}
 	}
 	terms := slices.Contains(actions, "registration-terms-and-conditions")
 	if terms && fc.r.PostFormValue("termsAccepted") != "on" {
-		errs = append(errs, userprofile.FieldError{Field: "termsAccepted", ErrorMessage: "You must agree to our terms and conditions."})
+		errs = append(errs, userprofile.FieldError{Field: "termsAccepted", ErrorMessage: "termsAcceptanceRequired"})
 	}
 	if len(errs) > 0 {
 		h.event(fc.r, fc.realm, "REGISTER_ERROR", &eventInfo{client: fc.client, err: "invalid_registration",

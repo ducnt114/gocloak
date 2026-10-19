@@ -83,12 +83,12 @@ func (h *Handler) actionToken(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	realm, err := h.realm(r)
 	if err != nil {
-		h.errorPage(w, r, http.StatusNotFound, "Realm does not exist.")
+		h.errorPage(w, r, http.StatusNotFound, "realmNotFoundMessage")
 		return
 	}
 	expired := func() {
-		h.render(w, http.StatusBadRequest, "error", pageData{Realm: realmTitle(realm), Title: "We are sorry...",
-			Error: "The link you clicked is no longer valid. It may have expired."})
+		h.render(w, http.StatusBadRequest, "error", pageData{realm: realm, r: r, Title: "errorTitle",
+			Error: "expiredActionMessage"})
 	}
 	iss := h.URLs.Issuer(r, realm.Name)
 	claims, err := jwt.Verify(r.URL.Query().Get("key"), func(kid, alg string) *jwt.Key { return h.Svc.VerificationKey(ctx, realm.ID, kid, alg) })
@@ -113,7 +113,7 @@ func (h *Handler) actionToken(w http.ResponseWriter, r *http.Request) {
 	}
 	client, err := h.Svc.Store.GetClientByClientID(ctx, realm.ID, claims.String("azp"))
 	if err != nil || !client.Enabled {
-		h.errorPage(w, r, http.StatusBadRequest, "Client not found.")
+		h.errorPage(w, r, http.StatusBadRequest, "clientNotFoundMessage")
 		return
 	}
 	if err := h.Svc.Store.RevokeToken(ctx, "action:"+jti, time.Unix(claims.Int("exp"), 0)); err != nil {
@@ -148,9 +148,9 @@ func (h *Handler) actionToken(w http.ResponseWriter, r *http.Request) {
 			h.continueFlow(w, r, realm, client, as, "")
 			return
 		}
-		d := pageData{Realm: realmTitle(realm), Title: "Your email address has been verified."}
+		d := pageData{realm: realm, r: r, Title: "emailVerifiedMessage"}
 		if reduri := claims.String("reduri"); reduri != "" {
-			d.LinkURL, d.LinkText = reduri, "« Back to Application"
+			d.LinkURL, d.LinkText = reduri, "backToApplication"
 		}
 		h.render(w, http.StatusOK, "info", d)
 
@@ -192,24 +192,13 @@ func (h *Handler) actionToken(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.event(r, realm, "EXECUTE_ACTION_TOKEN", &eventInfo{client: client, userID: user.ID})
-		names := make([]string, len(actions))
+		items := make([]string, len(actions))
 		for i, a := range actions {
-			names[i] = actionNames[a]
-			if names[i] == "" {
-				names[i] = a
-			}
+			items[i] = "requiredAction." + a
 		}
-		h.render(w, http.StatusOK, "info", pageData{Realm: realmTitle(realm), Title: "Perform the following action(s)",
-			Message: strings.Join(names, ", "), LinkURL: h.loginActionURL(r, realm, "required-action", as.ID),
-			LinkText: "» Click here to proceed"})
+		h.render(w, http.StatusOK, "info", pageData{realm: realm, r: r, user: user, Title: "performActionsTitle", Items: items,
+			LinkURL: h.loginActionURL(r, realm, "required-action", as.ID), LinkText: "proceedWithAction"})
 	}
-}
-
-var actionNames = map[string]string{
-	service.ActionUpdatePassword: "Update Password", service.ActionUpdateProfile: "Update Profile",
-	service.ActionVerifyEmail: "Verify Email", service.ActionConfigureTOTP: "Configure OTP",
-	service.ActionTermsAndConditions: "Terms and Conditions", service.ActionUpdateEmail: "Update Email",
-	service.ActionWebAuthnRegister: "Webauthn Register", service.ActionWebAuthnPasswordles: "Webauthn Register Passwordless",
 }
 
 // clientHome is where a login started from an email returns to.

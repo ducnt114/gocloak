@@ -13,6 +13,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/service"
 	"github.com/ducnt114/gocloak/internal/store"
+	"github.com/ducnt114/gocloak/internal/theme"
 )
 
 // URLs builds absolute URLs for a request. It is shared with the admin API.
@@ -55,9 +56,10 @@ func (u URLs) Issuer(r *http.Request, realm string) string {
 
 // Handler serves the protocol endpoints.
 type Handler struct {
-	Svc  *service.Service
-	URLs URLs
-	Log  *slog.Logger
+	Svc    *service.Service
+	URLs   URLs
+	Log    *slog.Logger
+	Themes *theme.Manager
 
 	jwks jwksCache
 }
@@ -87,6 +89,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /realms/{realm}/login-actions/reset-credentials", h.resetCredentialsEndpoint)
 	mux.HandleFunc("GET /realms/{realm}/login-actions/restart", h.restartEndpoint)
 	mux.HandleFunc("GET /realms/{realm}/login-actions/action-token", h.actionToken)
+	mux.HandleFunc("GET /resources/{theme}/{type}/{path...}", h.resources)
 }
 
 // ---------------------------------------------------------------- helpers

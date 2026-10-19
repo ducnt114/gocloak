@@ -33,6 +33,7 @@ type Policy struct {
 type Error struct {
 	Key     string
 	Message string
+	Args    []any // arguments of the message, for translations
 }
 
 func (e *Error) Error() string { return e.Message }
@@ -135,27 +136,27 @@ func (p *Policy) Validate(pw string, u Subject) *Error {
 	}
 	switch {
 	case p.MinLength > 0 && n < p.MinLength:
-		return &Error{"invalidPasswordMinLengthMessage", fmt.Sprintf("Invalid password: minimum length %d.", p.MinLength)}
+		return &Error{"invalidPasswordMinLengthMessage", fmt.Sprintf("Invalid password: minimum length %d.", p.MinLength), []any{p.MinLength}}
 	case p.MaxLength > 0 && n > p.MaxLength:
-		return &Error{"invalidPasswordMaxLengthMessage", fmt.Sprintf("Invalid password: maximum length %d.", p.MaxLength)}
+		return &Error{"invalidPasswordMaxLengthMessage", fmt.Sprintf("Invalid password: maximum length %d.", p.MaxLength), []any{p.MaxLength}}
 	case p.Digits > 0 && count(unicode.IsDigit) < p.Digits:
-		return &Error{"invalidPasswordMinDigitsMessage", fmt.Sprintf("Invalid password: must contain at least %d numerical digits.", p.Digits)}
+		return &Error{"invalidPasswordMinDigitsMessage", fmt.Sprintf("Invalid password: must contain at least %d numerical digits.", p.Digits), []any{p.Digits}}
 	case p.LowerCase > 0 && count(unicode.IsLower) < p.LowerCase:
-		return &Error{"invalidPasswordMinLowerCaseCharsMessage", fmt.Sprintf("Invalid password: must contain at least %d lower case characters.", p.LowerCase)}
+		return &Error{"invalidPasswordMinLowerCaseCharsMessage", fmt.Sprintf("Invalid password: must contain at least %d lower case characters.", p.LowerCase), []any{p.LowerCase}}
 	case p.UpperCase > 0 && count(unicode.IsUpper) < p.UpperCase:
-		return &Error{"invalidPasswordMinUpperCaseCharsMessage", fmt.Sprintf("Invalid password: must contain at least %d upper case characters.", p.UpperCase)}
+		return &Error{"invalidPasswordMinUpperCaseCharsMessage", fmt.Sprintf("Invalid password: must contain at least %d upper case characters.", p.UpperCase), []any{p.UpperCase}}
 	case p.SpecialChars > 0 && count(func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) < p.SpecialChars:
-		return &Error{"invalidPasswordMinSpecialCharsMessage", fmt.Sprintf("Invalid password: must contain at least %d special characters.", p.SpecialChars)}
+		return &Error{"invalidPasswordMinSpecialCharsMessage", fmt.Sprintf("Invalid password: must contain at least %d special characters.", p.SpecialChars), []any{p.SpecialChars}}
 	case p.NotUsername && u.Username != "" && strings.EqualFold(pw, u.Username):
-		return &Error{"invalidPasswordNotUsernameMessage", "Invalid password: must not be equal to the username."}
+		return &Error{"invalidPasswordNotUsernameMessage", "Invalid password: must not be equal to the username.", nil}
 	case p.NotContainsName && u.Username != "" && strings.Contains(strings.ToLower(pw), strings.ToLower(u.Username)):
-		return &Error{"invalidPasswordNotContainsUsernameMessage", "Invalid password: Can not contain the username."}
+		return &Error{"invalidPasswordNotContainsUsernameMessage", "Invalid password: Can not contain the username.", nil}
 	case p.NotEmail && u.Email != "" && strings.EqualFold(pw, u.Email):
-		return &Error{"invalidPasswordNotEmailMessage", "Invalid password: must not be equal to the email."}
+		return &Error{"invalidPasswordNotEmailMessage", "Invalid password: must not be equal to the email.", nil}
 	}
 	for _, re := range p.Regex {
 		if !re.MatchString(pw) {
-			return &Error{"invalidPasswordRegexPatternMessage", "Invalid password: fails to match regex pattern(s)."}
+			return &Error{"invalidPasswordRegexPatternMessage", "Invalid password: fails to match regex pattern(s).", nil}
 		}
 	}
 	return nil
@@ -163,5 +164,5 @@ func (p *Policy) Validate(pw string, u Subject) *Error {
 
 // HistoryError is the violation reported when a password was used recently.
 func (p *Policy) HistoryError() *Error {
-	return &Error{"invalidPasswordHistoryMessage", fmt.Sprintf("Invalid password: must not be equal to any of last %d passwords.", p.History)}
+	return &Error{"invalidPasswordHistoryMessage", fmt.Sprintf("Invalid password: must not be equal to any of last %d passwords.", p.History), []any{p.History}}
 }

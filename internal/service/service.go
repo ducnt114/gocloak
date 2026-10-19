@@ -21,6 +21,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/password"
 	"github.com/ducnt114/gocloak/internal/policy"
 	"github.com/ducnt114/gocloak/internal/store"
+	"github.com/ducnt114/gocloak/internal/theme"
 )
 
 // Well known names, identical to Keycloak's.
@@ -73,13 +74,16 @@ type Service struct {
 	// ExtraListeners are event listeners available to realms besides
 	// "jboss-logging", by id.
 	ExtraListeners map[string]EventListener
+	// Themes renders emails.
+	Themes *theme.Manager
 
 	mu   sync.RWMutex
 	keys map[string]*keySet // realm id -> keys
 }
 
 func New(st *store.Store) *Service {
-	return &Service{Store: st, Hasher: password.Default, Now: time.Now, keys: map[string]*keySet{}}
+	return &Service{Store: st, Hasher: password.Default, Now: time.Now, keys: map[string]*keySet{},
+		Themes: &theme.Manager{Cache: true}}
 }
 
 func (s *Service) logger() *slog.Logger {

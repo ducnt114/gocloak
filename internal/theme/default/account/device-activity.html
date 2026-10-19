@@ -1,0 +1,17 @@
+{{template "header" .}}
+<form method="post" action="{{.BaseURL}}/device-activity/sign-out">
+  <input type="hidden" name="stateChecker" value="{{.StateChecker}}">
+  <button class="danger" type="submit" id="sign-out-all">{{.T "signOutAllDevices"}}</button>
+</form>
+<table>
+  <tr><th>{{.T "ipAddress"}}</th><th>{{.T "browser"}}</th><th>{{.T "started"}}</th><th>{{.T "lastAccess"}}</th><th>{{.T "clients"}}</th><th></th></tr>
+  {{range .Sessions}}<tr>
+    <td>{{.IPAddress}}</td>
+    <td>{{.Browser}}{{if .Current}} <span class="badge">{{$.T "currentSession"}}</span>{{end}}</td>
+    <td>{{$.Date .Started}}</td>
+    <td>{{$.Date .LastAccess}}</td>
+    <td>{{range $i, $c := .Clients}}{{if $i}}, {{end}}{{$c.ClientName}}{{end}}</td>
+    <td><form method="post" action="{{$.BaseURL}}/device-activity/sign-out"><input type="hidden" name="stateChecker" value="{{$.StateChecker}}"><input type="hidden" name="session" value="{{.ID}}"><button class="link" type="submit">{{$.T "doSignOut"}}</button></form></td>
+  </tr>{{end}}
+</table>
+{{template "footer" .}}

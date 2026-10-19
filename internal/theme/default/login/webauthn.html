@@ -20,16 +20,16 @@ function submitCredential(cred) {
 
 {{define "webauthn-authenticate.html"}}{{template "header" .}}
 <form id="webauthn-form" method="post" action="{{.Action}}"><input type="hidden" id="credential" name="credential"></form>
-<button type="button" id="authenticateWebAuthnButton" onclick="navigator.credentials.get({publicKey: opts}).then(submitCredential).catch(e => alert(e))">Sign in with Passkey</button>
+<button type="button" id="authenticateWebAuthnButton" onclick="navigator.credentials.get({publicKey: opts}).then(submitCredential).catch(e => alert(e))">{{.T "webauthn-doAuthenticate"}}</button>
 {{template "webauthn-js" .}}
 {{template "footer" .}}{{end}}
 
 {{define "webauthn-register.html"}}{{template "header" .}}
 <form id="webauthn-form" method="post" action="{{.Action}}">
   <input type="hidden" id="credential" name="credential">
-  <label for="authenticatorLabel">Device name</label>
+  <label for="authenticatorLabel">{{.T "loginTotpDeviceName"}}</label>
   <input id="authenticatorLabel" name="authenticatorLabel" type="text" autocomplete="off">
 </form>
-<button type="button" id="registerWebAuthn" onclick="navigator.credentials.create({publicKey: opts}).then(submitCredential).catch(e => alert(e))">Register</button>
+<button type="button" id="registerWebAuthn" onclick="navigator.credentials.create({publicKey: opts}).then(submitCredential).catch(e => alert(e))">{{.T "webauthn-doRegister"}}</button>
 {{template "webauthn-js" .}}
 {{template "footer" .}}{{end}}

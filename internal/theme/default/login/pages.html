@@ -1,14 +1,15 @@
 {{define "error.html"}}{{template "header" .}}{{template "footer" .}}{{end}}
 
 {{define "info.html"}}{{template "header" .}}
-{{if .LinkURL}}<p class="center"><a id="kc-info-link" href="{{.LinkURL}}">{{.LinkText}}</a></p>{{end}}
+{{if .Items}}<p>{{range $i, $k := .Items}}{{if $i}}, {{end}}<strong>{{$.T $k}}</strong>{{end}}</p>{{end}}
+{{if .LinkURL}}<p class="center"><a id="kc-info-link" href="{{.LinkURL}}">{{.T .LinkText}}</a></p>{{end}}
 {{template "footer" .}}{{end}}
 
 {{define "logout-confirm.html"}}{{template "header" .}}
-<p>Do you want to log out?</p>
+<p>{{.T "logoutConfirmHeader"}}</p>
 <form method="post" action="{{.Action}}">
   {{range $k, $vs := .Fields}}{{range $vs}}<input type="hidden" name="{{$k}}" value="{{.}}">{{end}}{{end}}
-  <button type="submit" id="kc-logout">Logout</button>
+  <button type="submit" id="kc-logout">{{.T "doLogout"}}</button>
 </form>
 {{template "footer" .}}{{end}}
 
@@ -16,10 +17,10 @@
 <html lang="en">
 <head><meta charset="utf-8"><title>Submit This Form</title></head>
 <body onload="document.forms[0].submit()">
-<noscript><p>JavaScript is disabled. Click Continue to proceed.</p></noscript>
+<noscript><p>JavaScript is disabled. Click {{.T "doContinue"}} to proceed.</p></noscript>
 <form method="post" action="{{.Action}}">
   {{range $k, $vs := .Fields}}{{range $vs}}<input type="hidden" name="{{$k}}" value="{{.}}">{{end}}{{end}}
-  <noscript><button type="submit">Continue</button></noscript>
+  <noscript><button type="submit">{{.T "doContinue"}}</button></noscript>
 </form>
 </body>
 </html>{{end}}

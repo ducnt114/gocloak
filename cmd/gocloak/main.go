@@ -170,6 +170,8 @@ func start(args []string, dev bool) error {
 	strict := fs.Bool("hostname-strict", envDefault(strconv.FormatBool(!dev), "KC_HOSTNAME_STRICT") == "true", "require --hostname (env KC_HOSTNAME_STRICT)")
 	proxy := fs.String("proxy-headers", env("KC_PROXY_HEADERS"), "trust X-Forwarded-* headers when set to 'xforwarded' (env KC_PROXY_HEADERS)")
 	importDir := fs.String("import-dir", env("GOCLOAK_IMPORT_DIR"), "import realm exports (*.json) from this directory at startup (env GOCLOAK_IMPORT_DIR)")
+	themesDir := fs.String("themes-dir", envDefault("", "GOCLOAK_THEMES_DIR"), "directory of custom themes (env GOCLOAK_THEMES_DIR)")
+	themeCache := fs.Bool("theme-cache", !dev, "cache themes (disable while developing a theme)")
 	rateLimit := fs.Float64("rate-limit", atof(envDefault("100", "GOCLOAK_RATE_LIMIT")), "requests per second allowed per client IP on /realms and /admin, 0 to disable (env GOCLOAK_RATE_LIMIT)")
 	rateBurst := fs.Int("rate-burst", atoi(envDefault("200", "GOCLOAK_RATE_BURST")), "burst size of the per IP rate limit (env GOCLOAK_RATE_BURST)")
 	fs.Parse(args)
@@ -190,7 +192,7 @@ func start(args []string, dev bool) error {
 	defer stop()
 	srv, err := server.New(ctx, server.Config{
 		DB: dbCfg, Hostname: *hostname, ProxyHeaders: *proxy != "", ImportDir: *importDir, Log: log,
-		RateLimit: *rateLimit, RateBurst: *rateBurst,
+		RateLimit: *rateLimit, RateBurst: *rateBurst, ThemesDir: *themesDir, NoThemeCache: !*themeCache,
 		AdminUser:     env("KC_BOOTSTRAP_ADMIN_USERNAME", "KEYCLOAK_ADMIN"),
 		AdminPassword: env("KC_BOOTSTRAP_ADMIN_PASSWORD", "KEYCLOAK_ADMIN_PASSWORD"),
 	})

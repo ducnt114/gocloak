@@ -75,6 +75,7 @@ Main options (flag / environment variable):
 | `--import-dir` | `GOCLOAK_IMPORT_DIR` | none |
 | `--rate-limit`, `--rate-burst` | `GOCLOAK_RATE_LIMIT`, `GOCLOAK_RATE_BURST` | 100 requests/s per client IP, burst 200 (`0` disables); behind a proxy use `--proxy-headers` so the client IP is used |
 | `--log-level` | `KC_LOG_LEVEL` | `info` (`debug` in dev mode) |
+| `--themes-dir`, `--theme-cache` | `GOCLOAK_THEMES_DIR` | no custom themes; cache off in dev mode |
 | — | `KC_BOOTSTRAP_ADMIN_USERNAME` / `KC_BOOTSTRAP_ADMIN_PASSWORD` (or legacy `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD`) | admin created with the master realm on first start |
 
 ## What is implemented
@@ -123,6 +124,22 @@ Main options (flag / environment variable):
   `double`, `uri`, `options`, `local-date`, `multivalued`), required attributes per context,
   permissions and `unmanagedAttributePolicy`
 - Emails over SMTP (SSL / STARTTLS / authentication) with Keycloak's messages
+
+**Themes, languages and account console**
+
+- Login, email and account themes: built-in theme embedded in the binary, custom themes from
+  `--themes-dir` (`<theme>/<type>/theme.properties` with `parent` and `styles`, Go templates
+  overriding pages, `messages/messages_<locale>.properties` in Keycloak's format, static
+  `resources/` served under `/resources/<theme>/<type>/`), per realm `loginTheme`, `emailTheme`
+  and `accountTheme`
+- Internationalization with Keycloak's message keys: English and Vietnamese built in, locale from
+  `kc_locale`, `ui_locales`, the `KEYCLOAK_LOCALE` cookie, the user's `locale` attribute or
+  `Accept-Language`, a language selector on login pages, emails in the user's language
+- Account console at `/realms/{realm}/account`: personal info (user profile), account security
+  (password, OTP, security keys and passkeys through application initiated actions), device
+  activity with sign out, applications with offline access revocation, groups
+- Account REST API on the same paths (`Accept: application/json` or a bearer token): account,
+  sessions and devices, credentials and labels, applications and consents, groups
 - Client scopes and protocol mappers, as in Keycloak: the built-in scopes (`profile`, `email`,
   `roles`, `web-origins`, `acr`, `basic`, `address`, `phone`, `offline_access`, `microprofile-jwt`),
   default and optional scopes per realm and client, `invalid_scope` for unknown scopes, and
@@ -171,8 +188,9 @@ Main options (flag / environment variable):
 ## Not implemented yet
 
 SAML, identity brokering / social login, LDAP/Kerberos user federation, script mappers,
-fine-grained authorization services (UMA), consent screens, reCAPTCHA, organizations, themes,
-the admin and account consoles, clustering, token exchange, device flow, CIBA, PAR.
+fine-grained authorization services (UMA), consent screens, reCAPTCHA, organizations, the admin
+console, FreeMarker themes (gocloak themes use Go templates; Keycloak message bundles work as is),
+clustering, token exchange, device flow, CIBA, PAR.
 
 The plan for these is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -203,9 +221,12 @@ internal/password    Keycloak-compatible password hashing
 internal/policy      password policies
 internal/otp         TOTP / HOTP
 internal/userprofile declarative user profile and validators
+internal/i18n        Keycloak message bundles (.properties) and formatting
+internal/theme       themes (embedded default under theme/default/)
+internal/account     account console and account REST API
 internal/jwt         JWS (RS/PS/ES/HS), JWK, key generation
 internal/service     realm provisioning, users, roles, keys, token verification
-internal/oidc        protocol endpoints, authentication flow engine, required actions, login pages (templates/)
+internal/oidc        protocol endpoints, authentication flow engine, required actions, login pages
 internal/admin       admin REST API and realm import
 internal/server      wiring, bootstrap, health, import on startup
 ```

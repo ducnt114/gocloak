@@ -1,0 +1,24 @@
+{{template "header" .}}
+<form id="kc-register-form" method="post" action="{{.Action}}">
+  {{range .Profile}}
+  <label for="{{.Name}}">{{$.T .Label}}{{if .Required}} *{{end}}</label>
+  <input id="{{.Name}}" name="{{.Name}}" type="{{.Type}}" value="{{.Value}}"{{if .ReadOnly}} readonly{{end}}>
+  {{if .Error}}<div class="field-error" id="input-error-{{.Name}}">{{$.FieldText .}}</div>{{end}}
+  {{end}}
+  {{if .Password}}
+  <label for="password">{{.T "password"}} *</label>
+  <input id="password" name="password" type="password" autocomplete="new-password">
+  {{with index .FieldErrors "password"}}<div class="field-error" id="input-error-password">{{$.FieldText .}}</div>{{end}}
+  <label for="password-confirm">{{.T "passwordConfirm"}} *</label>
+  <input id="password-confirm" name="password-confirm" type="password" autocomplete="new-password">
+  {{with index .FieldErrors "password-confirm"}}<div class="field-error" id="input-error-password-confirm">{{$.FieldText .}}</div>{{end}}
+  {{end}}
+  {{if .Terms}}
+  <p>{{.T "termsText"}}</p>
+  <label class="check"><input type="checkbox" id="termsAccepted" name="termsAccepted"> {{.T "termsAgreement"}}</label>
+  {{with index .FieldErrors "termsAccepted"}}<div class="field-error">{{$.FieldText .}}</div>{{end}}
+  {{end}}
+  <button type="submit">{{.T "doRegister"}}</button>
+</form>
+{{if .LoginURL}}<p class="center"><a href="{{.LoginURL}}">{{.T "backToLogin"}}</a></p>{{end}}
+{{template "footer" .}}

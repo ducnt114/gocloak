@@ -163,7 +163,7 @@ files). Not done: reCAPTCHA, `delete_account`, `delete_credential`,
 `update_user_locale` (accepted and skipped), the organization authenticators,
 X.509 and Kerberos authenticators, configurable email templates (themes, M4).
 
-## M4 — Login theming and account console (M)
+## M4 — Login theming and account console (M) ✅ done
 
 - **Theme system**: theme directories (`--themes-dir`) overriding the embedded
   login templates and CSS, `loginTheme`/`emailTheme` per realm, and message
@@ -175,6 +175,10 @@ X.509 and Kerberos authenticators, configurable email templates (themes, M4).
 
 Acceptance: a custom theme directory changes the login page without rebuilding;
 a user can manage their own credentials and sessions.
+
+Done notes: themes use Go templates rather than FreeMarker, so Keycloak's
+`.ftl` templates do not apply; their message bundles and resources do.
+Linked accounts in the console come with identity brokering (M5).
 
 ## M5 — Identity brokering (L)
 

@@ -423,6 +423,12 @@ func (h *Handler) checkRefreshReuse(r *http.Request, realm *model.Realm, client 
 // newSession starts an SSO session for user with client attached.
 func (h *Handler) newSession(r *http.Request, realm *model.Realm, user *model.User, client *model.Client, notes map[string]string) (*model.UserSession, error) {
 	now := h.Svc.Now()
+	if notes == nil {
+		notes = map[string]string{}
+	}
+	if ua := r.UserAgent(); ua != "" {
+		notes["userAgent"] = ua
+	}
 	us := &model.UserSession{ID: service.NewID(), RealmID: realm.ID, UserID: user.ID, IPAddress: clientIP(r),
 		Started: now, LastRefresh: now, Clients: map[string]bool{client.ID: true}, Notes: notes}
 	if err := h.Svc.Store.CreateUserSession(r.Context(), us); err != nil {

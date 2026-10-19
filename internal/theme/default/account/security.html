@@ -1,0 +1,16 @@
+{{template "header" .}}
+{{range .Credentials}}
+<h2>{{$.T .DisplayName}}</h2>
+<p class="muted">{{$.T .HelpText}}</p>
+{{if .Items}}
+<table>
+  {{range .Items}}<tr>
+    <td>{{if .UserLabel}}{{.UserLabel}}{{else}}{{$.T "noLabel"}}{{end}}</td>
+    <td class="muted">{{$.T "created"}} {{$.DateMillis .CreatedDate}}</td>
+    <td>{{if $.Removable .}}<form method="post" action="{{$.BaseURL}}/security/credentials/{{.ID}}/delete"><input type="hidden" name="stateChecker" value="{{$.StateChecker}}"><button class="link" type="submit">{{$.T "doRemove"}}</button></form>{{end}}</td>
+  </tr>{{end}}
+</table>
+{{else}}<p class="muted">{{$.T "notSetUp"}}</p>{{end}}
+<p>{{if .SetupURL}}<a class="btn" href="{{.SetupURL}}">{{$.T "doSetUp"}}</a>{{end}}{{if .UpdateURL}} <a class="btn" href="{{.UpdateURL}}">{{$.T "doUpdate"}}</a>{{end}}</p>
+{{end}}
+{{template "footer" .}}
