@@ -7,6 +7,7 @@ import (
 
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/service"
+	"github.com/ducnt114/gocloak/internal/store"
 )
 
 // ExportOptions selects what Export includes.
@@ -49,8 +50,14 @@ func Export(ctx context.Context, svc *service.Service, realm *model.Realm, opts 
 		clientByID[c.ID] = c
 	}
 	if opts.Clients {
+		if err := exportScopes(ctx, st, realm, &rep, clients, clientByID); err != nil {
+			return nil, err
+		}
 		for _, c := range clients {
-			cr := clientToRep(c)
+			cr, err := clientRepWithScopes(ctx, st, c)
+			if err != nil {
+				return nil, err
+			}
 			if !c.PublicClient && !c.BearerOnly {
 				if opts.Secrets {
 					cr.Secret = ptr(c.Secret)
@@ -239,4 +246,83 @@ func (h *Handler) partialExport(w http.ResponseWriter, r *http.Request, p *princ
 		return err
 	}
 	return ok(w, rep)
+}
+
+// exportScopes adds client scopes, the realm's default scopes and the role
+// scope mappings of clients and client scopes.
+func exportScopes(ctx context.Context, st *store.Store, realm *model.Realm, rep *RealmRep, clients []*model.Client, clientByID map[string]*model.Client) error {
+	scopes, err := st.ListClientScopes(ctx, realm.ID)
+	if err != nil {
+		return err
+	}
+	scopeByID := map[string]*model.ClientScope{}
+	for _, cs := range scopes {
+		scopeByID[cs.ID] = cs
+		ms, err := st.ListMappers(ctx, cs.ID)
+		if err != nil {
+			return err
+		}
+		sr := ClientScopeRep{ID: ptr(cs.ID), Name: ptr(cs.Name), Protocol: ptr(cs.Protocol), Attributes: cs.Attributes,
+			ProtocolMappers: mappersToRep(ms)}
+		if cs.Description != "" {
+			sr.Description = ptr(cs.Description)
+		}
+		rep.ClientScopes = append(rep.ClientScopes, sr)
+	}
+	links, err := st.ListRealmDefaultScopes(ctx, realm.ID)
+	if err != nil {
+		return err
+	}
+	rep.DefaultDefaultClientScopes, rep.DefaultOptionalClientScopes = []string{}, []string{}
+	for _, l := range links {
+		if cs := scopeByID[l.ScopeID]; cs != nil {
+			if l.Default {
+				rep.DefaultDefaultClientScopes = append(rep.DefaultDefaultClientScopes, cs.Name)
+			} else {
+				rep.DefaultOptionalClientScopes = append(rep.DefaultOptionalClientScopes, cs.Name)
+			}
+		}
+	}
+	sort.Strings(rep.DefaultDefaultClientScopes)
+	sort.Strings(rep.DefaultOptionalClientScopes)
+
+	addMappings := func(ownerID string, sm ScopeMappingRep) error {
+		roles, err := st.ListScopeMappings(ctx, ownerID)
+		if err != nil {
+			return err
+		}
+		byClient := map[string][]string{}
+		for _, r := range roles {
+			if r.ClientID == "" {
+				byClient[""] = append(byClient[""], r.Name)
+			} else if c := clientByID[r.ClientID]; c != nil {
+				byClient[c.ClientID] = append(byClient[c.ClientID], r.Name)
+			}
+		}
+		for clientID, names := range byClient {
+			sort.Strings(names)
+			entry := sm
+			entry.Roles = names
+			if clientID == "" {
+				rep.ScopeMappings = append(rep.ScopeMappings, entry)
+				continue
+			}
+			if rep.ClientScopeMappings == nil {
+				rep.ClientScopeMappings = map[string][]ScopeMappingRep{}
+			}
+			rep.ClientScopeMappings[clientID] = append(rep.ClientScopeMappings[clientID], entry)
+		}
+		return nil
+	}
+	for _, c := range clients {
+		if err := addMappings(c.ID, ScopeMappingRep{Client: c.ClientID}); err != nil {
+			return err
+		}
+	}
+	for _, cs := range scopes {
+		if err := addMappings(cs.ID, ScopeMappingRep{ClientScope: cs.Name}); err != nil {
+			return err
+		}
+	}
+	return nil
 }

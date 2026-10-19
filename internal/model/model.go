@@ -136,6 +136,8 @@ type UserSession struct {
 	RememberMe  bool
 	// Clients maps client UUIDs that participated in this session.
 	Clients map[string]bool
+	// Notes are read by session note protocol mappers (e.g. AUTH_TIME).
+	Notes map[string]string
 }
 
 // AuthSession tracks an in-flight browser login (between /auth and the
@@ -173,4 +175,39 @@ type RealmKey struct {
 	Active     bool
 	Priority   int
 	CreatedAt  time.Time
+}
+
+// ClientScope is a reusable set of protocol mappers and role scope mappings
+// that clients include by default or on request (the "scope" parameter).
+type ClientScope struct {
+	ID          string
+	RealmID     string
+	Name        string
+	Description string
+	Protocol    string
+	Attributes  map[string]string
+}
+
+// IncludeInTokenScope reports whether the scope name is listed in the
+// "scope" claim of issued tokens.
+func (s *ClientScope) IncludeInTokenScope() bool {
+	return s.Attributes["include.in.token.scope"] != "false"
+}
+
+// ProtocolMapper adds or changes claims of issued tokens. It belongs to a
+// client or a client scope (OwnerID).
+type ProtocolMapper struct {
+	ID       string
+	RealmID  string
+	OwnerID  string
+	Name     string
+	Protocol string
+	Type     string // Keycloak provider id, e.g. oidc-usermodel-attribute-mapper
+	Config   map[string]string
+}
+
+// ClientScopeLink attaches a client scope to a client or realm.
+type ClientScopeLink struct {
+	ScopeID string
+	Default bool // default scope (always applied) vs optional (on request)
 }

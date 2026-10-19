@@ -62,6 +62,10 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 		st.Close()
 		return nil, fmt.Errorf("bootstrap: %w", err)
 	}
+	if err := svc.UpgradeRealms(ctx); err != nil {
+		st.Close()
+		return nil, fmt.Errorf("upgrade realms: %w", err)
+	}
 	if createdMaster {
 		if cfg.AdminUser != "" {
 			cfg.Log.Info("created master realm and temporary admin user", "username", cfg.AdminUser)

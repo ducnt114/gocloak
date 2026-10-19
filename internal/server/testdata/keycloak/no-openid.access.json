@@ -1,0 +1,48 @@
+{
+  "acr": "1",
+  "allowed-origins": [
+    "http://app.test"
+  ],
+  "aud": "account",
+  "azp": "web",
+  "email": "alice@example.com",
+  "email_verified": true,
+  "exp": "<volatile>",
+  "family_name": "Liddell",
+  "given_name": "Alice",
+  "iat": "<volatile>",
+  "iss": "{base}/realms/compat",
+  "jti": "<volatile>",
+  "name": "Alice Liddell",
+  "preferred_username": "alice",
+  "realm_access": {
+    "roles": [
+      "auditor",
+      "default-roles-compat",
+      "editor",
+      "offline_access",
+      "uma_authorization"
+    ]
+  },
+  "resource_access": {
+    "account": {
+      "roles": [
+        "manage-account",
+        "manage-account-links",
+        "view-profile"
+      ]
+    },
+    "web": {
+      "roles": [
+        "viewer"
+      ]
+    }
+  },
+  "scope": "email profile",
+  "sid": "<volatile>",
+  "sub": "<volatile>",
+  "tenant": {
+    "id": 42
+  },
+  "typ": "Bearer"
+}

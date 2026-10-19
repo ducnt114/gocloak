@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"net/url"
 	"strings"
 
 	"github.com/ducnt114/gocloak/internal/model"
@@ -30,10 +31,15 @@ type RealmRep struct {
 	model.RealmSettings
 
 	// Only used for import.
-	Roles   *RolesRep   `json:"roles,omitempty"`
-	Clients []ClientRep `json:"clients,omitempty"`
-	Users   []UserRep   `json:"users,omitempty"`
-	Groups  []GroupRep  `json:"groups,omitempty"`
+	Roles                       *RolesRep                    `json:"roles,omitempty"`
+	Clients                     []ClientRep                  `json:"clients,omitempty"`
+	Users                       []UserRep                    `json:"users,omitempty"`
+	Groups                      []GroupRep                   `json:"groups,omitempty"`
+	ClientScopes                []ClientScopeRep             `json:"clientScopes,omitempty"`
+	DefaultDefaultClientScopes  []string                     `json:"defaultDefaultClientScopes,omitempty"`
+	DefaultOptionalClientScopes []string                     `json:"defaultOptionalClientScopes,omitempty"`
+	ScopeMappings               []ScopeMappingRep            `json:"scopeMappings,omitempty"`
+	ClientScopeMappings         map[string][]ScopeMappingRep `json:"clientScopeMappings,omitempty"`
 }
 
 type RolesRep struct {
@@ -42,27 +48,30 @@ type RolesRep struct {
 }
 
 type ClientRep struct {
-	ID                        *string           `json:"id,omitempty"`
-	ClientID                  *string           `json:"clientId,omitempty"`
-	Name                      *string           `json:"name,omitempty"`
-	Description               *string           `json:"description,omitempty"`
-	Enabled                   *bool             `json:"enabled,omitempty"`
-	PublicClient              *bool             `json:"publicClient,omitempty"`
-	BearerOnly                *bool             `json:"bearerOnly,omitempty"`
-	ClientAuthenticatorType   *string           `json:"clientAuthenticatorType,omitempty"`
-	Secret                    *string           `json:"secret,omitempty"`
-	RootURL                   *string           `json:"rootUrl,omitempty"`
-	BaseURL                   *string           `json:"baseUrl,omitempty"`
-	RedirectURIs              []string          `json:"redirectUris"`
-	WebOrigins                []string          `json:"webOrigins"`
-	StandardFlowEnabled       *bool             `json:"standardFlowEnabled,omitempty"`
-	ImplicitFlowEnabled       *bool             `json:"implicitFlowEnabled,omitempty"`
-	DirectAccessGrantsEnabled *bool             `json:"directAccessGrantsEnabled,omitempty"`
-	ServiceAccountsEnabled    *bool             `json:"serviceAccountsEnabled,omitempty"`
-	ConsentRequired           *bool             `json:"consentRequired,omitempty"`
-	FullScopeAllowed          *bool             `json:"fullScopeAllowed,omitempty"`
-	Protocol                  *string           `json:"protocol,omitempty"`
-	Attributes                map[string]string `json:"attributes,omitempty"`
+	ID                        *string             `json:"id,omitempty"`
+	ClientID                  *string             `json:"clientId,omitempty"`
+	Name                      *string             `json:"name,omitempty"`
+	Description               *string             `json:"description,omitempty"`
+	Enabled                   *bool               `json:"enabled,omitempty"`
+	PublicClient              *bool               `json:"publicClient,omitempty"`
+	BearerOnly                *bool               `json:"bearerOnly,omitempty"`
+	ClientAuthenticatorType   *string             `json:"clientAuthenticatorType,omitempty"`
+	Secret                    *string             `json:"secret,omitempty"`
+	RootURL                   *string             `json:"rootUrl,omitempty"`
+	BaseURL                   *string             `json:"baseUrl,omitempty"`
+	RedirectURIs              []string            `json:"redirectUris"`
+	WebOrigins                []string            `json:"webOrigins"`
+	StandardFlowEnabled       *bool               `json:"standardFlowEnabled,omitempty"`
+	ImplicitFlowEnabled       *bool               `json:"implicitFlowEnabled,omitempty"`
+	DirectAccessGrantsEnabled *bool               `json:"directAccessGrantsEnabled,omitempty"`
+	ServiceAccountsEnabled    *bool               `json:"serviceAccountsEnabled,omitempty"`
+	ConsentRequired           *bool               `json:"consentRequired,omitempty"`
+	FullScopeAllowed          *bool               `json:"fullScopeAllowed,omitempty"`
+	Protocol                  *string             `json:"protocol,omitempty"`
+	Attributes                map[string]string   `json:"attributes,omitempty"`
+	ProtocolMappers           []ProtocolMapperRep `json:"protocolMappers,omitempty"`
+	DefaultClientScopes       []string            `json:"defaultClientScopes,omitempty"`
+	OptionalClientScopes      []string            `json:"optionalClientScopes,omitempty"`
 }
 
 type CredentialRep struct {
@@ -211,6 +220,32 @@ func clientToRep(c *model.Client) ClientRep {
 func newClient(realmID string) *model.Client {
 	return &model.Client{RealmID: realmID, Enabled: true, StandardFlowEnabled: true, FullScopeAllowed: true,
 		Protocol: "openid-connect", Attributes: map[string]string{}}
+}
+
+// newClientFromRep builds a client being created. Like Keycloak, a client
+// created without webOrigins gets the origins of its http(s) redirect URIs.
+func newClientFromRep(realmID string, rep *ClientRep) *model.Client {
+	c := newClient(realmID)
+	if rep.ID != nil {
+		c.ID = *rep.ID
+	}
+	applyClientRep(c, rep)
+	if rep.WebOrigins == nil {
+		seen := map[string]bool{}
+		for _, u := range c.RedirectURIs {
+			if !strings.HasPrefix(u, "http") {
+				continue
+			}
+			if parsed, err := url.Parse(strings.TrimSuffix(u, "*")); err == nil && parsed.Host != "" {
+				o := parsed.Scheme + "://" + parsed.Host
+				if !seen[o] {
+					seen[o] = true
+					c.WebOrigins = append(c.WebOrigins, o)
+				}
+			}
+		}
+	}
+	return c
 }
 
 func applyClientRep(c *model.Client, rep *ClientRep) {

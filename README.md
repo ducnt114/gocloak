@@ -92,18 +92,26 @@ Main options (flag / environment variable):
   Keycloak's back-channel logout with a refresh token
 - CORS from the client's web origins (including `+`)
 - Required action `UPDATE_PASSWORD` (temporary passwords)
-- Tokens shaped like Keycloak's: RS256, `realm_access`, `resource_access`, `aud` from client roles,
-  `azp`, `sid`, `scope`, `allowed-origins`, profile and email claims
+- Client scopes and protocol mappers, as in Keycloak: the built-in scopes (`profile`, `email`,
+  `roles`, `web-origins`, `acr`, `basic`, `address`, `phone`, `offline_access`, `microprofile-jwt`),
+  default and optional scopes per realm and client, `invalid_scope` for unknown scopes, and
+  mapper types for user properties and attributes, full name, address, realm / client roles,
+  group membership, audience, audience resolve, hardcoded claim / role, role name, allowed
+  origins, sub, acr and session notes
+- Role scope mappings for clients without full scope allowed
+- Tokens checked claim by claim against a real Keycloak 26 (see [Compatibility](#compatibility))
 
 **Admin REST API** (`/admin/realms/...`, Keycloak paths and JSON)
 
 - Realms: list, create (including full realm import with nested roles, clients, groups, users),
   get, partial update, delete, `logout-all`, `keys`, `partial-export`
 - Users: search (`search`, `username`, `email`, `firstName`, `lastName`, `exact`, `enabled`,
-  `first`, `max`), count, CRUD with partial updates, `reset-password`, credentials, sessions,
+  `q` attribute queries, `briefRepresentation`, `first`, `max`), count, CRUD with partial updates, `reset-password`, credentials, sessions,
   logout, group membership, role mappings (realm, client, composite, available)
 - Clients: search, CRUD, client secret get / regenerate, service account user, user sessions,
-  client roles
+  client roles, protocol mappers, default / optional client scopes, scope mappings,
+  `evaluate-scopes` (example access token, ID token, userinfo, applied mappers)
+- Client scopes: CRUD, protocol mappers, scope mappings, realm default / optional scopes
 - Roles: realm and client roles CRUD, composites, users in role, `roles-by-id`
 - Groups: tree listing, count, `group-by-path`, CRUD, children, members, role mappings
 - Authorization exactly by Keycloak's roles: master `admin` (all realms), master `create-realm`,
@@ -123,14 +131,29 @@ Main options (flag / environment variable):
 
 ## Not implemented yet
 
-SAML, identity brokering / social login, LDAP/Kerberos user federation, client scopes and
-protocol mappers as configurable entities (the default `profile`/`email`/`roles` behaviour is
-built in), fine-grained authorization services (UMA), consent, offline tokens, OTP/WebAuthn,
+SAML, identity brokering / social login, LDAP/Kerberos user federation, the declarative user
+profile (gocloak keeps any user attribute, while Keycloak 26 drops undeclared ones by default),
+script mappers, fine-grained authorization services (UMA), consent, offline tokens, OTP/WebAuthn,
 registration and reset-password emails, brute force detection, events, themes, the admin and
 account consoles, clustering, JWT client authentication, token exchange,
 device flow, CIBA, PAR.
 
 The plan for these is in [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Compatibility
+
+`scripts/compat/tokens.py` sets up the same realm on gocloak and on a real Keycloak through the
+admin REST API, requests tokens for several scenarios (default scopes, optional scopes, no
+`openid`, a client without full scope, client credentials, an invalid scope) and diffs the
+claims of access tokens, ID tokens and userinfo:
+
+```sh
+scripts/compat/tokens.py --keycloak http://localhost:8180 --gocloak http://localhost:8080
+```
+
+The Keycloak side of that run is checked in under `internal/server/testdata/keycloak`
+(recorded from Keycloak 26.0.7), and `TestKeycloakCompatibility` compares gocloak against it on
+every test run.
 
 ## Layout
 

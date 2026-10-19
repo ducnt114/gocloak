@@ -1,0 +1,4 @@
+{
+  "scope": "email profile",
+  "token_type": "Bearer"
+}

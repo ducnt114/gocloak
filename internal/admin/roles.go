@@ -450,12 +450,13 @@ func (h *Handler) removeClientRoleComposites(w http.ResponseWriter, r *http.Requ
 
 // mappingSubject is a user or a group that roles can be mapped to.
 type mappingSubject struct {
-	p         *principal
-	realm     *model.Realm
-	direct    func(ctx context.Context) ([]*model.Role, error)
-	effective func(ctx context.Context) ([]*model.Role, error)
-	grant     func(ctx context.Context, roleID string) error
-	revoke    func(ctx context.Context, roleID string) error
+	p            *principal
+	noGrantCheck bool // scope mappings do not grant roles
+	realm        *model.Realm
+	direct       func(ctx context.Context) ([]*model.Role, error)
+	effective    func(ctx context.Context) ([]*model.Role, error)
+	grant        func(ctx context.Context, roleID string) error
+	revoke       func(ctx context.Context, roleID string) error
 }
 
 func (h *Handler) userSubject(r *http.Request, p *principal, write bool) (*mappingSubject, error) {
@@ -598,7 +599,7 @@ func (h *Handler) changeMappings(w http.ResponseWriter, r *http.Request, s *mapp
 	if err != nil {
 		return err
 	}
-	if add {
+	if add && !s.noGrantCheck {
 		if err := h.checkGrantable(r.Context(), s.p, s.realm, roles); err != nil {
 			return err
 		}

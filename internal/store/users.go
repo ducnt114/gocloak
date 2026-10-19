@@ -34,14 +34,24 @@ func userArgs(u *model.User) []any {
 
 func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
 	args := append([]any{u.ID, u.RealmID}, userArgs(u)...)
-	return s.exec(ctx, `INSERT INTO users (`+userCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, args...)
+	return s.WithTx(ctx, func(tx *Store) error {
+		if err := tx.exec(ctx, `INSERT INTO users (`+userCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, args...); err != nil {
+			return err
+		}
+		return tx.indexUserAttributes(ctx, u)
+	})
 }
 
 func (s *Store) UpdateUser(ctx context.Context, u *model.User) error {
 	args := append(userArgs(u), u.ID)
-	return s.execOne(ctx, `UPDATE users SET username=?, email=?, email_verified=?, first_name=?, last_name=?,
-		enabled=?, created_timestamp=?, attributes=?, required_actions=?, service_account_client_id=?, not_before=?
-		WHERE id=?`, args...)
+	return s.WithTx(ctx, func(tx *Store) error {
+		if err := tx.execOne(ctx, `UPDATE users SET username=?, email=?, email_verified=?, first_name=?, last_name=?,
+			enabled=?, created_timestamp=?, attributes=?, required_actions=?, service_account_client_id=?, not_before=?
+			WHERE id=?`, args...); err != nil {
+			return err
+		}
+		return tx.indexUserAttributes(ctx, u)
+	})
 }
 
 func (s *Store) DeleteUser(ctx context.Context, realmID, id string) error {
@@ -80,9 +90,11 @@ type UserQuery struct {
 	FirstName string
 	LastName  string
 	Enabled   *bool
-	Exact     bool
-	First     int
-	Max       int
+	// Attributes requires exact attribute values (the "q" parameter).
+	Attributes map[string]string
+	Exact      bool
+	First      int
+	Max        int
 }
 
 func (q UserQuery) where(realmID string) (string, []any) {
@@ -120,6 +132,10 @@ func (q UserQuery) where(realmID string) (string, []any) {
 	if q.Enabled != nil {
 		w += ` AND enabled=?`
 		args = append(args, *q.Enabled)
+	}
+	for name, value := range q.Attributes {
+		w += ` AND EXISTS (SELECT 1 FROM user_attributes ua WHERE ua.user_id=users.id AND ua.name=? AND ua.value=?)`
+		args = append(args, name, value)
 	}
 	return w, args
 }

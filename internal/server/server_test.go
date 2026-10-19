@@ -237,7 +237,7 @@ func TestPasswordGrantAndRoles(t *testing.T) {
 	if c.String("aud") != "account" {
 		t.Errorf("aud = %v", c["aud"])
 	}
-	if tok.Scope != "openid profile email" || tok.IDToken == "" {
+	if tok.Scope != "openid email profile" || tok.IDToken == "" {
 		t.Errorf("scope=%q id_token=%q", tok.Scope, tok.IDToken)
 	}
 	idc := claims(t, tok.IDToken)
@@ -613,4 +613,17 @@ func pbkdf2Hash(pw string) string {
 		panic(err)
 	}
 	return base64.StdEncoding.EncodeToString(sum)
+}
+
+func cookiejarNew() (http.CookieJar, error) { return cookiejar.New(nil) }
+
+var formActionRe = regexp.MustCompile(`action="([^"]+)"`)
+
+func formAction(t *testing.T, body []byte) string {
+	t.Helper()
+	m := formActionRe.FindSubmatch(body)
+	if m == nil {
+		t.Fatalf("no form in %s", body)
+	}
+	return strings.ReplaceAll(string(m[1]), "&amp;", "&")
 }

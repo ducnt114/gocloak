@@ -49,7 +49,7 @@ Everything after this builds on it.
 Acceptance: tests pass on SQLite and PostgreSQL in CI; a realm exported from
 gocloak imports into Keycloak 26 and back without loss of supported fields.
 
-## M1 — Client scopes and protocol mappers (L)
+## M1 — Client scopes and protocol mappers (L) ✅ done
 
 The biggest compatibility gap today: real Keycloak setups customise tokens with
 client scopes and mappers, and request custom scopes that gocloak ignores.
@@ -79,6 +79,12 @@ client scopes and mappers, and request custom scopes that gocloak ignores.
 Acceptance: a token issued by gocloak for an imported realm matches the token
 Keycloak issues for the same realm/user/client, claim for claim (excluding
 ids, timestamps and signatures). Write this as a golden-file test.
+
+Done notes: golden files recorded from Keycloak 26.0.7 by
+`scripts/compat/tokens.py` (`TestKeycloakCompatibility`). The `organization`
+scope is left for when organizations exist. Found while comparing: Keycloak 26
+drops user attributes that are not declared in its user profile; gocloak keeps
+them. A declarative user profile is added to M3.
 
 ## M2 — Security hardening (M)
 
@@ -138,6 +144,8 @@ keeps previously issued tokens verifiable.
   arbitrary flow editing is not a goal; importing a realm with unsupported
   authenticators must fail loudly rather than silently weaken login.
 - **Remember me** and `KEYCLOAK_REMEMBER_ME`.
+- **User profile**: declared attributes with validators and permissions
+  (`/users/profile`), `unmanagedAttributePolicy`, as in Keycloak 24+.
 
 Acceptance: a new user can register, verify email, set up TOTP and log in with
 it; an admin can force a password reset by email; flows from a Keycloak export
@@ -267,8 +275,6 @@ To fix opportunistically, at the latest in the milestone noted:
 
 - `EffectiveRoles` loads all roles and composite edges of a realm on every
   call, and admin requests recompute the caller's roles each time (M11).
-- User search does not support attribute queries (`q=key:value`) or
-  `briefRepresentation` (M1).
 - Admin API has no CORS support for browser-based tools (M7).
 - Refresh tokens are signed with RS256; Keycloak uses HS512. Harmless for
   clients, but revisit with key providers (M2).

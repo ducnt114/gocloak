@@ -1,0 +1,4 @@
+{
+  "scope": "address email microprofile-jwt openid phone profile",
+  "token_type": "Bearer"
+}

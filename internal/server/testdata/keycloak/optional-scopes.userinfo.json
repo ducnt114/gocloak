@@ -1,0 +1,21 @@
+{
+  "address": {},
+  "email": "alice@example.com",
+  "email_verified": true,
+  "family_name": "Liddell",
+  "given_name": "Alice",
+  "groups": [
+    "auditor",
+    "default-roles-compat",
+    "editor",
+    "offline_access",
+    "uma_authorization"
+  ],
+  "name": "Alice Liddell",
+  "preferred_username": "alice",
+  "sub": "<volatile>",
+  "tenant": {
+    "id": 42
+  },
+  "upn": "alice"
+}

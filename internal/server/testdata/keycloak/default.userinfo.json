@@ -1,0 +1,12 @@
+{
+  "email": "alice@example.com",
+  "email_verified": true,
+  "family_name": "Liddell",
+  "given_name": "Alice",
+  "name": "Alice Liddell",
+  "preferred_username": "alice",
+  "sub": "<volatile>",
+  "tenant": {
+    "id": 42
+  }
+}

@@ -235,12 +235,12 @@ func (h *Handler) grantPassword(r *http.Request, realm *model.Realm, client *mod
 	if len(user.RequiredActions) > 0 {
 		return nil, errInvalidGrant("Account is not fully set up")
 	}
-	session, err := h.newSession(r, realm, user, client)
+	session, err := h.newSession(r, realm, user, client, nil)
 	if err != nil {
 		return nil, err
 	}
 	return h.issue(r, &issueRequest{realm: realm, client: client, user: user, session: session,
-		scope: grantedScope(r.PostFormValue("scope")), refresh: true})
+		scope: r.PostFormValue("scope"), strict: true, refresh: true})
 }
 
 func (h *Handler) grantClientCredentials(r *http.Request, realm *model.Realm, client *model.Client) (*tokenResponse, error) {
@@ -261,7 +261,7 @@ func (h *Handler) grantClientCredentials(r *http.Request, realm *model.Realm, cl
 	if !user.Enabled {
 		return nil, errInvalidRequest("User disabled")
 	}
-	return h.issue(r, &issueRequest{realm: realm, client: client, user: user, scope: grantedScope(r.PostFormValue("scope"))})
+	return h.issue(r, &issueRequest{realm: realm, client: client, user: user, scope: r.PostFormValue("scope"), strict: true})
 }
 
 func (h *Handler) grantRefreshToken(r *http.Request, realm *model.Realm, client *model.Client) (*tokenResponse, error) {
@@ -292,10 +292,10 @@ func (h *Handler) grantRefreshToken(r *http.Request, realm *model.Realm, client 
 }
 
 // newSession starts an SSO session for user with client attached.
-func (h *Handler) newSession(r *http.Request, realm *model.Realm, user *model.User, client *model.Client) (*model.UserSession, error) {
+func (h *Handler) newSession(r *http.Request, realm *model.Realm, user *model.User, client *model.Client, notes map[string]string) (*model.UserSession, error) {
 	now := h.Svc.Now()
 	us := &model.UserSession{ID: service.NewID(), RealmID: realm.ID, UserID: user.ID, IPAddress: clientIP(r),
-		Started: now, LastRefresh: now, Clients: map[string]bool{client.ID: true}}
+		Started: now, LastRefresh: now, Clients: map[string]bool{client.ID: true}, Notes: notes}
 	if err := h.Svc.Store.CreateUserSession(r.Context(), us); err != nil {
 		return nil, err
 	}
@@ -336,8 +336,27 @@ func (h *Handler) userinfo(w http.ResponseWriter, r *http.Request) {
 		unauthorized("User not found")
 		return
 	}
+	if !hasScope(vt.Claims.String("scope"), "openid") {
+		// Keycloak refuses userinfo for tokens issued without "openid".
+		w.Header().Set("WWW-Authenticate", `Bearer realm="`+realm.Name+`", error="insufficient_scope", error_description="Missing openid scope"`)
+		writeJSON(w, http.StatusForbidden, &oauthError{Code: "insufficient_scope", Description: "Missing openid scope"})
+		return
+	}
+	client, err := h.Svc.Store.GetClientByClientID(r.Context(), realm.ID, vt.Claims.String("azp"))
+	if err != nil {
+		unauthorized("Client not found")
+		return
+	}
+	tc, _, err := newTokenContext(r.Context(), h.Svc, h.URLs.Base(r), realm, client, vt.User, vt.Session, vt.Claims.String("scope"), false)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
 	out := jwt.Claims{"sub": vt.User.ID}
-	userClaims(out, vt.User)
+	if err := tc.apply(r.Context(), out, kindUserinfo); err != nil {
+		h.writeError(w, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 

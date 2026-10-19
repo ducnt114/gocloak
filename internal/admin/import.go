@@ -68,7 +68,17 @@ func importContent(ctx context.Context, svc *service.Service, tx *store.Store, r
 		return nil
 	}
 
-	// Clients first: client roles and service accounts depend on them.
+	// Client scopes before clients, which reference them by name.
+	for i := range rep.ClientScopes {
+		if _, err := upsertScope(ctx, tx, realm, &rep.ClientScopes[i], true); err != nil {
+			return err
+		}
+	}
+	if err := importRealmDefaultScopes(ctx, tx, realm, rep); err != nil {
+		return err
+	}
+
+	// Clients next: client roles and service accounts depend on them.
 	for i := range rep.Clients {
 		cr := &rep.Clients[i]
 		if cr.ClientID == nil || *cr.ClientID == "" {
@@ -80,6 +90,9 @@ func importContent(ctx context.Context, svc *service.Service, tx *store.Store, r
 			if err := tx.UpdateClient(ctx, c); err != nil {
 				return err
 			}
+			if err := applyClientScopes(ctx, tx, c, cr, true); err != nil {
+				return err
+			}
 			if err := svc.SyncServiceAccount(ctx, tx, c); err != nil {
 				return err
 			}
@@ -88,12 +101,11 @@ func importContent(ctx context.Context, svc *service.Service, tx *store.Store, r
 		if !errors.Is(err, store.ErrNotFound) {
 			return err
 		}
-		c = newClient(realm.ID)
-		if cr.ID != nil {
-			c.ID = *cr.ID
-		}
-		applyClientRep(c, cr)
+		c = newClientFromRep(realm.ID, cr)
 		if err := svc.CreateClient(ctx, tx, c); err != nil {
+			return err
+		}
+		if err := applyClientScopes(ctx, tx, c, cr, true); err != nil {
 			return err
 		}
 	}
@@ -120,6 +132,9 @@ func importContent(ctx context.Context, svc *service.Service, tx *store.Store, r
 		if err := addCompositesByName(ctx, tx, realm, p.role, p.comp); err != nil {
 			return err
 		}
+	}
+	if err := importScopeMappings(ctx, tx, realm, rep); err != nil {
+		return err
 	}
 	if rep.DefaultRole != nil && rep.DefaultRole.Name != nil {
 		// The export names its own default role (e.g. when a realm is
@@ -278,6 +293,95 @@ func grantRoles(ctx context.Context, tx *store.Store, realm *model.Realm, realmR
 				return roleNotFound(err, clientID+"/"+name)
 			}
 			if err := grant(role.ID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// importRealmDefaultScopes replaces the realm's default and optional client
+// scopes when the export lists them.
+func importRealmDefaultScopes(ctx context.Context, tx *store.Store, realm *model.Realm, rep *RealmRep) error {
+	for _, kind := range []struct {
+		names     []string
+		isDefault bool
+	}{{rep.DefaultDefaultClientScopes, true}, {rep.DefaultOptionalClientScopes, false}} {
+		if kind.names == nil {
+			continue
+		}
+		links, err := tx.ListRealmDefaultScopes(ctx, realm.ID)
+		if err != nil {
+			return err
+		}
+		for _, l := range links {
+			if l.Default == kind.isDefault {
+				if err := tx.RemoveRealmDefaultScope(ctx, realm.ID, l.ScopeID); err != nil {
+					return err
+				}
+			}
+		}
+		for _, name := range kind.names {
+			cs, err := tx.GetClientScopeByName(ctx, realm.ID, name)
+			if errors.Is(err, store.ErrNotFound) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			if err := tx.SetRealmDefaultScope(ctx, realm.ID, cs.ID, kind.isDefault); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// importScopeMappings applies the export's scopeMappings (realm roles) and
+// clientScopeMappings (client roles, keyed by the roles' client).
+func importScopeMappings(ctx context.Context, tx *store.Store, realm *model.Realm, rep *RealmRep) error {
+	owner := func(sm ScopeMappingRep) (string, error) {
+		if sm.ClientScope != "" {
+			cs, err := tx.GetClientScopeByName(ctx, realm.ID, sm.ClientScope)
+			if err != nil {
+				return "", fmt.Errorf("scope mapping of client scope %s: %w", sm.ClientScope, err)
+			}
+			return cs.ID, nil
+		}
+		c, err := tx.GetClientByClientID(ctx, realm.ID, sm.Client)
+		if err != nil {
+			return "", fmt.Errorf("scope mapping of client %s: %w", sm.Client, err)
+		}
+		return c.ID, nil
+	}
+	add := func(clientUUID string, sm ScopeMappingRep) error {
+		id, err := owner(sm)
+		if err != nil {
+			return err
+		}
+		for _, name := range sm.Roles {
+			role, err := tx.GetRoleByName(ctx, realm.ID, clientUUID, name)
+			if err != nil {
+				return roleNotFound(err, name)
+			}
+			if err := tx.AddScopeMapping(ctx, id, role.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	for _, sm := range rep.ScopeMappings {
+		if err := add("", sm); err != nil {
+			return err
+		}
+	}
+	for clientID, list := range rep.ClientScopeMappings {
+		c, err := tx.GetClientByClientID(ctx, realm.ID, clientID)
+		if err != nil {
+			return fmt.Errorf("client scope mappings of %s: %w", clientID, err)
+		}
+		for _, sm := range list {
+			if err := add(c.ID, sm); err != nil {
 				return err
 			}
 		}

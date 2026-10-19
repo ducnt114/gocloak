@@ -7,12 +7,12 @@ import (
 	"github.com/ducnt114/gocloak/internal/model"
 )
 
-const sessionCols = `id, realm_id, user_id, ip_address, started, last_refresh, remember_me, clients`
+const sessionCols = `id, realm_id, user_id, ip_address, started, last_refresh, remember_me, clients, notes`
 
 func scanSession(sc scanner) (*model.UserSession, error) {
-	us := &model.UserSession{Clients: map[string]bool{}}
+	us := &model.UserSession{Clients: map[string]bool{}, Notes: map[string]string{}}
 	var started, last int64
-	if err := sc.Scan(&us.ID, &us.RealmID, &us.UserID, &us.IPAddress, &started, &last, &us.RememberMe, jsonCol{&us.Clients}); err != nil {
+	if err := sc.Scan(&us.ID, &us.RealmID, &us.UserID, &us.IPAddress, &started, &last, &us.RememberMe, jsonCol{&us.Clients}, jsonCol{&us.Notes}); err != nil {
 		return nil, mapErr(err)
 	}
 	us.Started = time.Unix(started, 0)
@@ -24,13 +24,19 @@ func (s *Store) CreateUserSession(ctx context.Context, us *model.UserSession) er
 	if us.Clients == nil {
 		us.Clients = map[string]bool{}
 	}
-	return s.exec(ctx, `INSERT INTO user_sessions (`+sessionCols+`) VALUES (?,?,?,?,?,?,?,?)`,
-		us.ID, us.RealmID, us.UserID, us.IPAddress, us.Started.Unix(), us.LastRefresh.Unix(), us.RememberMe, toJSON(us.Clients))
+	if us.Notes == nil {
+		us.Notes = map[string]string{}
+	}
+	return s.exec(ctx, `INSERT INTO user_sessions (`+sessionCols+`) VALUES (?,?,?,?,?,?,?,?,?)`,
+		us.ID, us.RealmID, us.UserID, us.IPAddress, us.Started.Unix(), us.LastRefresh.Unix(), us.RememberMe, toJSON(us.Clients), toJSON(us.Notes))
 }
 
 func (s *Store) UpdateUserSession(ctx context.Context, us *model.UserSession) error {
-	return s.execOne(ctx, `UPDATE user_sessions SET last_refresh=?, clients=? WHERE id=?`,
-		us.LastRefresh.Unix(), toJSON(us.Clients), us.ID)
+	if us.Notes == nil {
+		us.Notes = map[string]string{}
+	}
+	return s.execOne(ctx, `UPDATE user_sessions SET last_refresh=?, clients=?, notes=? WHERE id=?`,
+		us.LastRefresh.Unix(), toJSON(us.Clients), toJSON(us.Notes), us.ID)
 }
 
 func (s *Store) GetUserSession(ctx context.Context, id string) (*model.UserSession, error) {

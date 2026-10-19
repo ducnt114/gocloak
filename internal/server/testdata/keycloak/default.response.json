@@ -1,0 +1,4 @@
+{
+  "scope": "email openid profile",
+  "token_type": "Bearer"
+}

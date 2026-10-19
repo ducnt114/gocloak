@@ -1,0 +1,26 @@
+{
+  "acr": "1",
+  "allowed-origins": [
+    "http://narrow.test"
+  ],
+  "azp": "narrow",
+  "email": "alice@example.com",
+  "email_verified": true,
+  "exp": "<volatile>",
+  "family_name": "Liddell",
+  "given_name": "Alice",
+  "iat": "<volatile>",
+  "iss": "{base}/realms/compat",
+  "jti": "<volatile>",
+  "name": "Alice Liddell",
+  "preferred_username": "alice",
+  "realm_access": {
+    "roles": [
+      "auditor"
+    ]
+  },
+  "scope": "email openid profile",
+  "sid": "<volatile>",
+  "sub": "<volatile>",
+  "typ": "Bearer"
+}

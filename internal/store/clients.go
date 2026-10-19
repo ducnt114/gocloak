@@ -59,6 +59,9 @@ func (s *Store) DeleteClient(ctx context.Context, id string) error {
 		if err := tx.exec(ctx, `DELETE FROM users WHERE service_account_client_id=?`, id); err != nil {
 			return err
 		}
+		if err := tx.deleteOwned(ctx, id); err != nil {
+			return err
+		}
 		return tx.execOne(ctx, `DELETE FROM clients WHERE id=?`, id)
 	})
 }

@@ -328,8 +328,6 @@ func (h *Handler) Register(mux *http.ServeMux) {
 		{"POST " + R + "/logout-all", h.logoutAll},
 		{"GET " + R + "/keys", h.getKeys},
 		{"POST " + R + "/partial-export", h.partialExport},
-		{"GET " + R + "/default-default-client-scopes", h.emptyList},
-		{"GET " + R + "/client-scopes", h.emptyList},
 
 		// users
 		{"GET " + R + "/users", h.listUsers},
@@ -415,13 +413,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	for _, rt := range routes {
 		mux.HandleFunc(rt.pattern, h.wrap(rt.fn))
 	}
-}
-
-func (h *Handler) emptyList(w http.ResponseWriter, r *http.Request, p *principal) error {
-	if _, err := h.realmFor(r, p, permViewRealm); err != nil {
-		return err
-	}
-	return ok(w, []any{})
+	h.registerScopeRoutes(R, func(pattern string, fn handlerFunc) { mux.HandleFunc(pattern, h.wrap(fn)) })
 }
 
 // withTx is a small helper for handlers that write several rows.

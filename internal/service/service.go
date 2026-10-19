@@ -195,7 +195,7 @@ func (s *Service) CreateRealm(ctx context.Context, st *store.Store, r *model.Rea
 			return err
 		}
 	}
-	return nil
+	return s.ProvisionClientScopes(ctx, st, r)
 }
 
 func (s *Service) createClientRoles(ctx context.Context, st *store.Store, c *model.Client, names []string, composites map[string][]string) (map[string]*model.Role, error) {
@@ -320,6 +320,9 @@ func (s *Service) CreateClient(ctx context.Context, st *store.Store, c *model.Cl
 	if err := st.CreateClient(ctx, c); err != nil {
 		return err
 	}
+	if err := s.LinkDefaultScopes(ctx, st, c); err != nil {
+		return err
+	}
 	return s.SyncServiceAccount(ctx, st, c)
 }
 
@@ -338,7 +341,10 @@ func (s *Service) SyncServiceAccount(ctx context.Context, st *store.Store, c *mo
 		ID: NewID(), RealmID: c.RealmID, Username: ServiceAccountPrefix + c.ClientID,
 		Enabled: true, ServiceAccountClientID: c.ID,
 	}
-	return s.CreateUser(ctx, st, u)
+	if err := s.CreateUser(ctx, st, u); err != nil {
+		return err
+	}
+	return s.addServiceAccountMappers(ctx, st, c)
 }
 
 // ---------------------------------------------------------------- users

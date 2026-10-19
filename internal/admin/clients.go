@@ -1,8 +1,10 @@
 package admin
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"sort"
 
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/service"
@@ -17,12 +19,114 @@ func (h *Handler) loadClient(r *http.Request, realm *model.Realm) (*model.Client
 	return c, err
 }
 
-func (h *Handler) clientRep(p *principal, realm *model.Realm, c *model.Client) ClientRep {
-	rep := clientToRep(c)
+func (h *Handler) clientRep(ctx context.Context, p *principal, realm *model.Realm, c *model.Client) (ClientRep, error) {
+	rep, err := clientRepWithScopes(ctx, h.Svc.Store, c)
+	if err != nil {
+		return rep, err
+	}
 	if !c.PublicClient && !c.BearerOnly && p.can(realm, permManageClients) {
 		rep.Secret = ptr(c.Secret)
 	}
-	return rep
+	return rep, nil
+}
+
+// clientRepWithScopes adds the client's scopes (by name) and its own
+// protocol mappers to the representation.
+func clientRepWithScopes(ctx context.Context, st *store.Store, c *model.Client) (ClientRep, error) {
+	rep := clientToRep(c)
+	links, err := st.ListClientScopeLinks(ctx, c.ID)
+	if err != nil {
+		return rep, err
+	}
+	for _, l := range links {
+		cs, err := st.GetClientScope(ctx, c.RealmID, l.ScopeID)
+		if err != nil {
+			return rep, err
+		}
+		if l.Default {
+			rep.DefaultClientScopes = append(rep.DefaultClientScopes, cs.Name)
+		} else {
+			rep.OptionalClientScopes = append(rep.OptionalClientScopes, cs.Name)
+		}
+	}
+	sort.Strings(rep.DefaultClientScopes)
+	sort.Strings(rep.OptionalClientScopes)
+	ms, err := st.ListMappers(ctx, c.ID)
+	if err != nil {
+		return rep, err
+	}
+	if len(ms) > 0 {
+		rep.ProtocolMappers = mappersToRep(ms)
+	}
+	return rep, nil
+}
+
+// applyClientScopes replaces the client's default and/or optional scopes
+// when the representation lists them; unknown scope names are ignored, as
+// in Keycloak. With mappers, the representation's protocol mappers replace
+// the client's own.
+func applyClientScopes(ctx context.Context, tx *store.Store, c *model.Client, rep *ClientRep, mappers bool) error {
+	for _, kind := range []struct {
+		names     []string
+		isDefault bool
+	}{{rep.DefaultClientScopes, true}, {rep.OptionalClientScopes, false}} {
+		if kind.names == nil {
+			continue
+		}
+		links, err := tx.ListClientScopeLinks(ctx, c.ID)
+		if err != nil {
+			return err
+		}
+		for _, l := range links {
+			if l.Default == kind.isDefault {
+				if err := tx.RemoveClientScopeLink(ctx, c.ID, l.ScopeID); err != nil {
+					return err
+				}
+			}
+		}
+		for _, name := range kind.names {
+			cs, err := tx.GetClientScopeByName(ctx, c.RealmID, name)
+			if errors.Is(err, store.ErrNotFound) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			if err := tx.SetClientScopeLink(ctx, c.ID, cs.ID, kind.isDefault); err != nil {
+				return err
+			}
+		}
+	}
+	if !mappers || rep.ProtocolMappers == nil {
+		return nil
+	}
+	existing, err := tx.ListMappers(ctx, c.ID)
+	if err != nil {
+		return err
+	}
+	byName := map[string]*model.ProtocolMapper{}
+	for _, m := range existing {
+		byName[m.Name] = m
+	}
+	for i := range rep.ProtocolMappers {
+		mr := rep.ProtocolMappers[i]
+		mr.ID = ""
+		m, err := validateMapper(c.RealmID, c.ID, &mr)
+		if err != nil {
+			return err
+		}
+		if old := byName[m.Name]; old != nil {
+			m.ID = old.ID
+			if err := tx.UpdateMapper(ctx, m); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := tx.CreateMapper(ctx, m); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (h *Handler) listClients(w http.ResponseWriter, r *http.Request, p *principal) error {
@@ -48,7 +152,11 @@ func (h *Handler) listClients(w http.ResponseWriter, r *http.Request, p *princip
 	}
 	out := []ClientRep{}
 	for _, c := range clients {
-		out = append(out, h.clientRep(p, realm, c))
+		rep, err := h.clientRep(r.Context(), p, realm, c)
+		if err != nil {
+			return err
+		}
+		out = append(out, rep)
 	}
 	return ok(w, out)
 }
@@ -65,13 +173,12 @@ func (h *Handler) createClient(w http.ResponseWriter, r *http.Request, p *princi
 	if rep.ClientID == nil || *rep.ClientID == "" {
 		return badRequest("clientId is required")
 	}
-	c := newClient(realm.ID)
-	if rep.ID != nil {
-		c.ID = *rep.ID
-	}
-	applyClientRep(c, &rep)
+	c := newClientFromRep(realm.ID, &rep)
 	err = h.withTx(r.Context(), func(tx *store.Store) error {
-		return h.Svc.CreateClient(r.Context(), tx, c)
+		if err := h.Svc.CreateClient(r.Context(), tx, c); err != nil {
+			return err
+		}
+		return applyClientScopes(r.Context(), tx, c, &rep, true)
 	})
 	if errors.Is(err, store.ErrConflict) {
 		return conflict("Client " + c.ClientID + " already exists")
@@ -91,7 +198,11 @@ func (h *Handler) getClient(w http.ResponseWriter, r *http.Request, p *principal
 	if err != nil {
 		return err
 	}
-	return ok(w, h.clientRep(p, realm, c))
+	rep, err := h.clientRep(r.Context(), p, realm, c)
+	if err != nil {
+		return err
+	}
+	return ok(w, rep)
 }
 
 func (h *Handler) updateClient(w http.ResponseWriter, r *http.Request, p *principal) error {
@@ -116,6 +227,9 @@ func (h *Handler) updateClient(w http.ResponseWriter, r *http.Request, p *princi
 	}
 	err = h.withTx(r.Context(), func(tx *store.Store) error {
 		if err := tx.UpdateClient(r.Context(), c); err != nil {
+			return err
+		}
+		if err := applyClientScopes(r.Context(), tx, c, &rep, false); err != nil {
 			return err
 		}
 		return h.Svc.SyncServiceAccount(r.Context(), tx, c)

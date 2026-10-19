@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/store"
@@ -19,11 +20,21 @@ func (h *Handler) loadUser(r *http.Request, realm *model.Realm) (*model.User, er
 
 func userQuery(r *http.Request) store.UserQuery {
 	q := r.URL.Query()
-	return store.UserQuery{
+	uq := store.UserQuery{
 		Search: q.Get("search"), Username: q.Get("username"), Email: q.Get("email"),
 		FirstName: q.Get("firstName"), LastName: q.Get("lastName"), Enabled: boolParam(r, "enabled"),
 		Exact: q.Get("exact") == "true", First: intParam(r, "first", 0), Max: intParam(r, "max", 100),
 	}
+	// q=key1:value1 key2:value2 matches exact attribute values.
+	for _, pair := range strings.Fields(q.Get("q")) {
+		if k, v, ok := strings.Cut(pair, ":"); ok && k != "" {
+			if uq.Attributes == nil {
+				uq.Attributes = map[string]string{}
+			}
+			uq.Attributes[k] = v
+		}
+	}
+	return uq
 }
 
 func usersToRep(users []*model.User) []UserRep {
@@ -34,6 +45,14 @@ func usersToRep(users []*model.User) []UserRep {
 	return out
 }
 
+// briefUsers drops attributes, as Keycloak's briefRepresentation does.
+func briefUsers(reps []UserRep) []UserRep {
+	for i := range reps {
+		reps[i].Attributes = nil
+	}
+	return reps
+}
+
 func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request, p *principal) error {
 	realm, err := h.realmFor(r, p, permQueryUsers)
 	if err != nil {
@@ -42,6 +61,9 @@ func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request, p *principal
 	users, err := h.Svc.Store.SearchUsers(r.Context(), realm.ID, userQuery(r))
 	if err != nil {
 		return err
+	}
+	if r.URL.Query().Get("briefRepresentation") == "true" {
+		return ok(w, briefUsers(usersToRep(users)))
 	}
 	return ok(w, usersToRep(users))
 }

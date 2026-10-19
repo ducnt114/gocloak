@@ -162,6 +162,13 @@ type migration struct {
 	version int
 	name    string
 	sql     string
+	fn      func(ctx context.Context, tx *Store) error // data migration written in Go
+}
+
+// goMigrations are data migrations that need Go code; they share the
+// version sequence with the SQL files.
+var goMigrations = []migration{
+	{version: 4, name: "0004_backfill_user_attributes", fn: backfillUserAttributes},
 }
 
 func loadMigrations() ([]migration, error) {
@@ -186,6 +193,7 @@ func loadMigrations() ([]migration, error) {
 		}
 		out = append(out, migration{version: v, name: name, sql: string(b)})
 	}
+	out = append(out, goMigrations...)
 	sort.Slice(out, func(i, j int) bool { return out[i].version < out[j].version })
 	for i := 1; i < len(out); i++ {
 		if out[i].version == out[i-1].version {
@@ -221,7 +229,11 @@ func (s *Store) migrate(ctx context.Context) error {
 			if n > 0 {
 				return nil
 			}
-			if _, err := tx.q.(rebinder).q.ExecContext(ctx, m.sql); err != nil {
+			if m.fn != nil {
+				if err := m.fn(ctx, tx); err != nil {
+					return fmt.Errorf("%s: %w", m.name, err)
+				}
+			} else if _, err := tx.q.(rebinder).q.ExecContext(ctx, m.sql); err != nil {
 				return fmt.Errorf("%s: %w", m.name, err)
 			}
 			return tx.exec(ctx, `INSERT INTO schema_migrations (version, name, applied_at) VALUES (?,?,?)`, m.version, m.name, time.Now().Unix())

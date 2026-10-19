@@ -94,11 +94,19 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if _, _, invalid, err := resolveScopes(ctx, h.Svc.Store, realm, client, q("scope")); err != nil {
+		h.serverErrorPage(w, r, err)
+		return
+	} else if len(invalid) > 0 {
+		fail("invalid_scope", "Invalid scopes: "+strings.Join(invalid, " "))
+		return
+	}
+
 	params := map[string]string{
 		"client_id":             client.ClientID,
 		"redirect_uri":          redirectURI,
 		"response_mode":         mode,
-		"scope":                 grantedScope(q("scope")),
+		"scope":                 q("scope"),
 		"state":                 q("state"),
 		"nonce":                 q("nonce"),
 		"code_challenge":        q("code_challenge"),
@@ -273,7 +281,9 @@ func (h *Handler) finishLogin(w http.ResponseWriter, r *http.Request, realm *mod
 	ctx := r.Context()
 	var err error
 	if us == nil {
-		if us, err = h.newSession(r, realm, user, client); err != nil {
+		if us, err = h.newSession(r, realm, user, client, map[string]string{
+			"AUTH_TIME": strconv.FormatInt(h.Svc.Now().Unix(), 10),
+		}); err != nil {
 			h.serverErrorPage(w, r, err)
 			return
 		}
