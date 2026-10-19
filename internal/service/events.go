@@ -91,6 +91,9 @@ func (s *Service) RecordEvent(ctx context.Context, realm *model.Realm, e *model.
 		e.Time = s.Now().UnixMilli()
 	}
 	e.RealmID = realm.ID
+	if s.EventObserver != nil {
+		s.EventObserver(realm, e)
+	}
 	if realm.Settings.EventsEnabled && s.eventEnabled(realm, e.Type) {
 		if err := s.Store.AddEvent(ctx, e); err != nil {
 			s.logger().Error("store event", "type", e.Type, "err", err)

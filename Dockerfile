@@ -15,6 +15,6 @@ COPY --from=build /admin-console /opt/gocloak/admin-console
 COPY --from=build --chown=65532:65532 /data /data
 ENV GOCLOAK_DB=/data/gocloak.db GOCLOAK_ADMIN_CONSOLE_DIR=/opt/gocloak/admin-console
 VOLUME /data
-EXPOSE 8080 8443
+EXPOSE 8080 8443 9000
 ENTRYPOINT ["/gocloak"]
 CMD ["start-dev"]

@@ -28,6 +28,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/adminconsole"
 	"github.com/ducnt114/gocloak/internal/server"
 	"github.com/ducnt114/gocloak/internal/store"
+	"github.com/ducnt114/gocloak/internal/tracing"
 )
 
 var version = "dev"
@@ -100,7 +101,7 @@ func main() {
 
 type commonFlags struct {
 	db, dbURL, dbUser, dbPassword *string
-	logLevel                      *string
+	logLevel, logOutput           *string
 }
 
 func addCommon(fs *flag.FlagSet, dev bool) commonFlags {
@@ -114,6 +115,7 @@ func addCommon(fs *flag.FlagSet, dev bool) commonFlags {
 		dbUser:     fs.String("db-username", env("KC_DB_USERNAME"), "PostgreSQL user (env KC_DB_USERNAME)"),
 		dbPassword: fs.String("db-password", env("KC_DB_PASSWORD"), "PostgreSQL password (env KC_DB_PASSWORD)"),
 		logLevel:   fs.String("log-level", envDefault(level, "KC_LOG_LEVEL"), "log level: debug, info, warn, error (env KC_LOG_LEVEL)"),
+		logOutput:  fs.String("log-console-output", envDefault("default", "KC_LOG_CONSOLE_OUTPUT"), "log format: default or json (env KC_LOG_CONSOLE_OUTPUT)"),
 	}
 }
 
@@ -156,7 +158,11 @@ func (c commonFlags) logger() *slog.Logger {
 	if err := lvl.UnmarshalText([]byte(*c.logLevel)); err != nil {
 		lvl = slog.LevelInfo
 	}
-	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: lvl}))
+	opts := &slog.HandlerOptions{Level: lvl}
+	if *c.logOutput == "json" {
+		return slog.New(slog.NewJSONHandler(os.Stderr, opts))
+	}
+	return slog.New(slog.NewTextHandler(os.Stderr, opts))
 }
 
 func start(args []string, dev bool) error {
@@ -181,6 +187,16 @@ func start(args []string, dev bool) error {
 	rateLimit := fs.Float64("rate-limit", atof(envDefault("100", "GOCLOAK_RATE_LIMIT")), "requests per second allowed per client IP on /realms and /admin, 0 to disable (env GOCLOAK_RATE_LIMIT)")
 	cibaURI := fs.String("ciba-auth-channel-uri", envDefault(env("KC_SPI_CIBA_AUTH_CHANNEL_CIBA_HTTP_AUTH_CHANNEL_HTTP_AUTHENTICATION_CHANNEL_URI"), "GOCLOAK_CIBA_AUTH_CHANNEL_URI"),
 		"URL the CIBA authentication requests are posted to (env GOCLOAK_CIBA_AUTH_CHANNEL_URI or Keycloak's KC_SPI_CIBA_AUTH_CHANNEL_CIBA_HTTP_AUTH_CHANNEL_HTTP_AUTHENTICATION_CHANNEL_URI)")
+	mgmtPort := fs.Int("http-management-port", atoi(envDefault("9000", "KC_HTTP_MANAGEMENT_PORT")), "port of the management interface: health checks and metrics (env KC_HTTP_MANAGEMENT_PORT)")
+	healthOn := fs.Bool("health-enabled", envDefault("false", "KC_HEALTH_ENABLED") == "true", "serve health checks on the management port (env KC_HEALTH_ENABLED)")
+	metricsOn := fs.Bool("metrics-enabled", envDefault("false", "KC_METRICS_ENABLED") == "true", "collect metrics, served on the management port at /metrics (env KC_METRICS_ENABLED)")
+	histograms := fs.Bool("http-metrics-histograms-enabled", envDefault("false", "KC_HTTP_METRICS_HISTOGRAMS_ENABLED") == "true", "add duration buckets to the HTTP request metrics (env KC_HTTP_METRICS_HISTOGRAMS_ENABLED)")
+	tracingOn := fs.Bool("tracing-enabled", envDefault("false", "KC_TRACING_ENABLED") == "true", "export traces to an OpenTelemetry collector (env KC_TRACING_ENABLED)")
+	tracingEndpoint := fs.String("tracing-endpoint", envDefault("http://localhost:4318", "KC_TRACING_ENDPOINT"), "OTLP/HTTP endpoint of the collector (env KC_TRACING_ENDPOINT)")
+	tracingProtocol := fs.String("tracing-protocol", envDefault("http/protobuf", "KC_TRACING_PROTOCOL"), "OTLP protocol; only http/protobuf is supported (env KC_TRACING_PROTOCOL)")
+	tracingService := fs.String("tracing-service-name", envDefault("gocloak", "KC_TRACING_SERVICE_NAME"), "service.name of the traces (env KC_TRACING_SERVICE_NAME)")
+	tracingRatio := fs.Float64("tracing-sampler-ratio", atof(envDefault("1.0", "KC_TRACING_SAMPLER_RATIO")), "sampled fraction of traces (env KC_TRACING_SAMPLER_RATIO)")
+	tracingAttrs := fs.String("tracing-resource-attributes", env("KC_TRACING_RESOURCE_ATTRIBUTES"), "extra resource attributes, key=value,... (env KC_TRACING_RESOURCE_ATTRIBUTES)")
 	rateBurst := fs.Int("rate-burst", atoi(envDefault("200", "GOCLOAK_RATE_BURST")), "burst size of the per IP rate limit (env GOCLOAK_RATE_BURST)")
 	fs.Parse(args)
 
@@ -196,12 +212,25 @@ func start(args []string, dev bool) error {
 	if err != nil {
 		return err
 	}
+	var tracingCfg *tracing.Config
+	if *tracingOn {
+		if *tracingProtocol != "http/protobuf" {
+			return fmt.Errorf("unsupported --tracing-protocol %q (gocloak exports OTLP over http/protobuf)", *tracingProtocol)
+		}
+		tracingCfg = &tracing.Config{Endpoint: *tracingEndpoint, ServiceName: *tracingService, Ratio: *tracingRatio,
+			Attributes: map[string]string{}, Log: log}
+		for _, kv := range strings.Split(*tracingAttrs, ",") {
+			if k, v, ok := strings.Cut(kv, "="); ok {
+				tracingCfg.Attributes[strings.TrimSpace(k)] = strings.TrimSpace(v)
+			}
+		}
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	srv, err := server.New(ctx, server.Config{
 		DB: dbCfg, Hostname: *hostname, ProxyHeaders: *proxy != "", ImportDir: *importDir, Log: log, CIBAChannelURI: *cibaURI,
 		RateLimit: *rateLimit, RateBurst: *rateBurst, ThemesDir: *themesDir, NoThemeCache: !*themeCache,
-		AdminConsoleDir: *consoleDir, Version: version,
+		AdminConsoleDir: *consoleDir, Version: version, MetricsEnabled: *metricsOn, MetricsHistograms: *histograms, Tracing: tracingCfg,
 		AdminUser:     env("KC_BOOTSTRAP_ADMIN_USERNAME", "KEYCLOAK_ADMIN"),
 		AdminPassword: env("KC_BOOTSTRAP_ADMIN_PASSWORD", "KEYCLOAK_ADMIN_PASSWORD"),
 	})
@@ -227,6 +256,17 @@ func start(args []string, dev bool) error {
 		IdleTimeout:       120 * time.Second,
 	}
 	errc := make(chan error, 1)
+	if *healthOn || *metricsOn {
+		ms := &http.Server{Addr: net.JoinHostPort(*host, strconv.Itoa(*mgmtPort)), Handler: srv.ManagementHandler(),
+			ReadHeaderTimeout: 10 * time.Second}
+		go func() {
+			log.Info("management interface started", "addr", ms.Addr, "metrics", *metricsOn)
+			if err := ms.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				errc <- err
+			}
+		}()
+		defer ms.Close()
+	}
 	go func() {
 		log.Info("gocloak started", "version", version, "addr", hs.Addr, "tls", tls, "dev", dev, "db", dbCfg.Driver)
 		if tls {

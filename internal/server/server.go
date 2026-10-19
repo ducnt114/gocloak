@@ -20,10 +20,13 @@ import (
 	"github.com/ducnt114/gocloak/internal/admin"
 	"github.com/ducnt114/gocloak/internal/adminconsole"
 	"github.com/ducnt114/gocloak/internal/federation"
+	"github.com/ducnt114/gocloak/internal/metrics"
+	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/oidc"
 	"github.com/ducnt114/gocloak/internal/service"
 	"github.com/ducnt114/gocloak/internal/store"
 	"github.com/ducnt114/gocloak/internal/theme"
+	"github.com/ducnt114/gocloak/internal/tracing"
 )
 
 // Config configures a Server.
@@ -51,11 +54,19 @@ type Config struct {
 	Version string
 	// CIBAChannelURI is the authentication channel of CIBA requests.
 	CIBAChannelURI string
+	// MetricsEnabled collects Prometheus metrics, served by the management
+	// handler; MetricsHistograms adds request duration buckets.
+	MetricsEnabled    bool
+	MetricsHistograms bool
+	// Tracing exports a span per request to an OpenTelemetry collector.
+	Tracing *tracing.Config
 }
 
 // Server is a running gocloak instance.
 type Server struct {
-	Svc     *service.Service
+	Svc *service.Service
+	// Metrics is nil unless metrics are enabled.
+	Metrics *metrics.Registry
 	Fed     *federation.Manager
 	Log     *slog.Logger
 	handler http.Handler
@@ -133,7 +144,19 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /health/live", s.health)
 	mux.HandleFunc("GET /health/ready", s.health)
 	mux.HandleFunc("GET /{$}", s.welcome)
-	var h http.Handler = admin.StripTrailingSlash(mux)
+	var h http.Handler = mux
+	if cfg.MetricsEnabled {
+		s.Metrics = metrics.New(cfg.MetricsHistograms)
+		h = s.Metrics.Middleware(h)
+		svc.EventObserver = func(realm *model.Realm, e *model.Event) {
+			s.Metrics.ObserveEvent(realm.Name, e.Type, e.ClientID, e.Details["identity_provider"], e.Error)
+		}
+	}
+	if cfg.Tracing != nil {
+		// outermost, so that the inner handlers see its request
+		h = tracing.New(ctx, *cfg.Tracing).Middleware(h)
+	}
+	h = admin.StripTrailingSlash(h)
 	if cfg.RateLimit > 0 {
 		h = newRateLimiter(cfg.RateLimit, cfg.RateBurst, cfg.ProxyHeaders).wrap(h)
 	}
@@ -147,6 +170,19 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 func resourceVersion(version string) string {
 	sum := sha256.Sum256([]byte(version + "|" + time.Now().String()))
 	return hex.EncodeToString(sum[:])[:5]
+}
+
+// ManagementHandler serves the management interface (Keycloak's port 9000):
+// health checks, and the metrics when they are enabled.
+func (s *Server) ManagementHandler() http.Handler {
+	mux := http.NewServeMux()
+	for _, p := range []string{"/health", "/health/live", "/health/ready", "/health/started"} {
+		mux.HandleFunc("GET "+p, s.health)
+	}
+	if s.Metrics != nil {
+		mux.Handle("GET /metrics", s.Metrics.Handler())
+	}
+	return mux
 }
 
 // Handler returns the root HTTP handler.

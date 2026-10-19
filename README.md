@@ -85,7 +85,10 @@ Main options (flag / environment variable):
 | `--proxy-headers xforwarded` | `KC_PROXY_HEADERS` | do not trust `X-Forwarded-*` |
 | `--import-dir` | `GOCLOAK_IMPORT_DIR` | none |
 | `--rate-limit`, `--rate-burst` | `GOCLOAK_RATE_LIMIT`, `GOCLOAK_RATE_BURST` | 100 requests/s per client IP, burst 200 (`0` disables); behind a proxy use `--proxy-headers` so the client IP is used |
-| `--log-level` | `KC_LOG_LEVEL` | `info` (`debug` in dev mode) |
+| `--log-level`, `--log-console-output` | `KC_LOG_LEVEL`, `KC_LOG_CONSOLE_OUTPUT` | `info` (`debug` in dev mode), `default` (or `json`) |
+| `--health-enabled`, `--metrics-enabled`, `--http-management-port` | `KC_HEALTH_ENABLED`, `KC_METRICS_ENABLED`, `KC_HTTP_MANAGEMENT_PORT` | off, off, `9000`: health checks and Prometheus metrics (`/metrics`, Keycloak's `http_server_requests_seconds` and `keycloak_user_events_total`) on the management port; `--http-metrics-histograms-enabled` adds buckets. `/health` stays on the main port too |
+| `--tracing-enabled`, `--tracing-endpoint`, `--tracing-service-name`, `--tracing-sampler-ratio`, `--tracing-resource-attributes` | `KC_TRACING_*` | off, `http://localhost:4318`, `gocloak`, `1.0`: a span per request exported with OTLP over HTTP (protobuf), continuing W3C `traceparent` |
+| `--ciba-auth-channel-uri` | `GOCLOAK_CIBA_AUTH_CHANNEL_URI` | none: where CIBA authentication requests are posted |
 | `--themes-dir`, `--theme-cache` | `GOCLOAK_THEMES_DIR` | no custom themes; cache off in dev mode |
 | — | `KC_BOOTSTRAP_ADMIN_USERNAME` / `KC_BOOTSTRAP_ADMIN_PASSWORD` (or legacy `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD`) | admin created with the master realm on first start |
 

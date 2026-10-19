@@ -82,6 +82,8 @@ type Service struct {
 	// for users to authenticate on their device (Keycloak's
 	// ciba-http-auth-channel).
 	CIBAChannelURI string
+	// EventObserver sees every user event (metrics).
+	EventObserver func(*model.Realm, *model.Event)
 	// LogoutHandler sends back-channel logouts to the clients of ended
 	// sessions (set by the protocol handlers).
 	LogoutHandler BackchannelLogoutFunc
