@@ -130,8 +130,33 @@ func (h *Handler) logoutAll(w http.ResponseWriter, r *http.Request, p *principal
 	if err != nil {
 		return err
 	}
+	sessions, err := h.Svc.Store.ListRealmSessions(r.Context(), realm.ID)
+	if err != nil {
+		return err
+	}
+	h.Svc.BackchannelLogout(r.Context(), h.URLs.Base(r), realm, sessions...)
 	if err := h.Svc.Store.DeleteUserSessionsOfRealm(r.Context(), realm.ID); err != nil {
 		return err
 	}
 	return ok(w, map[string]any{})
+}
+
+// deleteSession ends one user session (DELETE /sessions/{session}).
+func (h *Handler) deleteSession(w http.ResponseWriter, r *http.Request, p *principal) error {
+	realm, err := h.realmFor(r, p, permManageUsers)
+	if err != nil {
+		return err
+	}
+	offline := r.URL.Query().Get("isOffline") == "true"
+	s, err := h.Svc.Store.GetSession(r.Context(), r.PathValue("session"), offline)
+	if err != nil || s.RealmID != realm.ID {
+		return notFound("Session not found")
+	}
+	if !offline {
+		h.Svc.BackchannelLogout(r.Context(), h.URLs.Base(r), realm, s)
+	}
+	if err := h.Svc.Store.DeleteSession(r.Context(), s); err != nil {
+		return err
+	}
+	return noContent(w)
 }

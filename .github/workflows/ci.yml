@@ -86,3 +86,28 @@ jobs:
             localhost:8080/realms/master/protocol/openid-connect/token > /dev/null
           curl -sf localhost:8080/admin/master/console/ | grep -q '"clientId":"security-admin-console"'
           docker logs gocloak
+
+  saml-interop:
+    # A real Keycloak acts as the SAML service provider of a gocloak realm:
+    # login, assertion encryption, both bindings and logout.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: start Keycloak
+        run: |
+          docker run -d --name keycloak --network host \
+            -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+            quay.io/keycloak/keycloak:26.0.7 start-dev --http-port 8180
+      - name: start gocloak
+        run: |
+          go build -o gocloak ./cmd/gocloak
+          KC_BOOTSTRAP_ADMIN_USERNAME=admin KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+            ./gocloak start-dev --http-port 8080 --db-url gocloak.db --rate-limit 0 > gocloak.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf localhost:8080/health/ready > /dev/null && break; sleep 1; done
+          for i in $(seq 1 90); do curl -sf localhost:8180/realms/master > /dev/null && break; sleep 2; done
+      - run: python3 scripts/compat/saml_sp.py --keycloak http://localhost:8180 --gocloak http://localhost:8080
+      - if: failure()
+        run: docker logs keycloak 2>&1 | tail -80; tail -80 gocloak.log

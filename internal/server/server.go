@@ -109,6 +109,7 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 	urls := oidc.URLs{Hostname: cfg.Hostname, ProxyHeaders: cfg.ProxyHeaders}
 	mux := http.NewServeMux()
 	oh := &oidc.Handler{Svc: svc, URLs: urls, Log: cfg.Log, Themes: themes}
+	svc.LogoutHandler = oh.BackchannelLogout
 	oh.Register(mux)
 	(&account.Handler{Svc: svc, URLs: urls, Log: cfg.Log, Themes: themes, OIDC: oh}).Register(mux)
 	ah := &admin.Handler{Svc: svc, URLs: urls, Log: cfg.Log, Fed: fed, Version: cfg.Version, Themes: themes}

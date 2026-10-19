@@ -311,7 +311,7 @@ func (h *Handler) signOutPage(w http.ResponseWriter, r *http.Request, c *caller)
 	ctx := r.Context()
 	switch id := r.PostFormValue("session"); id {
 	case "":
-		if err := h.signOut(ctx, c, false); err != nil {
+		if err := h.signOut(r, c, false); err != nil {
 			return err
 		}
 	default:
@@ -319,6 +319,7 @@ func (h *Handler) signOutPage(w http.ResponseWriter, r *http.Request, c *caller)
 		if err != nil || s.UserID != c.user.ID {
 			return &apiError{http.StatusNotFound, nil}
 		}
+		h.Svc.BackchannelLogout(ctx, h.URLs.Base(r), c.realm, s)
 		if err := h.Svc.Store.DeleteSession(ctx, s); err != nil {
 			return err
 		}

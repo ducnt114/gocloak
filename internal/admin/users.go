@@ -371,6 +371,11 @@ func (h *Handler) logoutUser(w http.ResponseWriter, r *http.Request, p *principa
 	if err != nil {
 		return err
 	}
+	sessions, err := h.Svc.Store.ListUserSessions(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
+	h.Svc.BackchannelLogout(r.Context(), h.URLs.Base(r), realm, sessions...)
 	if err := h.Svc.Store.DeleteUserSessionsOfUser(r.Context(), u.ID); err != nil {
 		return err
 	}

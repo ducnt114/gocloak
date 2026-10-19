@@ -293,7 +293,7 @@ permissions (users / clients / groups), the user-managed access policy API
 pushed claims (`claim_token`). The order of evaluation results differs from
 Keycloak's, which does not guarantee one.
 
-## M9 — SAML 2.0 (XL)
+## M9 — SAML 2.0 (XL) ✅ done
 
 - SAML IdP: descriptor endpoint, SP-initiated and IdP-initiated SSO, Redirect
   and POST bindings, signed responses/assertions, optional encryption, Single
@@ -303,6 +303,24 @@ Keycloak's, which does not guarantee one.
 
 Acceptance: login works for a reference SP (e.g. crewjam/saml sample and a
 SimpleSAMLphp SP) in CI.
+
+Done notes: signatures use goxmldsig (signing works on a copy, since its
+canonicalization mutates the document), incoming documents go through
+xml-roundtrip-validator and only the signed content is trusted; the parsers
+are fuzzed. Responses, assertions, logout messages, error pages and the
+descriptor were compared with Keycloak 26.0.7 for the same client
+configurations, and the SAML client pages of the admin console were walked
+through on both. The reference service providers are crewjam/saml (in the Go
+tests) and Keycloak itself (`scripts/compat/saml_sp.py`, the `saml-interop` CI
+job: login through Keycloak's SAML broker with signed requests, signed or
+encrypted assertions, both bindings, and SP initiated logout); SimpleSAMLphp
+was replaced by Keycloak, a stricter SP. Differences: the persistent NameID is
+generated per login unless the user has a `saml.persistent.name.id.for.*`
+attribute, as in Keycloak; when a client has its own role list mapper only that
+one applies (Keycloak picks one of them at random). Not done: SAML identity
+brokering (gocloak as SP), the artifact binding, ECP (the `saml ecp` flow of
+Keycloak exports is accepted but not run), `keycloak-saml` and
+`mod-auth-mellon` adapter downloads.
 
 ## M10 — Additional OAuth specs (M, can be split)
 

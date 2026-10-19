@@ -172,6 +172,7 @@ var goMigrations = []migration{
 	{version: 7, name: "0007_realm_settings_defaults", fn: migrateRealmSettingsDefaults},
 	{version: 8, name: "0008_key_components", fn: migrateRealmKeys},
 	{version: 10, name: "0010_realm_settings_defaults_m3", fn: migrateRealmSettingsDefaults},
+	{version: 16, name: "0016_saml_role_list_scope", fn: addSAMLRoleListScope},
 }
 
 func loadMigrations() ([]migration, error) {

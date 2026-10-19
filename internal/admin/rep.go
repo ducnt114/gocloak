@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/ducnt114/gocloak/internal/model"
+	"github.com/ducnt114/gocloak/internal/service"
 )
 
 // The *Rep types mirror Keycloak's JSON representations. Pointer fields let
@@ -77,6 +78,7 @@ type ClientRep struct {
 	NotBefore                          *int64              `json:"notBefore,omitempty"`
 	Secret                             *string             `json:"secret,omitempty"`
 	RootURL                            *string             `json:"rootUrl,omitempty"`
+	AdminURL                           *string             `json:"adminUrl,omitempty"`
 	BaseURL                            *string             `json:"baseUrl,omitempty"`
 	RedirectURIs                       []string            `json:"redirectUris"`
 	WebOrigins                         []string            `json:"webOrigins"`
@@ -86,6 +88,7 @@ type ClientRep struct {
 	ServiceAccountsEnabled             *bool               `json:"serviceAccountsEnabled,omitempty"`
 	ConsentRequired                    *bool               `json:"consentRequired,omitempty"`
 	FullScopeAllowed                   *bool               `json:"fullScopeAllowed,omitempty"`
+	FrontchannelLogout                 *bool               `json:"frontchannelLogout,omitempty"`
 	Protocol                           *string             `json:"protocol,omitempty"`
 	Attributes                         strMap              `json:"attributes,omitempty"`
 	ProtocolMappers                    []ProtocolMapperRep `json:"protocolMappers,omitempty"`
@@ -196,6 +199,14 @@ func NewRealmRep() RealmRep {
 
 func ptr[T any](v T) *T { return &v }
 
+// optional is nil for an empty string (an omitted field).
+func optional(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
 func set[T any](dst *T, src *T) {
 	if src != nil {
 		*dst = *src
@@ -247,7 +258,7 @@ func clientToRep(c *model.Client) ClientRep {
 		StandardFlowEnabled: ptr(c.StandardFlowEnabled), ImplicitFlowEnabled: ptr(false),
 		DirectAccessGrantsEnabled: ptr(c.DirectAccessGrantsEnabled), ServiceAccountsEnabled: ptr(c.ServiceAccountsEnabled),
 		ConsentRequired: ptr(false), FullScopeAllowed: ptr(c.FullScopeAllowed), Protocol: ptr(c.Protocol),
-		Attributes: c.Attributes,
+		Attributes: c.Attributes, FrontchannelLogout: ptr(c.FrontchannelLogout), AdminURL: optional(c.AdminURL),
 	}
 }
 
@@ -265,6 +276,9 @@ func newClientFromRep(realmID string, rep *ClientRep) *model.Client {
 		c.ID = *rep.ID
 	}
 	applyClientRep(c, rep)
+	if c.Protocol == service.ProtocolSAML && rep.FrontchannelLogout == nil {
+		c.FrontchannelLogout = true
+	}
 	if rep.WebOrigins == nil {
 		seen := map[string]bool{}
 		for _, u := range c.RedirectURIs {
@@ -294,7 +308,9 @@ func applyClientRep(c *model.Client, rep *ClientRep) {
 		c.Secret = *rep.Secret
 	}
 	set(&c.RootURL, rep.RootURL)
+	set(&c.AdminURL, rep.AdminURL)
 	set(&c.BaseURL, rep.BaseURL)
+	set(&c.FrontchannelLogout, rep.FrontchannelLogout)
 	if rep.RedirectURIs != nil {
 		c.RedirectURIs = rep.RedirectURIs
 	}
@@ -311,8 +327,19 @@ func applyClientRep(c *model.Client, rep *ClientRep) {
 	if rep.AuthenticationFlowBindingOverrides != nil {
 		c.FlowOverrides = rep.AuthenticationFlowBindingOverrides
 	}
+	// like Keycloak, the given attributes are merged and empty values
+	// remove an attribute
 	if rep.Attributes != nil {
-		c.Attributes = rep.Attributes
+		if c.Attributes == nil {
+			c.Attributes = map[string]string{}
+		}
+		for k, v := range rep.Attributes {
+			if strings.TrimSpace(v) == "" {
+				delete(c.Attributes, k)
+			} else {
+				c.Attributes[k] = v
+			}
+		}
 	}
 	if c.PublicClient {
 		c.Secret = ""

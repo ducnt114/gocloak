@@ -22,6 +22,10 @@ MAPPERS = {"oidc-usermodel-property-mapper", "oidc-usermodel-attribute-mapper", 
     "oidc-usermodel-realm-role-mapper", "oidc-usermodel-client-role-mapper", "oidc-group-membership-mapper", "oidc-audience-mapper",
     "oidc-audience-resolve-mapper", "oidc-hardcoded-claim-mapper", "oidc-hardcoded-role-mapper", "oidc-role-name-mapper",
     "oidc-allowed-origins-mapper", "oidc-sub-mapper", "oidc-acr-mapper", "oidc-usersessionmodel-note-mapper"}
+SAML_MAPPERS = {"saml-user-attribute-nameid-mapper", "saml-audience-resolve-mapper", "saml-user-session-note-mapper",
+    "saml-audience-mapper", "saml-group-membership-mapper", "saml-role-name-mapper", "saml-user-property-mapper",
+    "saml-role-list-mapper", "saml-hardcode-attribute-mapper", "saml-user-attribute-mapper", "saml-hardcode-role-mapper"}
+SAML_INSTALLATIONS = {"saml-sp-descriptor"}
 KEYS = {"rsa-generated", "rsa", "ecdsa-generated", "hmac-generated"}
 IDPS = {"oidc", "keycloak-oidc", "github", "facebook", "google", "microsoft", "gitlab"}
 LDAP_MAPPERS = {"user-attribute-ldap-mapper", "full-name-ldap-mapper", "group-ldap-mapper", "role-ldap-mapper",
@@ -38,12 +42,15 @@ for f in out["features"]:
     if f["name"] in DISABLED:
         f["enabled"] = False
 out["profileInfo"]["disabledFeatures"] = sorted({f["name"] for f in out["features"] if not f["enabled"]})
-out["protocolMapperTypes"] = {"openid-connect": [m for m in info["protocolMapperTypes"]["openid-connect"] if m["id"] in MAPPERS]}
-out["builtinProtocolMappers"] = {"openid-connect": [m for m in info["builtinProtocolMappers"]["openid-connect"] if m["protocolMapper"] in MAPPERS]}
-out["clientInstallations"] = {"openid-connect": [c for c in info["clientInstallations"]["openid-connect"] if c["id"] == "keycloak-oidc-keycloak-json"]}
+out["protocolMapperTypes"] = {"openid-connect": [m for m in info["protocolMapperTypes"]["openid-connect"] if m["id"] in MAPPERS],
+    "saml": [m for m in info["protocolMapperTypes"]["saml"] if m["id"] in SAML_MAPPERS]}
+out["builtinProtocolMappers"] = {"openid-connect": [m for m in info["builtinProtocolMappers"]["openid-connect"] if m["protocolMapper"] in MAPPERS],
+    "saml": [m for m in info["builtinProtocolMappers"]["saml"] if m["protocolMapper"] in SAML_MAPPERS]}
+out["clientInstallations"] = {"openid-connect": [c for c in info["clientInstallations"]["openid-connect"] if c["id"] == "keycloak-oidc-keycloak-json"],
+    "saml": [c for c in info["clientInstallations"]["saml"] if c["id"] in SAML_INSTALLATIONS]}
 keep = {"org.keycloak.authentication.Authenticator": AUTHENTICATORS, "org.keycloak.authentication.ClientAuthenticator": CLIENT_AUTHENTICATORS,
     "org.keycloak.broker.provider.IdentityProvider": IDPS, "org.keycloak.broker.social.SocialIdentityProvider": IDPS,
-    "org.keycloak.keys.KeyProvider": KEYS, "org.keycloak.protocol.ProtocolMapper": MAPPERS,
+    "org.keycloak.keys.KeyProvider": KEYS, "org.keycloak.protocol.ProtocolMapper": MAPPERS | SAML_MAPPERS,
     "org.keycloak.storage.UserStorageProvider": {"ldap"}, "org.keycloak.storage.ldap.mappers.LDAPStorageMapper": LDAP_MAPPERS}
 ct = {}
 for typ, comps in info["componentTypes"].items():
@@ -55,7 +62,7 @@ out["identityProviders"] = [p for p in info["identityProviders"] if p["id"] in I
 out["socialProviders"] = [p for p in info["socialProviders"] if p["id"] in IDPS]
 out["passwordPolicies"] = [p for p in info["passwordPolicies"] if p["id"] in POLICIES]
 lp = out["providers"]["login-protocol"]["providers"]
-out["providers"]["login-protocol"]["providers"] = {k: v for k, v in lp.items() if k == "openid-connect"}
+out["providers"]["login-protocol"]["providers"] = {k: v for k, v in lp.items() if k in ("openid-connect", "saml")}
 path = os.path.join(os.path.dirname(__file__), "..", "..", "internal", "admin", "serverinfo.json")
 json.dump(out, open(path, "w"), indent=1, sort_keys=True, ensure_ascii=False)
 print("wrote", path, os.path.getsize(path))

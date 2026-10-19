@@ -412,6 +412,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 		{"PUT " + R, h.updateRealm},
 		{"DELETE " + R, h.deleteRealm},
 		{"POST " + R + "/logout-all", h.logoutAll},
+		{"DELETE " + R + "/sessions/{session}", h.deleteSession},
 		{"GET " + R + "/keys", h.getKeys},
 		{"POST " + R + "/partial-export", h.partialExport},
 		{"POST " + R + "/push-revocation", h.pushRevocation},
@@ -465,6 +466,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 		// clients
 		{"GET " + R + "/clients", h.listClients},
 		{"POST " + R + "/clients", h.createClient},
+		{"POST " + R + "/client-description-converter", h.convertClientDescription},
+		{"GET " + R + "/clients/{id}/installation/providers/{provider}", h.clientInstallation},
 		{"GET " + R + "/clients/{id}", h.getClient},
 		{"PUT " + R + "/clients/{id}", h.updateClient},
 		{"DELETE " + R + "/clients/{id}", h.deleteClient},

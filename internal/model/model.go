@@ -231,6 +231,12 @@ type Client struct {
 	NotBefore               int64
 	// FlowOverrides binds flows by id for this client ("browser", "direct_grant").
 	FlowOverrides map[string]string
+	// FrontchannelLogout makes logout notify the client through the browser
+	// (SAML clients default to it).
+	FrontchannelLogout bool
+	// AdminURL is the client's management endpoint; SAML clients use it as
+	// the default assertion consumer and logout URL.
+	AdminURL string
 }
 
 // User is a realm user. Service account users are linked to a client.

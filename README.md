@@ -186,6 +186,28 @@ Main options (flag / environment variable):
   settings export and import; authorization settings in realm exports; the admin console's
   Authorization tabs
 
+**SAML 2.0 identity provider**
+
+- SAML clients (`protocol: saml`) with Keycloak's defaults and attributes, the `role_list` client
+  scope, IdP metadata at `/realms/{realm}/protocol/saml/descriptor`, the client description
+  converter (import a client from SP metadata) and the `saml-sp-descriptor` installation
+- SP initiated login (`AuthnRequest`) over the HTTP-Redirect and HTTP-POST bindings, IdP initiated
+  login (`/protocol/saml/clients/{saml_idp_initiated_sso_url_name}`), `ForceAuthn`, `IsPassive`,
+  the SSO session shared with OIDC clients
+- Request signatures checked against the client certificate (query string or XML signature);
+  responses and/or assertions signed with the realm RSA key (RSA-SHA1/256/512, exclusive or
+  inclusive canonicalization); encrypted assertions (AES-CBC/GCM, RSA-OAEP with SHA-1/256/512)
+- NameID formats unspecified (username), email, persistent and transient, and the NameID mapper
+- SAML mappers: user property, user attribute, role list, group membership, hardcoded attribute
+  and role, role name, user session note, audience and audience resolve
+- Single Logout: `LogoutRequest` from service providers (front-channel through the browser to the
+  other SAML clients of the session, back-channel with the POST or SOAP binding), and SAML
+  logouts when the session ends through the OIDC logout endpoint, the account console or an
+  administrator
+- Checked against Keycloak 26.0.7 (same documents for the same configuration) and with
+  Keycloak as the service provider (`scripts/compat/saml_sp.py`, run in CI); crewjam/saml is the
+  service provider of the tests. Incoming XML is checked with xml-roundtrip-validator and fuzzed.
+
 **Themes, languages and account console**
 
 - Login, email and account themes: built-in theme embedded in the binary, custom themes from
@@ -242,7 +264,9 @@ Main options (flag / environment variable):
   `execute-actions-email`, `send-verify-email`, `testSMTPConnection`, credential labels
 - Clients: search, CRUD, client secret get / regenerate, service account user, user sessions,
   client roles, protocol mappers, default / optional client scopes, scope mappings,
-  `evaluate-scopes` (example access token, ID token, userinfo, applied mappers)
+  `evaluate-scopes` (example access token, ID token, userinfo, applied mappers), certificates,
+  installation providers (`keycloak-oidc-keycloak-json`, `saml-sp-descriptor`) and
+  `client-description-converter`
 - Client scopes: CRUD, protocol mappers, scope mappings, realm default / optional scopes
 - Roles: realm and client roles CRUD, composites, users in role, `roles-by-id`
 - Groups: tree listing, count, `group-by-path`, CRUD, children, members, role mappings, default
@@ -269,7 +293,8 @@ Main options (flag / environment variable):
 
 ## Not implemented yet
 
-SAML, Kerberos, script mappers, admin fine-grained permissions, consent screens, reCAPTCHA, organizations,
+SAML identity brokering (gocloak as a SAML service provider), the SAML artifact binding and ECP,
+Kerberos, script mappers, admin fine-grained permissions, consent screens, reCAPTCHA, organizations,
 FreeMarker themes (gocloak themes use Go templates; Keycloak message bundles work as is),
 clustering, token exchange, device flow, CIBA, PAR.
 

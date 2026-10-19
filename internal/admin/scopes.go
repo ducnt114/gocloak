@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/oidc"
@@ -74,10 +75,10 @@ func validateMapper(realmID, ownerID string, rep *ProtocolMapperRep) (*model.Pro
 	if rep.Protocol == "" {
 		rep.Protocol = "openid-connect"
 	}
-	if rep.Protocol != "openid-connect" {
+	if rep.Protocol != "openid-connect" && rep.Protocol != service.ProtocolSAML {
 		return nil, badRequest("Unsupported protocol " + rep.Protocol)
 	}
-	if !service.MapperTypes[rep.ProtocolMapper] {
+	if !service.MapperTypes[rep.ProtocolMapper] || strings.HasPrefix(rep.ProtocolMapper, "saml-") != (rep.Protocol == service.ProtocolSAML) {
 		return nil, badRequest("ProtocolMapper provider not found: " + rep.ProtocolMapper)
 	}
 	m := &model.ProtocolMapper{ID: rep.ID, RealmID: realmID, OwnerID: ownerID, Name: rep.Name,

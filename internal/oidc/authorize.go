@@ -285,6 +285,10 @@ func (h *Handler) finishLogin(w http.ResponseWriter, r *http.Request, realm *mod
 		h.serverErrorPage(w, r, err)
 		return
 	}
+	if client.Protocol == service.ProtocolSAML {
+		h.samlLoginResponse(w, r, realm, client, user, us, params)
+		return
+	}
 	code := &model.AuthCode{
 		Code: service.RandomToken(32), RealmID: realm.ID, ClientID: client.ID, UserID: user.ID, SessionID: us.ID,
 		RedirectURI: params["redirect_uri"], Scope: params["scope"], Nonce: params["nonce"],
@@ -301,6 +305,15 @@ func (h *Handler) finishLogin(w http.ResponseWriter, r *http.Request, realm *mod
 	h.redirectResult(w, r, params["redirect_uri"], params["response_mode"], url.Values{
 		"code": {code.Code}, "state": {params["state"]}, "session_state": {us.ID}, "iss": {h.URLs.Issuer(r, realm.Name)},
 	})
+}
+
+// appendQuery adds query parameters to a URL.
+func appendQuery(u string, v url.Values) string {
+	sep := "?"
+	if strings.Contains(u, "?") {
+		sep = "&"
+	}
+	return u + sep + v.Encode()
 }
 
 // redirectResult sends authorization response parameters to the client.
@@ -452,6 +465,13 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 			Action: h.URLs.Issuer(r, realm.Name) + "/protocol/openid-connect/logout", Fields: fields})
 		return
 	}
+	final := ""
+	if redirect != "" {
+		final = redirect
+		if st := r.FormValue("state"); st != "" {
+			final = appendQuery(redirect, url.Values{"state": {st}})
+		}
+	}
 	front := ""
 	if us != nil {
 		front = h.idpLogout(r, realm, us, true, redirect, r.FormValue("state"))
@@ -468,12 +488,18 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, front, http.StatusFound)
 		return
 	}
-	if redirect != "" {
-		v := url.Values{}
-		if s := r.FormValue("state"); s != "" {
-			v.Set("state", s)
+	if us != nil {
+		// SAML clients logged in with the session are logged out through
+		// the browser before the final redirect
+		if done, err := h.samlBrowserLogout(w, r, realm, us, final); err != nil {
+			h.serverErrorPage(w, r, err)
+			return
+		} else if done {
+			return
 		}
-		h.redirectResult(w, r, redirect, "query", v)
+	}
+	if final != "" {
+		http.Redirect(w, r, final, http.StatusFound)
 		return
 	}
 	h.render(w, http.StatusOK, "info", pageData{realm: realm, r: r, Title: "loggedOut"})
@@ -516,6 +542,7 @@ func (h *Handler) backchannelLogout(w http.ResponseWriter, r *http.Request, real
 	}
 	if vt.Session != nil {
 		h.idpLogout(r, realm, vt.Session, false, "", "")
+		h.BackchannelLogout(r.Context(), h.URLs.Base(r), realm, []*model.UserSession{vt.Session})
 		if err := h.Svc.Store.DeleteSession(r.Context(), vt.Session); err != nil {
 			h.writeError(w, err)
 			return

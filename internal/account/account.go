@@ -437,7 +437,8 @@ func (h *Handler) apiDevices(w http.ResponseWriter, r *http.Request, c *caller) 
 }
 
 // signOut ends the user's sessions: all, or all but the current one.
-func (h *Handler) signOut(ctx context.Context, c *caller, includeCurrent bool) error {
+func (h *Handler) signOut(r *http.Request, c *caller, includeCurrent bool) error {
+	ctx := r.Context()
 	list, err := h.Svc.Store.ListUserSessions(ctx, c.user.ID)
 	if err != nil {
 		return err
@@ -446,6 +447,7 @@ func (h *Handler) signOut(ctx context.Context, c *caller, includeCurrent bool) e
 		if !includeCurrent && c.session != nil && s.ID == c.session.ID {
 			continue
 		}
+		h.Svc.BackchannelLogout(ctx, h.URLs.Base(r), c.realm, s)
 		if err := h.Svc.Store.DeleteSession(ctx, s); err != nil {
 			return err
 		}
@@ -454,7 +456,7 @@ func (h *Handler) signOut(ctx context.Context, c *caller, includeCurrent bool) e
 }
 
 func (h *Handler) apiDeleteSessions(w http.ResponseWriter, r *http.Request, c *caller) error {
-	if err := h.signOut(r.Context(), c, r.URL.Query().Get("current") == "true"); err != nil {
+	if err := h.signOut(r, c, r.URL.Query().Get("current") == "true"); err != nil {
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -466,6 +468,7 @@ func (h *Handler) apiDeleteSession(w http.ResponseWriter, r *http.Request, c *ca
 	if err != nil || s.UserID != c.user.ID {
 		return &apiError{http.StatusNotFound, map[string]string{"errorMessage": "Session not found"}}
 	}
+	h.Svc.BackchannelLogout(r.Context(), h.URLs.Base(r), c.realm, s)
 	if err := h.Svc.Store.DeleteSession(r.Context(), s); err != nil {
 		return err
 	}

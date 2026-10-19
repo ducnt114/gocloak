@@ -440,6 +440,55 @@
     "protocol": "openid-connect",
     "protocolMapper": "oidc-usermodel-attribute-mapper"
    }
+  ],
+  "saml": [
+   {
+    "config": {
+     "attribute.name": "urn:oid:1.2.840.113549.1.9.1",
+     "attribute.nameformat": "urn:oasis:names:tc:SAML:2.0:attrname-format:uri",
+     "friendly.name": "email",
+     "user.attribute": "email"
+    },
+    "consentRequired": false,
+    "name": "X500 email",
+    "protocol": "saml",
+    "protocolMapper": "saml-user-property-mapper"
+   },
+   {
+    "config": {
+     "attribute.name": "Role",
+     "attribute.nameformat": "Basic",
+     "single": "false"
+    },
+    "consentRequired": false,
+    "name": "role list",
+    "protocol": "saml",
+    "protocolMapper": "saml-role-list-mapper"
+   },
+   {
+    "config": {
+     "attribute.name": "urn:oid:2.5.4.42",
+     "attribute.nameformat": "urn:oasis:names:tc:SAML:2.0:attrname-format:uri",
+     "friendly.name": "givenName",
+     "user.attribute": "firstName"
+    },
+    "consentRequired": false,
+    "name": "X500 givenName",
+    "protocol": "saml",
+    "protocolMapper": "saml-user-property-mapper"
+   },
+   {
+    "config": {
+     "attribute.name": "urn:oid:2.5.4.4",
+     "attribute.nameformat": "urn:oasis:names:tc:SAML:2.0:attrname-format:uri",
+     "friendly.name": "surname",
+     "user.attribute": "lastName"
+    },
+    "consentRequired": false,
+    "name": "X500 surname",
+    "protocol": "saml",
+    "protocolMapper": "saml-user-property-mapper"
+   }
   ]
  },
  "clientInstallations": {
@@ -452,6 +501,17 @@
     "id": "keycloak-oidc-keycloak-json",
     "mediaType": "application/json",
     "protocol": "openid-connect"
+   }
+  ],
+  "saml": [
+   {
+    "displayType": "SAML Metadata SPSSODescriptor",
+    "downloadOnly": false,
+    "filename": "saml-sp-metadata.xml",
+    "helpText": "SAML SP Metadata EntityDescriptor or rather SPSSODescriptor. This is an XML file.",
+    "id": "saml-sp-descriptor",
+    "mediaType": "application/xml",
+    "protocol": "saml"
    }
   ]
  },
@@ -3198,6 +3258,420 @@
       "required": false,
       "secret": false,
       "type": "boolean"
+     }
+    ]
+   },
+   {
+    "helpText": "Add specified audience to the audience conditions in the assertion.",
+    "id": "saml-audience-mapper",
+    "metadata": {},
+    "properties": [
+     {
+      "helpText": "included.client.audience.tooltip",
+      "label": "included.client.audience.label",
+      "name": "included.client.audience",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "ClientList"
+     },
+     {
+      "helpText": "included.custom.audience.tooltip",
+      "label": "included.custom.audience.label",
+      "name": "included.custom.audience",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     }
+    ]
+   },
+   {
+    "helpText": "Adds all client_ids of \"allowed\" clients to the audience conditions in the assertion. Allowed client means any SAML client for which user has at least one client role",
+    "id": "saml-audience-resolve-mapper",
+    "metadata": {},
+    "properties": []
+   },
+   {
+    "helpText": "Group names are stored in an attribute value.  There is either one attribute with multiple attribute values, or an attribute per group name depending on how you configure it.  You can also specify the attribute name i.e. 'member' or 'memberOf' being examples.",
+    "id": "saml-group-membership-mapper",
+    "metadata": {},
+    "properties": [
+     {
+      "defaultValue": "member",
+      "helpText": "Name of the SAML attribute you want to put your groups into.  i.e. 'member', 'memberOf'.",
+      "label": "Group attribute name",
+      "name": "attribute.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "Standard SAML attribute setting.  An optional, more human-readable form of the attribute's name that can be provided if the actual attribute name is cryptic.",
+      "label": "Friendly Name",
+      "name": "friendly.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute NameFormat.  Can be basic, URI reference, or unspecified.",
+      "label": "SAML Attribute NameFormat",
+      "name": "attribute.nameformat",
+      "options": [
+       "Basic",
+       "URI Reference",
+       "Unspecified"
+      ],
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "List"
+     },
+     {
+      "defaultValue": "true",
+      "helpText": "If true, all groups will be stored under one attribute with multiple attribute values.",
+      "label": "Single Group Attribute",
+      "name": "single",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "boolean"
+     },
+     {
+      "defaultValue": "true",
+      "helpText": "Include full path to group i.e. /top/level1/level2, false will just specify the group name",
+      "label": "Full group path",
+      "name": "full.path",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "boolean"
+     }
+    ]
+   },
+   {
+    "helpText": "Hardcode an attribute into the SAML Assertion.",
+    "id": "saml-hardcode-attribute-mapper",
+    "metadata": {},
+    "properties": [
+     {
+      "helpText": "Standard SAML attribute setting.  An optional, more human-readable form of the attribute's name that can be provided if the actual attribute name is cryptic.",
+      "label": "Friendly Name",
+      "name": "friendly.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute Name",
+      "label": "SAML Attribute Name",
+      "name": "attribute.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute NameFormat.  Can be basic, URI reference, or unspecified.",
+      "label": "SAML Attribute NameFormat",
+      "name": "attribute.nameformat",
+      "options": [
+       "Basic",
+       "URI Reference",
+       "Unspecified"
+      ],
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "List"
+     },
+     {
+      "helpText": "Value of the attribute you want to hard code.",
+      "label": "Attribute value",
+      "name": "attribute.value",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     }
+    ]
+   },
+   {
+    "helpText": "Hardcode role into SAML Assertion.",
+    "id": "saml-hardcode-role-mapper",
+    "metadata": {},
+    "properties": [
+     {
+      "helpText": "Arbitrary role name you want to hardcode.  This role does not have to exist in current realm and can be just any string you need",
+      "label": "Role",
+      "name": "role",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "Role"
+     }
+    ]
+   },
+   {
+    "helpText": "Role names are stored in an attribute value.  There is either one attribute with multiple attribute values, or an attribute per role name depending on how you configure it.  You can also specify the attribute name i.e. 'Role' or 'memberOf' being examples.",
+    "id": "saml-role-list-mapper",
+    "metadata": {},
+    "properties": [
+     {
+      "defaultValue": "Role",
+      "helpText": "Name of the SAML attribute you want to put your roles into.  i.e. 'Role', 'memberOf'.",
+      "label": "Role attribute name",
+      "name": "attribute.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "Standard SAML attribute setting.  An optional, more human-readable form of the attribute's name that can be provided if the actual attribute name is cryptic.",
+      "label": "Friendly Name",
+      "name": "friendly.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute NameFormat.  Can be basic, URI reference, or unspecified.",
+      "label": "SAML Attribute NameFormat",
+      "name": "attribute.nameformat",
+      "options": [
+       "Basic",
+       "URI Reference",
+       "Unspecified"
+      ],
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "List"
+     },
+     {
+      "defaultValue": "true",
+      "helpText": "If true, all roles will be stored under one attribute with multiple attribute values.",
+      "label": "Single Role Attribute",
+      "name": "single",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "boolean"
+     }
+    ]
+   },
+   {
+    "helpText": "Map an assigned role to a new name",
+    "id": "saml-role-name-mapper",
+    "metadata": {},
+    "properties": [
+     {
+      "helpText": "Role name you want changed.  Click 'Select Role' button to browse roles, or just type it in the textbox.  To reference a client role the syntax is clientname.clientrole, i.e. myclient.myrole",
+      "label": "Role",
+      "name": "role",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "Role"
+     },
+     {
+      "helpText": "The new role name.",
+      "label": "New Role Name",
+      "name": "new.role.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     }
+    ]
+   },
+   {
+    "helpText": "Map a custom user attribute to a to a SAML attribute.",
+    "id": "saml-user-attribute-mapper",
+    "metadata": {},
+    "properties": [
+     {
+      "helpText": "usermodel.attr.tooltip",
+      "label": "usermodel.attr.label",
+      "name": "user.attribute",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "UserProfileAttributeList"
+     },
+     {
+      "helpText": "Standard SAML attribute setting.  An optional, more human-readable form of the attribute's name that can be provided if the actual attribute name is cryptic.",
+      "label": "Friendly Name",
+      "name": "friendly.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute Name",
+      "label": "SAML Attribute Name",
+      "name": "attribute.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute NameFormat.  Can be basic, URI reference, or unspecified.",
+      "label": "SAML Attribute NameFormat",
+      "name": "attribute.nameformat",
+      "options": [
+       "Basic",
+       "URI Reference",
+       "Unspecified"
+      ],
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "List"
+     },
+     {
+      "helpText": "aggregate.attrs.tooltip",
+      "label": "aggregate.attrs.label",
+      "name": "aggregate.attrs",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "boolean"
+     }
+    ]
+   },
+   {
+    "helpText": "Map user attribute to SAML NameID value.",
+    "id": "saml-user-attribute-nameid-mapper",
+    "metadata": {},
+    "properties": [
+     {
+      "helpText": "mapper.nameid.format.tooltip",
+      "label": "name-id-format",
+      "name": "mapper.nameid.format",
+      "options": [
+       "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified",
+       "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
+       "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
+       "urn:oasis:names:tc:SAML:2.0:nameid-format:transient"
+      ],
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "List"
+     },
+     {
+      "helpText": "usermodel.attr.tooltip",
+      "label": "usermodel.attr.label",
+      "name": "user.attribute",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     }
+    ]
+   },
+   {
+    "helpText": "Map a built in user property (email, firstName, lastName) to a SAML attribute type.",
+    "id": "saml-user-property-mapper",
+    "metadata": {},
+    "properties": [
+     {
+      "helpText": "usermodel.prop.tooltip",
+      "label": "usermodel.prop.label",
+      "name": "user.attribute",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "UserProfileAttributeList"
+     },
+     {
+      "helpText": "Standard SAML attribute setting.  An optional, more human-readable form of the attribute's name that can be provided if the actual attribute name is cryptic.",
+      "label": "Friendly Name",
+      "name": "friendly.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute Name",
+      "label": "SAML Attribute Name",
+      "name": "attribute.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute NameFormat.  Can be basic, URI reference, or unspecified.",
+      "label": "SAML Attribute NameFormat",
+      "name": "attribute.nameformat",
+      "options": [
+       "Basic",
+       "URI Reference",
+       "Unspecified"
+      ],
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "List"
+     }
+    ]
+   },
+   {
+    "helpText": "Map a user session note to a SAML attribute.",
+    "id": "saml-user-session-note-mapper",
+    "metadata": {},
+    "properties": [
+     {
+      "helpText": "The user session note you want to grab the value from.",
+      "label": "User Session Note Attribute",
+      "name": "note",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "Standard SAML attribute setting.  An optional, more human-readable form of the attribute's name that can be provided if the actual attribute name is cryptic.",
+      "label": "Friendly Name",
+      "name": "friendly.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute Name",
+      "label": "SAML Attribute Name",
+      "name": "attribute.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute NameFormat.  Can be basic, URI reference, or unspecified.",
+      "label": "SAML Attribute NameFormat",
+      "name": "attribute.nameformat",
+      "options": [
+       "Basic",
+       "URI Reference",
+       "Unspecified"
+      ],
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "List"
      }
     ]
    }
@@ -6404,6 +6878,444 @@
      }
     ]
    }
+  ],
+  "saml": [
+   {
+    "category": "NameID Mapper",
+    "helpText": "Map user attribute to SAML NameID value.",
+    "id": "saml-user-attribute-nameid-mapper",
+    "name": "User Attribute Mapper For NameID",
+    "priority": 0,
+    "properties": [
+     {
+      "helpText": "mapper.nameid.format.tooltip",
+      "label": "name-id-format",
+      "name": "mapper.nameid.format",
+      "options": [
+       "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified",
+       "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
+       "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
+       "urn:oasis:names:tc:SAML:2.0:nameid-format:transient"
+      ],
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "List"
+     },
+     {
+      "helpText": "usermodel.attr.tooltip",
+      "label": "usermodel.attr.label",
+      "name": "user.attribute",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     }
+    ]
+   },
+   {
+    "category": "Audience mapper",
+    "helpText": "Adds all client_ids of \"allowed\" clients to the audience conditions in the assertion. Allowed client means any SAML client for which user has at least one client role",
+    "id": "saml-audience-resolve-mapper",
+    "name": "Audience Resolve",
+    "priority": 0,
+    "properties": []
+   },
+   {
+    "category": "AttributeStatement Mapper",
+    "helpText": "Map a user session note to a SAML attribute.",
+    "id": "saml-user-session-note-mapper",
+    "name": "User Session Note",
+    "priority": 0,
+    "properties": [
+     {
+      "helpText": "The user session note you want to grab the value from.",
+      "label": "User Session Note Attribute",
+      "name": "note",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "Standard SAML attribute setting.  An optional, more human-readable form of the attribute's name that can be provided if the actual attribute name is cryptic.",
+      "label": "Friendly Name",
+      "name": "friendly.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute Name",
+      "label": "SAML Attribute Name",
+      "name": "attribute.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute NameFormat.  Can be basic, URI reference, or unspecified.",
+      "label": "SAML Attribute NameFormat",
+      "name": "attribute.nameformat",
+      "options": [
+       "Basic",
+       "URI Reference",
+       "Unspecified"
+      ],
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "List"
+     }
+    ]
+   },
+   {
+    "category": "Audience mapper",
+    "helpText": "Add specified audience to the audience conditions in the assertion.",
+    "id": "saml-audience-mapper",
+    "name": "Audience",
+    "priority": 0,
+    "properties": [
+     {
+      "helpText": "included.client.audience.tooltip",
+      "label": "included.client.audience.label",
+      "name": "included.client.audience",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "ClientList"
+     },
+     {
+      "helpText": "included.custom.audience.tooltip",
+      "label": "included.custom.audience.label",
+      "name": "included.custom.audience",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     }
+    ]
+   },
+   {
+    "category": "Group Mapper",
+    "helpText": "Group names are stored in an attribute value.  There is either one attribute with multiple attribute values, or an attribute per group name depending on how you configure it.  You can also specify the attribute name i.e. 'member' or 'memberOf' being examples.",
+    "id": "saml-group-membership-mapper",
+    "name": "Group list",
+    "priority": 0,
+    "properties": [
+     {
+      "defaultValue": "member",
+      "helpText": "Name of the SAML attribute you want to put your groups into.  i.e. 'member', 'memberOf'.",
+      "label": "Group attribute name",
+      "name": "attribute.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "Standard SAML attribute setting.  An optional, more human-readable form of the attribute's name that can be provided if the actual attribute name is cryptic.",
+      "label": "Friendly Name",
+      "name": "friendly.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute NameFormat.  Can be basic, URI reference, or unspecified.",
+      "label": "SAML Attribute NameFormat",
+      "name": "attribute.nameformat",
+      "options": [
+       "Basic",
+       "URI Reference",
+       "Unspecified"
+      ],
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "List"
+     },
+     {
+      "defaultValue": "true",
+      "helpText": "If true, all groups will be stored under one attribute with multiple attribute values.",
+      "label": "Single Group Attribute",
+      "name": "single",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "boolean"
+     },
+     {
+      "defaultValue": "true",
+      "helpText": "Include full path to group i.e. /top/level1/level2, false will just specify the group name",
+      "label": "Full group path",
+      "name": "full.path",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "boolean"
+     }
+    ]
+   },
+   {
+    "category": "Role Mapper",
+    "helpText": "Map an assigned role to a new name",
+    "id": "saml-role-name-mapper",
+    "name": "Role Name Mapper",
+    "priority": 0,
+    "properties": [
+     {
+      "helpText": "Role name you want changed.  Click 'Select Role' button to browse roles, or just type it in the textbox.  To reference a client role the syntax is clientname.clientrole, i.e. myclient.myrole",
+      "label": "Role",
+      "name": "role",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "Role"
+     },
+     {
+      "helpText": "The new role name.",
+      "label": "New Role Name",
+      "name": "new.role.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     }
+    ]
+   },
+   {
+    "category": "AttributeStatement Mapper",
+    "helpText": "Map a built in user property (email, firstName, lastName) to a SAML attribute type.",
+    "id": "saml-user-property-mapper",
+    "name": "User Property",
+    "priority": 0,
+    "properties": [
+     {
+      "helpText": "usermodel.prop.tooltip",
+      "label": "usermodel.prop.label",
+      "name": "user.attribute",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "UserProfileAttributeList"
+     },
+     {
+      "helpText": "Standard SAML attribute setting.  An optional, more human-readable form of the attribute's name that can be provided if the actual attribute name is cryptic.",
+      "label": "Friendly Name",
+      "name": "friendly.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute Name",
+      "label": "SAML Attribute Name",
+      "name": "attribute.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute NameFormat.  Can be basic, URI reference, or unspecified.",
+      "label": "SAML Attribute NameFormat",
+      "name": "attribute.nameformat",
+      "options": [
+       "Basic",
+       "URI Reference",
+       "Unspecified"
+      ],
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "List"
+     }
+    ]
+   },
+   {
+    "category": "Role Mapper",
+    "helpText": "Role names are stored in an attribute value.  There is either one attribute with multiple attribute values, or an attribute per role name depending on how you configure it.  You can also specify the attribute name i.e. 'Role' or 'memberOf' being examples.",
+    "id": "saml-role-list-mapper",
+    "name": "Role list",
+    "priority": 0,
+    "properties": [
+     {
+      "defaultValue": "Role",
+      "helpText": "Name of the SAML attribute you want to put your roles into.  i.e. 'Role', 'memberOf'.",
+      "label": "Role attribute name",
+      "name": "attribute.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "Standard SAML attribute setting.  An optional, more human-readable form of the attribute's name that can be provided if the actual attribute name is cryptic.",
+      "label": "Friendly Name",
+      "name": "friendly.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute NameFormat.  Can be basic, URI reference, or unspecified.",
+      "label": "SAML Attribute NameFormat",
+      "name": "attribute.nameformat",
+      "options": [
+       "Basic",
+       "URI Reference",
+       "Unspecified"
+      ],
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "List"
+     },
+     {
+      "defaultValue": "true",
+      "helpText": "If true, all roles will be stored under one attribute with multiple attribute values.",
+      "label": "Single Role Attribute",
+      "name": "single",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "boolean"
+     }
+    ]
+   },
+   {
+    "category": "AttributeStatement Mapper",
+    "helpText": "Hardcode an attribute into the SAML Assertion.",
+    "id": "saml-hardcode-attribute-mapper",
+    "name": "Hardcoded attribute",
+    "priority": 0,
+    "properties": [
+     {
+      "helpText": "Standard SAML attribute setting.  An optional, more human-readable form of the attribute's name that can be provided if the actual attribute name is cryptic.",
+      "label": "Friendly Name",
+      "name": "friendly.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute Name",
+      "label": "SAML Attribute Name",
+      "name": "attribute.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute NameFormat.  Can be basic, URI reference, or unspecified.",
+      "label": "SAML Attribute NameFormat",
+      "name": "attribute.nameformat",
+      "options": [
+       "Basic",
+       "URI Reference",
+       "Unspecified"
+      ],
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "List"
+     },
+     {
+      "helpText": "Value of the attribute you want to hard code.",
+      "label": "Attribute value",
+      "name": "attribute.value",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     }
+    ]
+   },
+   {
+    "category": "AttributeStatement Mapper",
+    "helpText": "Map a custom user attribute to a to a SAML attribute.",
+    "id": "saml-user-attribute-mapper",
+    "name": "User Attribute",
+    "priority": 0,
+    "properties": [
+     {
+      "helpText": "usermodel.attr.tooltip",
+      "label": "usermodel.attr.label",
+      "name": "user.attribute",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "UserProfileAttributeList"
+     },
+     {
+      "helpText": "Standard SAML attribute setting.  An optional, more human-readable form of the attribute's name that can be provided if the actual attribute name is cryptic.",
+      "label": "Friendly Name",
+      "name": "friendly.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute Name",
+      "label": "SAML Attribute Name",
+      "name": "attribute.name",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "String"
+     },
+     {
+      "helpText": "SAML Attribute NameFormat.  Can be basic, URI reference, or unspecified.",
+      "label": "SAML Attribute NameFormat",
+      "name": "attribute.nameformat",
+      "options": [
+       "Basic",
+       "URI Reference",
+       "Unspecified"
+      ],
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "List"
+     },
+     {
+      "helpText": "aggregate.attrs.tooltip",
+      "label": "aggregate.attrs.label",
+      "name": "aggregate.attrs",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "boolean"
+     }
+    ]
+   },
+   {
+    "category": "AttributeStatement Mapper",
+    "helpText": "Hardcode role into SAML Assertion.",
+    "id": "saml-hardcode-role-mapper",
+    "name": "Hardcoded role",
+    "priority": 0,
+    "properties": [
+     {
+      "helpText": "Arbitrary role name you want to hardcode.  This role does not have to exist in current realm and can be just any string you need",
+      "label": "Role",
+      "name": "role",
+      "readOnly": false,
+      "required": false,
+      "secret": false,
+      "type": "Role"
+     }
+    ]
+   }
   ]
  },
  "providers": {
@@ -7511,6 +8423,9 @@
    "internal": true,
    "providers": {
     "openid-connect": {
+     "order": 0
+    },
+    "saml": {
      "order": 0
     }
    }

@@ -43,7 +43,8 @@ type builtinMapper struct {
 
 type builtinScope struct {
 	name, description string
-	isDefault         bool // realm default (true) or optional scope
+	protocol          string // openid-connect when empty
+	isDefault         bool   // realm default (true) or optional scope
 	inTokenScope      bool
 	consentText       string
 	mappers           []builtinMapper
@@ -177,6 +178,16 @@ var builtinScopes = []builtinScope{
 				"claim.name", "groups", "jsonType.label", "String", "multivalued", "true")},
 		},
 	},
+	samlRoleListScope,
+}
+
+// samlRoleListScope is the default client scope of SAML clients.
+var samlRoleListScope = builtinScope{
+	name: "role_list", description: "SAML role list", protocol: ProtocolSAML, isDefault: true,
+	consentText: "${samlRoleListScopeConsentText}",
+	mappers: []builtinMapper{
+		{"role list", SAMLMapperRoleList, map[string]string{"attribute.name": "Role", "attribute.nameformat": "Basic", "single": "false"}},
+	},
 }
 
 // ProvisionClientScopes creates Keycloak's built-in client scopes in a realm,
@@ -184,36 +195,7 @@ var builtinScopes = []builtinScope{
 // defaults to every existing client.
 func (s *Service) ProvisionClientScopes(ctx context.Context, st *store.Store, realm *model.Realm) error {
 	for _, b := range builtinScopes {
-		attrs := map[string]string{
-			"include.in.token.scope":    boolString(b.inTokenScope),
-			"display.on.consent.screen": "true",
-		}
-		if b.consentText != "" {
-			attrs["consent.screen.text"] = b.consentText
-		} else {
-			attrs["display.on.consent.screen"] = "false"
-		}
-		cs := &model.ClientScope{ID: NewID(), RealmID: realm.ID, Name: b.name, Description: b.description,
-			Protocol: "openid-connect", Attributes: attrs}
-		if err := st.CreateClientScope(ctx, cs); err != nil {
-			return err
-		}
-		for _, bm := range b.mappers {
-			if err := st.CreateMapper(ctx, &model.ProtocolMapper{ID: NewID(), RealmID: realm.ID, OwnerID: cs.ID,
-				Name: bm.name, Protocol: "openid-connect", Type: bm.typ, Config: bm.config}); err != nil {
-				return err
-			}
-		}
-		for _, roleName := range b.scopeRoles {
-			role, err := st.GetRoleByName(ctx, realm.ID, "", roleName)
-			if err != nil {
-				return err
-			}
-			if err := st.AddScopeMapping(ctx, cs.ID, role.ID); err != nil {
-				return err
-			}
-		}
-		if err := st.SetRealmDefaultScope(ctx, realm.ID, cs.ID, b.isDefault); err != nil {
+		if err := provisionScope(ctx, st, realm, b); err != nil {
 			return err
 		}
 	}
@@ -229,14 +211,63 @@ func (s *Service) ProvisionClientScopes(ctx context.Context, st *store.Store, re
 	return nil
 }
 
+// protocolOf defaults an empty protocol to openid-connect.
+func protocolOf(p string) string {
+	if p == "" {
+		return "openid-connect"
+	}
+	return p
+}
+
+func provisionScope(ctx context.Context, st *store.Store, realm *model.Realm, b builtinScope) error {
+	protocol := protocolOf(b.protocol)
+	attrs := map[string]string{"display.on.consent.screen": "true"}
+	if protocol != ProtocolSAML {
+		attrs["include.in.token.scope"] = boolString(b.inTokenScope)
+	}
+	if b.consentText != "" {
+		attrs["consent.screen.text"] = b.consentText
+	} else {
+		attrs["display.on.consent.screen"] = "false"
+	}
+	cs := &model.ClientScope{ID: NewID(), RealmID: realm.ID, Name: b.name, Description: b.description,
+		Protocol: protocol, Attributes: attrs}
+	if err := st.CreateClientScope(ctx, cs); err != nil {
+		return err
+	}
+	for _, bm := range b.mappers {
+		if err := st.CreateMapper(ctx, &model.ProtocolMapper{ID: NewID(), RealmID: realm.ID, OwnerID: cs.ID,
+			Name: bm.name, Protocol: protocol, Type: bm.typ, Config: bm.config}); err != nil {
+			return err
+		}
+	}
+	for _, roleName := range b.scopeRoles {
+		role, err := st.GetRoleByName(ctx, realm.ID, "", roleName)
+		if err != nil {
+			return err
+		}
+		if err := st.AddScopeMapping(ctx, cs.ID, role.ID); err != nil {
+			return err
+		}
+	}
+	return st.SetRealmDefaultScope(ctx, realm.ID, cs.ID, b.isDefault)
+}
+
 // LinkDefaultScopes attaches the realm's default and optional client scopes
-// to a client, as Keycloak does for every new client.
+// of the client's protocol to a client, as Keycloak does for every new client.
 func (s *Service) LinkDefaultScopes(ctx context.Context, st *store.Store, c *model.Client) error {
 	links, err := st.ListRealmDefaultScopes(ctx, c.RealmID)
 	if err != nil {
 		return err
 	}
 	for _, l := range links {
+		cs, err := st.GetClientScope(ctx, c.RealmID, l.ScopeID)
+		if err != nil {
+			return err
+		}
+		if protocolOf(cs.Protocol) != protocolOf(c.Protocol) {
+			continue
+		}
 		if err := st.SetClientScopeLink(ctx, c.ID, l.ScopeID, l.Default); err != nil {
 			return err
 		}

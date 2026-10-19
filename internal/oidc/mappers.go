@@ -237,7 +237,7 @@ func (tc *tokenContext) resolveRoles(ctx context.Context) error {
 	}
 	for _, m := range tc.mappers {
 		switch m.Type {
-		case service.MapperHardcodedRole:
+		case service.MapperHardcodedRole, service.SAMLMapperHardcodedRole:
 			if c, role := split(m.Config["role"]); role != "" {
 				if c == "" {
 					realmSet[role] = true
@@ -245,7 +245,7 @@ func (tc *tokenContext) resolveRoles(ctx context.Context) error {
 					addClientRole(c, role)
 				}
 			}
-		case service.MapperRoleName:
+		case service.MapperRoleName, service.SAMLMapperRoleName:
 			c, role := split(m.Config["role"])
 			newName := m.Config["new.role.name"]
 			if role == "" || newName == "" {

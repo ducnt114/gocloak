@@ -93,6 +93,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	h.registerBroker(mux)
 	h.registerIframes(mux)
 	h.registerUMA(mux)
+	h.registerSAML(mux)
 }
 
 // ---------------------------------------------------------------- helpers

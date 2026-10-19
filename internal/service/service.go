@@ -78,6 +78,9 @@ type Service struct {
 	Themes *theme.Manager
 	// Federation is the user storage (LDAP) behind the local users.
 	Federation UserFederation
+	// LogoutHandler sends back-channel logouts to the clients of ended
+	// sessions (set by the protocol handlers).
+	LogoutHandler BackchannelLogoutFunc
 
 	mu   sync.RWMutex
 	keys map[string]*keySet // realm id -> keys
@@ -268,6 +271,11 @@ func (s *Service) CreateClient(ctx context.Context, st *store.Store, c *model.Cl
 	}
 	if !c.PublicClient && !c.BearerOnly && c.Secret == "" {
 		c.Secret = RandomToken(24)
+	}
+	if c.Protocol == ProtocolSAML {
+		if err := SetupSAMLClient(c); err != nil {
+			return err
+		}
 	}
 	if err := st.CreateClient(ctx, c); err != nil {
 		return err

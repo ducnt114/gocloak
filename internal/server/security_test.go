@@ -331,7 +331,7 @@ func TestKeyProviders(t *testing.T) {
 	}
 
 	// Rotation: a higher priority RSA key takes over, the old one still verifies.
-	e.expect(e.do(nil, "PUT", R+"/clients/"+web, admin, map[string]any{"attributes": map[string]string{}}, nil), 204)
+	e.expect(e.do(nil, "PUT", R+"/clients/"+web, admin, map[string]any{"attributes": map[string]string{"access.token.signed.response.alg": ""}}, nil), 204)
 	e.expect(e.do(nil, "POST", R+"/components", admin, map[string]any{"name": "rsa-new", "providerId": "rsa-generated",
 		"providerType": "org.keycloak.keys.KeyProvider", "config": map[string][]string{"priority": {"200"}}}, nil), 201)
 	tok3, _ := e.passwordGrant("demo", "web", "web-secret", "alice", "wonderland")
