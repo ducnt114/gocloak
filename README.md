@@ -62,6 +62,40 @@ docker run -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADM
   -v gocloak-data:/data gocloak start-dev
 ```
 
+Releases publish binaries for Linux, macOS and Windows (amd64 and arm64) on
+the GitHub releases page, and a multi-arch image:
+
+```sh
+docker run -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+  -v gocloak-data:/data ghcr.io/ducnt114/gocloak start-dev
+```
+
+On Kubernetes, with the Helm chart (`charts/gocloak`, also published as
+`oci://ghcr.io/ducnt114/charts/gocloak`):
+
+```sh
+# one node on SQLite
+helm install sso oci://ghcr.io/ducnt114/charts/gocloak --set hostname=https://sso.example.com
+
+# three nodes on PostgreSQL
+helm install sso oci://ghcr.io/ducnt114/charts/gocloak --set hostname=https://sso.example.com \
+  --set replicaCount=3 --set database.vendor=postgres \
+  --set database.url=postgres://db.example.com/gocloak --set database.username=gocloak \
+  --set database.existingSecret=gocloak-db
+```
+
+See `charts/gocloak/values.yaml` for the settings (ingress, metrics and
+ServiceMonitor, tracing, realm import, resources).
+
+### Running a cluster
+
+Nodes on the same PostgreSQL database form a cluster: they keep no state of
+their own, so a load balancer needs no sticky sessions. Each node caches
+signing keys and realm configuration, and tells the others about changes
+through PostgreSQL `LISTEN`/`NOTIFY`. Periodic jobs (expired session cleanup,
+LDAP synchronization) run on one node at a time under advisory locks.
+Measurements of a three-node cluster are in [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+
 ## Commands
 
 | Command | Description |
@@ -317,7 +351,7 @@ Main options (flag / environment variable):
 SAML identity brokering (gocloak as a SAML service provider), the SAML artifact binding and ECP,
 Kerberos, script mappers, admin fine-grained permissions, reCAPTCHA, organizations,
 FreeMarker themes (gocloak themes use Go templates; Keycloak message bundles work as is),
-clustering, external token exchange (from identity providers), mutual TLS, JARM, implicit and hybrid flows.
+external token exchange (from identity providers), mutual TLS, JARM, implicit and hybrid flows.
 
 The plan for these is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -360,6 +394,10 @@ internal/service     realm provisioning, users, roles, keys, token verification
 internal/oidc        protocol endpoints, authentication flow engine, required actions, login pages
 internal/admin       admin REST API and realm import
 internal/server      wiring, bootstrap, health, import on startup
+internal/metrics     Prometheus metrics
+internal/tracing     OpenTelemetry tracing (OTLP over HTTP)
+charts/gocloak       Helm chart
+scripts/loadtest     load generator and round-robin load balancer
 ```
 
 ## Development

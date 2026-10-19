@@ -1,0 +1,178 @@
+{{- include "gocloak.validate" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gocloak.fullname" . }}
+  labels:
+    {{- include "gocloak.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  {{- if include "gocloak.sqlite" . }}
+  # the SQLite volume is used by one pod at a time
+  strategy:
+    type: Recreate
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "gocloak.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "gocloak.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "gocloak.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: gocloak
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - start
+            {{- range .Values.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
+          env:
+            - name: KC_HTTP_PORT
+              value: "8080"
+            - name: KC_HTTP_MANAGEMENT_PORT
+              value: "9000"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_METRICS_ENABLED
+              value: {{ .Values.metrics.enabled | quote }}
+            - name: KC_HTTP_METRICS_HISTOGRAMS_ENABLED
+              value: {{ .Values.metrics.histograms | quote }}
+            {{- if .Values.hostname }}
+            - name: KC_HOSTNAME
+              value: {{ .Values.hostname | quote }}
+            {{- else }}
+            - name: KC_HOSTNAME_STRICT
+              value: "false"
+            {{- end }}
+            {{- with .Values.proxyHeaders }}
+            - name: KC_PROXY_HEADERS
+              value: {{ . | quote }}
+            {{- end }}
+            - name: KC_LOG_LEVEL
+              value: {{ .Values.log.level | quote }}
+            - name: KC_LOG_CONSOLE_OUTPUT
+              value: {{ .Values.log.format | quote }}
+            - name: GOCLOAK_RATE_LIMIT
+              value: {{ .Values.rateLimit | quote }}
+            {{- if .Values.tracing.enabled }}
+            - name: KC_TRACING_ENABLED
+              value: "true"
+            - name: KC_TRACING_ENDPOINT
+              value: {{ .Values.tracing.endpoint | quote }}
+            - name: KC_TRACING_SAMPLER_RATIO
+              value: {{ .Values.tracing.samplerRatio | quote }}
+            {{- end }}
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gocloak.adminSecret" . }}
+                  key: username
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gocloak.adminSecret" . }}
+                  key: password
+            - name: KC_DB
+              value: {{ .Values.database.vendor | quote }}
+            {{- if include "gocloak.sqlite" . }}
+            - name: KC_DB_URL
+              value: /data/gocloak.db
+            {{- else }}
+            - name: KC_DB_URL
+              value: {{ .Values.database.url | quote }}
+            {{- with .Values.database.username }}
+            - name: KC_DB_USERNAME
+              value: {{ . | quote }}
+            {{- end }}
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gocloak.dbSecret" . }}
+                  key: {{ .Values.database.existingSecretPasswordKey }}
+            {{- end }}
+            {{- if .Values.importRealms.configMap }}
+            - name: GOCLOAK_IMPORT_DIR
+              value: /opt/gocloak/import
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 9000
+          startupProbe:
+            httpGet:
+              path: /health/started
+              port: management
+            periodSeconds: 2
+            failureThreshold: 60
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: management
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: management
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            {{- if .Values.importRealms.configMap }}
+            - name: import
+              mountPath: /opt/gocloak/import
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: data
+          {{- if and (include "gocloak.sqlite" .) .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ default (include "gocloak.fullname" .) .Values.persistence.existingClaim }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if .Values.importRealms.configMap }}
+        - name: import
+          configMap:
+            name: {{ .Values.importRealms.configMap }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -148,3 +148,47 @@ jobs:
         run: SUITE_DIR=$PWD/conformance-suite PYTHON=$RUNNER_TEMP/venv/bin/python WORK=$RUNNER_TEMP scripts/conformance/run.sh
       - if: failure()
         run: tail -n 60 "$RUNNER_TEMP/run.log" "$RUNNER_TEMP/gocloak.log" "$RUNNER_TEMP/suite.log"
+
+  packaging:
+    # The release configuration (.goreleaser.yaml) built as a snapshot, its
+    # image started, and the Helm chart linted and validated.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: docker/setup-buildx-action@v3
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: v2.12.7
+          args: release --snapshot --clean
+      - name: start the image
+        run: |
+          version=$(jq -r .version dist/metadata.json)
+          docker run -d --name gocloak -p 8080:8080 -p 9000:9000 -e KC_HEALTH_ENABLED=true \
+            -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+            "ghcr.io/ducnt114/gocloak:$version-amd64" start-dev
+          for i in $(seq 1 30); do curl -sf localhost:9000/health/ready && break; sleep 1; done
+          curl -sf -o /dev/null localhost:8080/admin/
+          curl -sf -d grant_type=password -d client_id=admin-cli -d username=admin -d password=admin \
+            localhost:8080/realms/master/protocol/openid-connect/token > /dev/null
+          test "$(docker image inspect -f '{{.Architecture}}' "ghcr.io/ducnt114/gocloak:$version-arm64")" = arm64
+      - if: failure()
+        run: docker logs gocloak 2>&1 | tail -50
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.19.0
+      - name: helm chart
+        run: |
+          curl -sL https://github.com/yannh/kubeconform/releases/download/v0.7.0/kubeconform-linux-amd64.tar.gz | tar xz -C "$RUNNER_TEMP" kubeconform
+          helm lint charts/gocloak
+          helm template t charts/gocloak | "$RUNNER_TEMP/kubeconform" -strict -summary -
+          helm template t charts/gocloak --set database.vendor=postgres,database.url=postgres://db/gocloak,replicaCount=3 \
+            --set ingress.enabled=true,podDisruptionBudget.enabled=true,metrics.serviceMonitor.enabled=true \
+            | "$RUNNER_TEMP/kubeconform" -strict -summary -skip ServiceMonitor -
+          if helm template t charts/gocloak --set replicaCount=2 >/dev/null 2>&1; then
+            echo "several SQLite replicas were accepted"; exit 1
+          fi

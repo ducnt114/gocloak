@@ -1,0 +1,17 @@
+gocloak is starting ({{ .Values.replicaCount }} node(s), database: {{ .Values.database.vendor }}).
+
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+URL: http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}/
+{{- end }}
+{{- else }}
+Reach it with:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "gocloak.fullname" . }} 8080:{{ .Values.service.port }}
+  open http://localhost:8080/admin/
+{{- end }}
+
+Master realm administrator: {{ .Values.admin.username }}
+{{- if not .Values.admin.existingSecret }}
+Password:
+  kubectl get secret -n {{ .Release.Namespace }} {{ include "gocloak.adminSecret" . }} -o jsonpath='{.data.password}' | base64 -d
+{{- end }}

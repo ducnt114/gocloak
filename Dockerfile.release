@@ -1,0 +1,12 @@
+# Image of a release, built by GoReleaser from its binaries (see
+# .goreleaser.yaml); Dockerfile builds the same image from source.
+FROM gcr.io/distroless/static-debian12:nonroot
+ARG TARGETPLATFORM
+COPY $TARGETPLATFORM/gocloak /gocloak
+COPY build/admin-console /opt/gocloak/admin-console
+COPY --chown=65532:65532 build/data /data
+ENV GOCLOAK_DB=/data/gocloak.db GOCLOAK_ADMIN_CONSOLE_DIR=/opt/gocloak/admin-console
+VOLUME /data
+EXPOSE 8080 8443 9000
+ENTRYPOINT ["/gocloak"]
+CMD ["start-dev"]

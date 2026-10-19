@@ -351,7 +351,7 @@ external tokens (identity providers), encrypted request objects, mutual TLS
 client authentication and bound tokens, JARM, the implicit and hybrid flows,
 the account console page of consents (the account API has them).
 
-## M11 — Operations and scale (M)
+## M11 — Operations and scale (M) ✅ done
 
 - **Clustering**: stateless nodes over a shared PostgreSQL database; cross-node
   invalidation of the key and realm caches; optional Redis for sessions if the
@@ -366,17 +366,39 @@ the account console page of consents (the account API has them).
 Acceptance: three nodes behind a load balancer serve logins and refreshes
 without sticky sessions; p99 token endpoint latency is documented.
 
+Done notes: nodes on one PostgreSQL database invalidate each other's key and
+configuration caches with `LISTEN`/`NOTIFY`, drop them when (re)connecting
+the listener, and take advisory locks for periodic jobs, migrations and the
+first bootstrap, so replicas can start together on an empty database. The
+configuration cache (`internal/store/cache.go`) keeps the results of queries
+that read only realm configuration and replays them through `database/sql`;
+it brought a token request from about 20 queries to 6. The cluster tests
+(`TestCluster*`, PostgreSQL) run three nodes behind a round-robin balancer
+for logins, refreshes, key rotation and mapper changes, and start three nodes
+at once. `scripts/loadtest` measured the same setup on a 4-core Pentium
+Silver: token endpoint p99 of 8.8 ms (client credentials) and 13.8 ms
+(refresh) under moderate load, with RSA signing as the main cost
+(docs/PERFORMANCE.md). The load test is a Go tool rather than k6. Metrics
+cover HTTP requests, user events and the Go runtime; traces cover HTTP
+requests (no database spans). Releases: GoReleaser builds binaries for
+Linux, macOS and Windows on amd64 and arm64 and the multi-arch image
+`ghcr.io/ducnt114/gocloak`; the Helm chart (`charts/gocloak`) is published
+to `oci://ghcr.io/ducnt114/charts`. Not done: Redis for sessions. The
+database was not the bottleneck: PostgreSQL used about a tenth of a core
+while three nodes were saturated.
+
 ---
 
 ## Known technical debt in v0
 
 To fix opportunistically, at the latest in the milestone noted:
 
-- `EffectiveRoles` loads all roles and composite edges of a realm on every
-  call, and admin requests recompute the caller's roles each time (M11).
+- ~~`EffectiveRoles` loads all roles and composite edges of a realm on every
+  call~~: they now come from the configuration cache (M11).
 - Admin API has no CORS support for browser-based tools (M7).
-- Sessions and auth codes live in the database; fine for one node, revisit for
-  clustering (M11).
+- Sessions and auth codes live in the database, which also makes clustering
+  work without sticky sessions; revisit if the database becomes the
+  bottleneck (it was not at three nodes, see docs/PERFORMANCE.md).
 - Admin error messages only partly match Keycloak's wording (ongoing).
 
 ## Out of scope

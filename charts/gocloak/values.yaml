@@ -1,0 +1,130 @@
+# Number of gocloak nodes. More than one needs PostgreSQL (database.vendor);
+# the nodes share it and need no sticky sessions.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/ducnt114/gocloak
+  # defaults to the chart's appVersion
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# The first master realm administrator, created when the database is empty.
+admin:
+  username: admin
+  # generated (and kept across upgrades) when empty
+  password: ""
+  # use the keys "username" and "password" of this secret instead
+  existingSecret: ""
+
+database:
+  # sqlite (one node, on a persistent volume) or postgres
+  vendor: sqlite
+  # postgres: postgres://host:5432/db?sslmode=require or jdbc:postgresql://host/db
+  url: ""
+  username: ""
+  password: ""
+  # use the key "password" of this secret instead of database.password
+  existingSecret: ""
+  existingSecretPasswordKey: password
+
+# Public base URL, e.g. https://sso.example.com. When empty, the URL is taken
+# from each request (hostname-strict off).
+hostname: ""
+# Trust X-Forwarded-* (xforwarded) or Forwarded (forwarded) headers: set it
+# when gocloak runs behind an ingress controller or another proxy.
+proxyHeaders: xforwarded
+
+log:
+  level: info
+  # default or json
+  format: json
+
+metrics:
+  enabled: true
+  # histogram buckets for http_server_requests_seconds
+  histograms: false
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    labels: {}
+
+tracing:
+  enabled: false
+  endpoint: http://otel-collector:4318
+  samplerRatio: 1.0
+
+# Requests per second allowed per client IP on /realms and /admin, 0 to
+# disable. Behind a proxy, set proxyHeaders so that client IPs are known.
+rateLimit: 100
+
+# Realm exports (JSON) imported at startup, from a config map with one key
+# per realm file. Existing realms are skipped.
+importRealms:
+  configMap: ""
+
+# Extra arguments of "gocloak start", and environment variables.
+extraArgs: []
+extraEnv: []
+
+persistence:
+  # the SQLite database (database.vendor sqlite)
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  existingClaim: ""
+
+service:
+  type: ClusterIP
+  port: 8080
+  managementPort: 9000
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: sso.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
