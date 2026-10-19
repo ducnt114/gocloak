@@ -67,6 +67,11 @@ func (s *Store) GetServiceAccountUser(ctx context.Context, clientUUID string) (*
 	return scanUser(s.q.QueryRowContext(ctx, `SELECT `+userCols+` FROM users WHERE service_account_client_id=?`, clientUUID))
 }
 
+// ListAllUsers returns every user of a realm, service accounts included.
+func (s *Store) ListAllUsers(ctx context.Context, realmID string) ([]*model.User, error) {
+	return queryList(ctx, s, scanUser, `SELECT `+userCols+` FROM users WHERE realm_id=? ORDER BY username`, realmID)
+}
+
 // UserQuery mirrors the query parameters of GET /admin/realms/{realm}/users.
 type UserQuery struct {
 	Search    string
@@ -154,13 +159,4 @@ func (s *Store) DeleteCredential(ctx context.Context, userID, id string) error {
 
 func (s *Store) DeleteCredentialsOfType(ctx context.Context, userID, typ string) error {
 	return s.exec(ctx, `DELETE FROM credentials WHERE user_id=? AND type=?`, userID, typ)
-}
-
-func lower(s string) string { return strings.ToLower(s) }
-
-func limit(max int) int {
-	if max <= 0 {
-		return -1 // SQLite: no limit
-	}
-	return max
 }

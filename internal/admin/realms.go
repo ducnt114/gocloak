@@ -1,7 +1,9 @@
 package admin
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 
 	"github.com/ducnt114/gocloak/internal/jwt"
@@ -81,9 +83,16 @@ func (h *Handler) updateRealm(w http.ResponseWriter, r *http.Request, p *princip
 	if err != nil {
 		return err
 	}
+	body, err := io.ReadAll(http.MaxBytesReader(nil, r.Body, 10<<20))
+	if err != nil {
+		return badRequest("Invalid body")
+	}
 	var rep RealmRep
-	if err := decode(r, &rep); err != nil {
-		return err
+	if err := json.Unmarshal(body, &rep); err != nil {
+		return badRequest("Invalid JSON: " + err.Error())
+	}
+	if err := json.Unmarshal(body, &realm.Settings); err != nil {
+		return badRequest("Invalid JSON: " + err.Error())
 	}
 	if rep.Realm != nil && *rep.Realm != realm.Name && realm.Name == service.MasterRealm {
 		return badRequest("Can't rename master realm")

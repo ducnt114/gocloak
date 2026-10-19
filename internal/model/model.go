@@ -20,7 +20,30 @@ type Realm struct {
 	RegistrationAllowed    bool
 	DefaultRoleID          string
 	Attributes             map[string]string
+	Settings               RealmSettings
 	CreatedAt              time.Time
+}
+
+// RealmSettings holds realm configuration that does not need a column of
+// its own. It is stored as one JSON document; JSON names follow Keycloak's
+// RealmRepresentation so the import/export code can map them one to one.
+type RealmSettings struct {
+	SSLRequired                 string   `json:"sslRequired,omitempty"`
+	RegistrationEmailAsUsername bool     `json:"registrationEmailAsUsername,omitempty"`
+	RememberMe                  bool     `json:"rememberMe,omitempty"`
+	VerifyEmail                 bool     `json:"verifyEmail,omitempty"`
+	ResetPasswordAllowed        bool     `json:"resetPasswordAllowed,omitempty"`
+	EditUsernameAllowed         bool     `json:"editUsernameAllowed,omitempty"`
+	RevokeRefreshToken          bool     `json:"revokeRefreshToken,omitempty"`
+	RefreshTokenMaxReuse        int      `json:"refreshTokenMaxReuse,omitempty"`
+	OfflineSessionIdleTimeout   int      `json:"offlineSessionIdleTimeout,omitempty"`
+	NotBefore                   int64    `json:"notBefore,omitempty"`
+	LoginTheme                  string   `json:"loginTheme,omitempty"`
+	AccountTheme                string   `json:"accountTheme,omitempty"`
+	EmailTheme                  string   `json:"emailTheme,omitempty"`
+	InternationalizationEnabled bool     `json:"internationalizationEnabled,omitempty"`
+	SupportedLocales            []string `json:"supportedLocales,omitempty"`
+	DefaultLocale               string   `json:"defaultLocale,omitempty"`
 }
 
 // Client is an application that can request authentication.

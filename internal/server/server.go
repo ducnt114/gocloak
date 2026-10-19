@@ -22,7 +22,7 @@ import (
 
 // Config configures a Server.
 type Config struct {
-	DBPath        string
+	DB            store.Config
 	Hostname      string
 	ProxyHeaders  bool
 	AdminUser     string
@@ -43,12 +43,14 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
-	if dir := filepath.Dir(cfg.DBPath); dir != "" {
-		if err := os.MkdirAll(dir, 0o700); err != nil {
-			return nil, err
+	if cfg.DB.Driver == "" || cfg.DB.Driver == store.SQLite {
+		if dir := filepath.Dir(cfg.DB.URL); dir != "" {
+			if err := os.MkdirAll(dir, 0o700); err != nil {
+				return nil, err
+			}
 		}
 	}
-	st, err := store.Open(cfg.DBPath)
+	st, err := store.Open(cfg.DB)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
@@ -142,6 +144,31 @@ func (s *Server) ImportDir(ctx context.Context, dir string) error {
 		}
 	}
 	return nil
+}
+
+// ExportRealm returns the full export (including users and secrets) of a realm.
+func (s *Server) ExportRealm(ctx context.Context, name string) (*admin.RealmRep, error) {
+	realm, err := s.Svc.Store.GetRealmByName(ctx, name)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, fmt.Errorf("realm %q does not exist", name)
+		}
+		return nil, err
+	}
+	return admin.Export(ctx, s.Svc, realm, admin.FullExport)
+}
+
+// RealmNames lists all realm names.
+func (s *Server) RealmNames(ctx context.Context) ([]string, error) {
+	realms, err := s.Svc.Store.ListRealms(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, r := range realms {
+		out = append(out, r.Name)
+	}
+	return out, nil
 }
 
 // BootstrapAdmin creates (or resets) an admin user in the master realm.

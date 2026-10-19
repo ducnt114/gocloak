@@ -24,6 +24,11 @@ type RealmRep struct {
 	Attributes             map[string]string `json:"attributes,omitempty"`
 	DefaultRole            *RoleRep          `json:"defaultRole,omitempty"`
 
+	// Settings flatten into the realm JSON, as in Keycloak. PUT requests
+	// apply them by decoding the body onto the stored settings, so absent
+	// keys keep their value.
+	model.RealmSettings
+
 	// Only used for import.
 	Roles   *RolesRep   `json:"roles,omitempty"`
 	Clients []ClientRep `json:"clients,omitempty"`
@@ -162,7 +167,7 @@ func realmToRep(r *model.Realm, defaultRole *model.Role) RealmRep {
 		AccessTokenLifespan: ptr(r.AccessTokenLifespan), AccessCodeLifespan: ptr(r.AccessCodeLifespan),
 		SSOSessionIdleTimeout: ptr(r.SSOSessionIdleTimeout), SSOSessionMaxLifespan: ptr(r.SSOSessionMaxLifespan),
 		LoginWithEmailAllowed: ptr(r.LoginWithEmailAllowed), DuplicateEmailsAllowed: ptr(r.DuplicateEmailsAllowed),
-		RegistrationAllowed: ptr(r.RegistrationAllowed), Attributes: r.Attributes,
+		RegistrationAllowed: ptr(r.RegistrationAllowed), Attributes: r.Attributes, RealmSettings: r.Settings,
 	}
 	if defaultRole != nil {
 		dr := roleToRep(defaultRole, r.ID)

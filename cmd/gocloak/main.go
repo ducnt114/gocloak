@@ -3,24 +3,30 @@
 //	gocloak start-dev                       development mode (HTTP, hostname from request)
 //	gocloak start --hostname https://sso.example.com
 //	gocloak import --file realm-export.json
+//	gocloak export --realm demo --file demo-realm.json
 //	gocloak bootstrap-admin --username admin --password secret
 package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/ducnt114/gocloak/internal/server"
+	"github.com/ducnt114/gocloak/internal/store"
 )
 
 var version = "dev"
@@ -48,6 +54,8 @@ Usage:
   gocloak start-dev [flags]        start in development mode
   gocloak start [flags]            start in production mode (requires --hostname)
   gocloak import --file <path>     import realm export(s) and exit
+  gocloak export --realm <name> --file <path>
+                                   export a realm (or --dir for all realms) and exit
   gocloak bootstrap-admin          create or reset a master realm admin and exit
   gocloak version
 
@@ -69,6 +77,8 @@ func main() {
 		err = importCmd(args)
 	case "bootstrap-admin":
 		err = bootstrapAdmin(args)
+	case "export":
+		err = exportCmd(args)
 	case "version", "--version", "-v":
 		fmt.Println("gocloak", version)
 	case "help", "-h", "--help":
@@ -84,8 +94,8 @@ func main() {
 }
 
 type commonFlags struct {
-	db       *string
-	logLevel *string
+	db, dbURL, dbUser, dbPassword *string
+	logLevel                      *string
 }
 
 func addCommon(fs *flag.FlagSet, dev bool) commonFlags {
@@ -94,9 +104,46 @@ func addCommon(fs *flag.FlagSet, dev bool) commonFlags {
 		level = "debug"
 	}
 	return commonFlags{
-		db:       fs.String("db", envDefault("data/gocloak.db", "GOCLOAK_DB"), "path of the SQLite database `file` (env GOCLOAK_DB)"),
-		logLevel: fs.String("log-level", envDefault(level, "KC_LOG_LEVEL"), "log level: debug, info, warn, error (env KC_LOG_LEVEL)"),
+		db:         fs.String("db", envDefault(store.SQLite, "KC_DB"), "database vendor: sqlite or postgres (env KC_DB)"),
+		dbURL:      fs.String("db-url", env("KC_DB_URL"), "SQLite file path (default data/gocloak.db), or PostgreSQL URL: postgres://host/db or jdbc:postgresql://host/db (env KC_DB_URL)"),
+		dbUser:     fs.String("db-username", env("KC_DB_USERNAME"), "PostgreSQL user (env KC_DB_USERNAME)"),
+		dbPassword: fs.String("db-password", env("KC_DB_PASSWORD"), "PostgreSQL password (env KC_DB_PASSWORD)"),
+		logLevel:   fs.String("log-level", envDefault(level, "KC_LOG_LEVEL"), "log level: debug, info, warn, error (env KC_LOG_LEVEL)"),
 	}
+}
+
+// dbConfig builds the store configuration, accepting Keycloak's JDBC URLs.
+func (c commonFlags) dbConfig() (store.Config, error) {
+	switch *c.db {
+	case store.SQLite, "":
+		u := *c.dbURL
+		if u == "" {
+			u = envDefault("data/gocloak.db", "GOCLOAK_DB")
+		}
+		return store.Config{Driver: store.SQLite, URL: u}, nil
+	case store.Postgres:
+		raw := *c.dbURL
+		if raw == "" {
+			raw = "postgres://localhost:5432/keycloak"
+		}
+		raw = strings.TrimPrefix(raw, "jdbc:")
+		if strings.HasPrefix(raw, "postgresql://") {
+			raw = "postgres://" + strings.TrimPrefix(raw, "postgresql://")
+		}
+		u, err := url.Parse(raw)
+		if err != nil || u.Scheme != "postgres" {
+			return store.Config{}, fmt.Errorf("invalid --db-url %q", *c.dbURL)
+		}
+		if *c.dbUser != "" {
+			if *c.dbPassword != "" {
+				u.User = url.UserPassword(*c.dbUser, *c.dbPassword)
+			} else {
+				u.User = url.User(*c.dbUser)
+			}
+		}
+		return store.Config{Driver: store.Postgres, URL: u.String()}, nil
+	}
+	return store.Config{}, fmt.Errorf("unsupported --db %q (use sqlite or postgres)", *c.db)
 }
 
 func (c commonFlags) logger() *slog.Logger {
@@ -133,10 +180,14 @@ func start(args []string, dev bool) error {
 		return fmt.Errorf("unsupported --proxy-headers value %q", *proxy)
 	}
 
+	dbCfg, err := common.dbConfig()
+	if err != nil {
+		return err
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	srv, err := server.New(ctx, server.Config{
-		DBPath: *common.db, Hostname: *hostname, ProxyHeaders: *proxy != "", ImportDir: *importDir, Log: log,
+		DB: dbCfg, Hostname: *hostname, ProxyHeaders: *proxy != "", ImportDir: *importDir, Log: log,
 		AdminUser:     env("KC_BOOTSTRAP_ADMIN_USERNAME", "KEYCLOAK_ADMIN"),
 		AdminPassword: env("KC_BOOTSTRAP_ADMIN_PASSWORD", "KEYCLOAK_ADMIN_PASSWORD"),
 	})
@@ -161,7 +212,7 @@ func start(args []string, dev bool) error {
 	}
 	errc := make(chan error, 1)
 	go func() {
-		log.Info("gocloak started", "version", version, "addr", hs.Addr, "tls", tls, "dev", dev, "db", *common.db)
+		log.Info("gocloak started", "version", version, "addr", hs.Addr, "tls", tls, "dev", dev, "db", dbCfg.Driver)
 		if tls {
 			errc <- hs.ListenAndServeTLS(*certFile, *keyFile)
 		} else {
@@ -188,8 +239,12 @@ func importCmd(args []string) error {
 	if *file == "" && *dir == "" {
 		return errors.New("--file or --dir is required")
 	}
+	dbCfg, err := common.dbConfig()
+	if err != nil {
+		return err
+	}
 	ctx := context.Background()
-	srv, err := server.New(ctx, server.Config{DBPath: *common.db, Log: common.logger(),
+	srv, err := server.New(ctx, server.Config{DB: dbCfg, Log: common.logger(),
 		AdminUser: env("KC_BOOTSTRAP_ADMIN_USERNAME", "KEYCLOAK_ADMIN"), AdminPassword: env("KC_BOOTSTRAP_ADMIN_PASSWORD", "KEYCLOAK_ADMIN_PASSWORD")})
 	if err != nil {
 		return err
@@ -210,8 +265,12 @@ func bootstrapAdmin(args []string) error {
 	if *password == "" {
 		return errors.New("--password (or KC_BOOTSTRAP_ADMIN_PASSWORD) is required")
 	}
+	dbCfg, err := common.dbConfig()
+	if err != nil {
+		return err
+	}
 	ctx := context.Background()
-	srv, err := server.New(ctx, server.Config{DBPath: *common.db, Log: common.logger()})
+	srv, err := server.New(ctx, server.Config{DB: dbCfg, Log: common.logger()})
 	if err != nil {
 		return err
 	}
@@ -229,4 +288,64 @@ func atoi(s string) int {
 		return 0
 	}
 	return n
+}
+
+func exportCmd(args []string) error {
+	fs := flag.NewFlagSet("export", flag.ExitOnError)
+	common := addCommon(fs, false)
+	realm := fs.String("realm", "", "realm to export (all realms when empty, requires --dir)")
+	file := fs.String("file", "", "output `file` for a single realm")
+	dir := fs.String("dir", "", "output directory: one <realm>-realm.json per realm")
+	users := fs.String("users", "realm_file", "realm_file to include users, skip to leave them out")
+	fs.Parse(args)
+	if (*file == "") == (*dir == "") {
+		return errors.New("exactly one of --file or --dir is required")
+	}
+	if *file != "" && *realm == "" {
+		return errors.New("--file requires --realm")
+	}
+	if *users != "realm_file" && *users != "skip" {
+		return fmt.Errorf("unsupported --users %q (use realm_file or skip)", *users)
+	}
+	dbCfg, err := common.dbConfig()
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+	srv, err := server.New(ctx, server.Config{DB: dbCfg, Log: common.logger()})
+	if err != nil {
+		return err
+	}
+	defer srv.Close()
+	names := []string{*realm}
+	if *realm == "" {
+		if names, err = srv.RealmNames(ctx); err != nil {
+			return err
+		}
+	}
+	for _, name := range names {
+		rep, err := srv.ExportRealm(ctx, name)
+		if err != nil {
+			return err
+		}
+		if *users == "skip" {
+			rep.Users = nil
+		}
+		b, err := json.MarshalIndent(rep, "", "  ")
+		if err != nil {
+			return err
+		}
+		out := *file
+		if out == "" {
+			if err := os.MkdirAll(*dir, 0o700); err != nil {
+				return err
+			}
+			out = filepath.Join(*dir, name+"-realm.json")
+		}
+		if err := os.WriteFile(out, append(b, '\n'), 0o600); err != nil {
+			return err
+		}
+		fmt.Printf("exported realm %q to %s\n", name, out)
+	}
+	return nil
 }

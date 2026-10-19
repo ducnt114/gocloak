@@ -327,6 +327,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 		{"DELETE " + R, h.deleteRealm},
 		{"POST " + R + "/logout-all", h.logoutAll},
 		{"GET " + R + "/keys", h.getKeys},
+		{"POST " + R + "/partial-export", h.partialExport},
 		{"GET " + R + "/default-default-client-scopes", h.emptyList},
 		{"GET " + R + "/client-scopes", h.emptyList},
 

@@ -9,14 +9,14 @@ import (
 
 const realmCols = `id, name, display_name, enabled, access_token_lifespan, access_code_lifespan,
 	sso_session_idle_timeout, sso_session_max_lifespan, login_with_email_allowed,
-	duplicate_emails_allowed, registration_allowed, default_role_id, attributes, created_at`
+	duplicate_emails_allowed, registration_allowed, default_role_id, attributes, settings, created_at`
 
 func scanRealm(sc scanner) (*model.Realm, error) {
 	r := &model.Realm{Attributes: map[string]string{}}
 	var created int64
 	err := sc.Scan(&r.ID, &r.Name, &r.DisplayName, &r.Enabled, &r.AccessTokenLifespan, &r.AccessCodeLifespan,
 		&r.SSOSessionIdleTimeout, &r.SSOSessionMaxLifespan, &r.LoginWithEmailAllowed,
-		&r.DuplicateEmailsAllowed, &r.RegistrationAllowed, &r.DefaultRoleID, jsonCol{&r.Attributes}, &created)
+		&r.DuplicateEmailsAllowed, &r.RegistrationAllowed, &r.DefaultRoleID, jsonCol{&r.Attributes}, jsonCol{&r.Settings}, &created)
 	if err != nil {
 		return nil, mapErr(err)
 	}
@@ -25,20 +25,20 @@ func scanRealm(sc scanner) (*model.Realm, error) {
 }
 
 func (s *Store) CreateRealm(ctx context.Context, r *model.Realm) error {
-	return s.exec(ctx, `INSERT INTO realms (`+realmCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+	return s.exec(ctx, `INSERT INTO realms (`+realmCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		r.ID, r.Name, r.DisplayName, r.Enabled, r.AccessTokenLifespan, r.AccessCodeLifespan,
 		r.SSOSessionIdleTimeout, r.SSOSessionMaxLifespan, r.LoginWithEmailAllowed,
-		r.DuplicateEmailsAllowed, r.RegistrationAllowed, r.DefaultRoleID, toJSON(r.Attributes), r.CreatedAt.Unix())
+		r.DuplicateEmailsAllowed, r.RegistrationAllowed, r.DefaultRoleID, toJSON(r.Attributes), toJSON(r.Settings), r.CreatedAt.Unix())
 }
 
 func (s *Store) UpdateRealm(ctx context.Context, r *model.Realm) error {
 	return s.execOne(ctx, `UPDATE realms SET name=?, display_name=?, enabled=?, access_token_lifespan=?,
 		access_code_lifespan=?, sso_session_idle_timeout=?, sso_session_max_lifespan=?,
 		login_with_email_allowed=?, duplicate_emails_allowed=?, registration_allowed=?,
-		default_role_id=?, attributes=? WHERE id=?`,
+		default_role_id=?, attributes=?, settings=? WHERE id=?`,
 		r.Name, r.DisplayName, r.Enabled, r.AccessTokenLifespan, r.AccessCodeLifespan,
 		r.SSOSessionIdleTimeout, r.SSOSessionMaxLifespan, r.LoginWithEmailAllowed,
-		r.DuplicateEmailsAllowed, r.RegistrationAllowed, r.DefaultRoleID, toJSON(r.Attributes), r.ID)
+		r.DuplicateEmailsAllowed, r.RegistrationAllowed, r.DefaultRoleID, toJSON(r.Attributes), toJSON(r.Settings), r.ID)
 }
 
 func (s *Store) DeleteRealm(ctx context.Context, id string) error {

@@ -2,17 +2,17 @@ CREATE TABLE IF NOT EXISTS realms (
     id                       TEXT PRIMARY KEY,
     name                     TEXT NOT NULL UNIQUE,
     display_name             TEXT NOT NULL DEFAULT '',
-    enabled                  BOOLEAN NOT NULL DEFAULT 1,
-    access_token_lifespan    INTEGER NOT NULL,
-    access_code_lifespan     INTEGER NOT NULL,
-    sso_session_idle_timeout INTEGER NOT NULL,
-    sso_session_max_lifespan INTEGER NOT NULL,
-    login_with_email_allowed BOOLEAN NOT NULL DEFAULT 1,
-    duplicate_emails_allowed BOOLEAN NOT NULL DEFAULT 0,
-    registration_allowed     BOOLEAN NOT NULL DEFAULT 0,
+    enabled                  BOOLEAN NOT NULL DEFAULT TRUE,
+    access_token_lifespan    BIGINT NOT NULL,
+    access_code_lifespan     BIGINT NOT NULL,
+    sso_session_idle_timeout BIGINT NOT NULL,
+    sso_session_max_lifespan BIGINT NOT NULL,
+    login_with_email_allowed BOOLEAN NOT NULL DEFAULT TRUE,
+    duplicate_emails_allowed BOOLEAN NOT NULL DEFAULT FALSE,
+    registration_allowed     BOOLEAN NOT NULL DEFAULT FALSE,
     default_role_id          TEXT NOT NULL DEFAULT '',
     attributes               TEXT NOT NULL DEFAULT '{}',
-    created_at               INTEGER NOT NULL
+    created_at               BIGINT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS clients (
@@ -21,18 +21,18 @@ CREATE TABLE IF NOT EXISTS clients (
     client_id                    TEXT NOT NULL,
     name                         TEXT NOT NULL DEFAULT '',
     description                  TEXT NOT NULL DEFAULT '',
-    enabled                      BOOLEAN NOT NULL DEFAULT 1,
-    public_client                BOOLEAN NOT NULL DEFAULT 0,
-    bearer_only                  BOOLEAN NOT NULL DEFAULT 0,
+    enabled                      BOOLEAN NOT NULL DEFAULT TRUE,
+    public_client                BOOLEAN NOT NULL DEFAULT FALSE,
+    bearer_only                  BOOLEAN NOT NULL DEFAULT FALSE,
     secret                       TEXT NOT NULL DEFAULT '',
     root_url                     TEXT NOT NULL DEFAULT '',
     base_url                     TEXT NOT NULL DEFAULT '',
     redirect_uris                TEXT NOT NULL DEFAULT '[]',
     web_origins                  TEXT NOT NULL DEFAULT '[]',
-    standard_flow_enabled        BOOLEAN NOT NULL DEFAULT 1,
-    direct_access_grants_enabled BOOLEAN NOT NULL DEFAULT 0,
-    service_accounts_enabled     BOOLEAN NOT NULL DEFAULT 0,
-    full_scope_allowed           BOOLEAN NOT NULL DEFAULT 1,
+    standard_flow_enabled        BOOLEAN NOT NULL DEFAULT TRUE,
+    direct_access_grants_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    service_accounts_enabled     BOOLEAN NOT NULL DEFAULT FALSE,
+    full_scope_allowed           BOOLEAN NOT NULL DEFAULT TRUE,
     protocol                     TEXT NOT NULL DEFAULT 'openid-connect',
     attributes                   TEXT NOT NULL DEFAULT '{}',
     UNIQUE (realm_id, client_id)
@@ -43,15 +43,15 @@ CREATE TABLE IF NOT EXISTS users (
     realm_id                  TEXT NOT NULL REFERENCES realms(id) ON DELETE CASCADE,
     username                  TEXT NOT NULL,
     email                     TEXT NOT NULL DEFAULT '',
-    email_verified            BOOLEAN NOT NULL DEFAULT 0,
+    email_verified            BOOLEAN NOT NULL DEFAULT FALSE,
     first_name                TEXT NOT NULL DEFAULT '',
     last_name                 TEXT NOT NULL DEFAULT '',
-    enabled                   BOOLEAN NOT NULL DEFAULT 1,
-    created_timestamp         INTEGER NOT NULL,
+    enabled                   BOOLEAN NOT NULL DEFAULT TRUE,
+    created_timestamp         BIGINT NOT NULL,
     attributes                TEXT NOT NULL DEFAULT '{}',
     required_actions          TEXT NOT NULL DEFAULT '[]',
     service_account_client_id TEXT NOT NULL DEFAULT '',
-    not_before                INTEGER NOT NULL DEFAULT 0,
+    not_before                BIGINT NOT NULL DEFAULT 0,
     UNIQUE (realm_id, username)
 );
 CREATE INDEX IF NOT EXISTS idx_users_email ON users (realm_id, email);
@@ -63,8 +63,8 @@ CREATE TABLE IF NOT EXISTS credentials (
     user_label      TEXT NOT NULL DEFAULT '',
     secret_data     TEXT NOT NULL,
     credential_data TEXT NOT NULL,
-    created_date    INTEGER NOT NULL,
-    priority        INTEGER NOT NULL DEFAULT 10
+    created_date    BIGINT NOT NULL,
+    priority        BIGINT NOT NULL DEFAULT 10
 );
 CREATE INDEX IF NOT EXISTS idx_credentials_user ON credentials (user_id);
 
@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS roles (
     client_id   TEXT NOT NULL DEFAULT '',
     name        TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
-    composite   BOOLEAN NOT NULL DEFAULT 0,
+    composite   BOOLEAN NOT NULL DEFAULT FALSE,
     attributes  TEXT NOT NULL DEFAULT '{}',
     UNIQUE (realm_id, client_id, name)
 );
@@ -119,9 +119,9 @@ CREATE TABLE IF NOT EXISTS user_sessions (
     realm_id     TEXT NOT NULL REFERENCES realms(id) ON DELETE CASCADE,
     user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     ip_address   TEXT NOT NULL DEFAULT '',
-    started      INTEGER NOT NULL,
-    last_refresh INTEGER NOT NULL,
-    remember_me  BOOLEAN NOT NULL DEFAULT 0,
+    started      BIGINT NOT NULL,
+    last_refresh BIGINT NOT NULL,
+    remember_me  BOOLEAN NOT NULL DEFAULT FALSE,
     clients      TEXT NOT NULL DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions (user_id);
@@ -132,7 +132,7 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
     client_id  TEXT NOT NULL,
     params     TEXT NOT NULL,
     user_id    TEXT NOT NULL DEFAULT '',
-    expires_at INTEGER NOT NULL
+    expires_at BIGINT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS auth_codes (
@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS auth_codes (
     nonce                 TEXT NOT NULL,
     code_challenge        TEXT NOT NULL,
     code_challenge_method TEXT NOT NULL,
-    expires_at            INTEGER NOT NULL
+    expires_at            BIGINT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS realm_keys (
@@ -154,12 +154,12 @@ CREATE TABLE IF NOT EXISTS realm_keys (
     realm_id    TEXT NOT NULL REFERENCES realms(id) ON DELETE CASCADE,
     algorithm   TEXT NOT NULL,
     private_pem TEXT NOT NULL,
-    active      BOOLEAN NOT NULL DEFAULT 1,
-    priority    INTEGER NOT NULL DEFAULT 100,
-    created_at  INTEGER NOT NULL
+    active      BOOLEAN NOT NULL DEFAULT TRUE,
+    priority    BIGINT NOT NULL DEFAULT 100,
+    created_at  BIGINT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS revoked_tokens (
     jti        TEXT PRIMARY KEY,
-    expires_at INTEGER NOT NULL
+    expires_at BIGINT NOT NULL
 );

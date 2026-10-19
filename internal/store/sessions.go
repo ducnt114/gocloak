@@ -93,25 +93,19 @@ func (s *Store) CreateAuthCode(ctx context.Context, c *model.AuthCode) error {
 		c.CodeChallenge, c.CodeChallengeMethod, c.ExpiresAt.Unix())
 }
 
-// ConsumeAuthCode atomically fetches and deletes a code, so it can only be used once.
+// ConsumeAuthCode atomically fetches and deletes a code, so it can only be
+// used once even when two requests race.
 func (s *Store) ConsumeAuthCode(ctx context.Context, code string) (*model.AuthCode, error) {
-	var c *model.AuthCode
-	err := s.WithTx(ctx, func(tx *Store) error {
-		c = &model.AuthCode{}
-		var exp int64
-		err := tx.q.QueryRowContext(ctx, `SELECT code, realm_id, client_id, user_id, session_id, redirect_uri, scope, nonce,
-			code_challenge, code_challenge_method, expires_at FROM auth_codes WHERE code=?`, code).
-			Scan(&c.Code, &c.RealmID, &c.ClientID, &c.UserID, &c.SessionID, &c.RedirectURI, &c.Scope, &c.Nonce,
-				&c.CodeChallenge, &c.CodeChallengeMethod, &exp)
-		if err != nil {
-			return mapErr(err)
-		}
-		c.ExpiresAt = time.Unix(exp, 0)
-		return tx.exec(ctx, `DELETE FROM auth_codes WHERE code=?`, code)
-	})
+	c := &model.AuthCode{}
+	var exp int64
+	err := s.q.QueryRowContext(ctx, `DELETE FROM auth_codes WHERE code=? RETURNING code, realm_id, client_id, user_id,
+		session_id, redirect_uri, scope, nonce, code_challenge, code_challenge_method, expires_at`, code).
+		Scan(&c.Code, &c.RealmID, &c.ClientID, &c.UserID, &c.SessionID, &c.RedirectURI, &c.Scope, &c.Nonce,
+			&c.CodeChallenge, &c.CodeChallengeMethod, &exp)
 	if err != nil {
-		return nil, err
+		return nil, mapErr(err)
 	}
+	c.ExpiresAt = time.Unix(exp, 0)
 	return c, nil
 }
 

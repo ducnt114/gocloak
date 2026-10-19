@@ -1,0 +1,242 @@
+package admin
+
+import (
+	"context"
+	"net/http"
+	"sort"
+
+	"github.com/ducnt114/gocloak/internal/model"
+	"github.com/ducnt114/gocloak/internal/service"
+)
+
+// ExportOptions selects what Export includes.
+type ExportOptions struct {
+	Clients bool // clients and client roles
+	Groups  bool // groups and realm roles
+	Users   bool // users with credentials, role mappings and groups
+	Secrets bool // client secrets in clear text instead of "**********"
+}
+
+// FullExport is what `gocloak export` writes.
+var FullExport = ExportOptions{Clients: true, Groups: true, Users: true, Secrets: true}
+
+const maskedSecret = "**********"
+
+// Export builds a Keycloak RealmRepresentation of a realm, the inverse of
+// Import: roles and composites are referenced by name, groups by path.
+func Export(ctx context.Context, svc *service.Service, realm *model.Realm, opts ExportOptions) (*RealmRep, error) {
+	st := svc.Store
+	var defaultRole *model.Role
+	roles, err := st.ListAllRoles(ctx, realm.ID)
+	if err != nil {
+		return nil, err
+	}
+	roleByID := map[string]*model.Role{}
+	for _, r := range roles {
+		roleByID[r.ID] = r
+		if r.ID == realm.DefaultRoleID {
+			defaultRole = r
+		}
+	}
+	rep := realmToRep(realm, defaultRole)
+
+	clients, err := st.ListClients(ctx, realm.ID, "", 0, 0)
+	if err != nil {
+		return nil, err
+	}
+	clientByID := map[string]*model.Client{}
+	for _, c := range clients {
+		clientByID[c.ID] = c
+	}
+	if opts.Clients {
+		for _, c := range clients {
+			cr := clientToRep(c)
+			if !c.PublicClient && !c.BearerOnly {
+				if opts.Secrets {
+					cr.Secret = ptr(c.Secret)
+				} else {
+					cr.Secret = ptr(maskedSecret)
+				}
+			}
+			rep.Clients = append(rep.Clients, cr)
+		}
+	}
+
+	// splitRoles groups roles into realm role names and clientId -> names.
+	splitRoles := func(list []*model.Role) ([]string, map[string][]string) {
+		var realmNames []string
+		var clientNames map[string][]string
+		for _, r := range list {
+			if r.ClientID == "" {
+				realmNames = append(realmNames, r.Name)
+				continue
+			}
+			c := clientByID[r.ClientID]
+			if c == nil {
+				continue
+			}
+			if clientNames == nil {
+				clientNames = map[string][]string{}
+			}
+			clientNames[c.ClientID] = append(clientNames[c.ClientID], r.Name)
+		}
+		sort.Strings(realmNames)
+		for _, v := range clientNames {
+			sort.Strings(v)
+		}
+		return realmNames, clientNames
+	}
+
+	if opts.Groups || opts.Clients {
+		edges, err := st.CompositeEdges(ctx, realm.ID)
+		if err != nil {
+			return nil, err
+		}
+		roleRep := func(r *model.Role) RoleRep {
+			rr := roleToRep(r, realm.ID)
+			if children := edges[r.ID]; len(children) > 0 {
+				var list []*model.Role
+				for _, id := range children {
+					if c := roleByID[id]; c != nil {
+						list = append(list, c)
+					}
+				}
+				rn, cn := splitRoles(list)
+				rr.Composites = &CompositesRep{Realm: rn, Client: cn}
+			}
+			return rr
+		}
+		rep.Roles = &RolesRep{}
+		for _, r := range roles {
+			switch {
+			case r.ClientID == "" && opts.Groups:
+				rep.Roles.Realm = append(rep.Roles.Realm, roleRep(r))
+			case r.ClientID != "" && opts.Clients:
+				c := clientByID[r.ClientID]
+				if c == nil {
+					continue
+				}
+				if rep.Roles.Client == nil {
+					rep.Roles.Client = map[string][]RoleRep{}
+				}
+				rep.Roles.Client[c.ClientID] = append(rep.Roles.Client[c.ClientID], roleRep(r))
+			}
+		}
+		sort.Slice(rep.Roles.Realm, func(i, j int) bool { return *rep.Roles.Realm[i].Name < *rep.Roles.Realm[j].Name })
+		for _, list := range rep.Roles.Client {
+			sort.Slice(list, func(i, j int) bool { return *list[i].Name < *list[j].Name })
+		}
+	}
+
+	if opts.Groups {
+		groups, err := st.ListAllGroups(ctx, realm.ID)
+		if err != nil {
+			return nil, err
+		}
+		children := map[string][]*model.Group{}
+		for _, g := range groups {
+			children[g.ParentID] = append(children[g.ParentID], g)
+		}
+		paths := groupPaths(groups)
+		var build func(g *model.Group) (GroupRep, error)
+		build = func(g *model.Group) (GroupRep, error) {
+			gr := groupToRep(g, paths[g.ID], len(children[g.ID]))
+			gr.Access, gr.SubGroupCount = nil, nil
+			mapped, err := st.GroupRoles(ctx, g.ID)
+			if err != nil {
+				return gr, err
+			}
+			gr.RealmRoles, gr.ClientRoles = splitRoles(mapped)
+			for _, c := range children[g.ID] {
+				sub, err := build(c)
+				if err != nil {
+					return gr, err
+				}
+				gr.SubGroups = append(gr.SubGroups, sub)
+			}
+			return gr, nil
+		}
+		for _, g := range children[""] {
+			gr, err := build(g)
+			if err != nil {
+				return nil, err
+			}
+			rep.Groups = append(rep.Groups, gr)
+		}
+	}
+
+	if opts.Users {
+		users, err := exportUsers(ctx, svc, realm, clientByID, splitRoles)
+		if err != nil {
+			return nil, err
+		}
+		rep.Users = users
+	}
+	return &rep, nil
+}
+
+func exportUsers(ctx context.Context, svc *service.Service, realm *model.Realm, clientByID map[string]*model.Client,
+	splitRoles func([]*model.Role) ([]string, map[string][]string)) ([]UserRep, error) {
+	st := svc.Store
+	groups, err := st.ListAllGroups(ctx, realm.ID)
+	if err != nil {
+		return nil, err
+	}
+	paths := groupPaths(groups)
+	users, err := st.ListAllUsers(ctx, realm.ID)
+	if err != nil {
+		return nil, err
+	}
+	out := []UserRep{}
+	for _, u := range users {
+		ur := userToRep(u)
+		ur.Access = nil
+		if u.ServiceAccountClientID != "" {
+			if c := clientByID[u.ServiceAccountClientID]; c != nil {
+				ur.ServiceAccountClientID = ptr(c.ClientID)
+			}
+		}
+		creds, err := st.ListCredentials(ctx, u.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range creds {
+			ur.Credentials = append(ur.Credentials, CredentialRep{ID: c.ID, Type: c.Type, UserLabel: c.UserLabel,
+				CreatedDate: c.CreatedDate, SecretData: c.SecretData, CredentialData: c.CredentialData, Priority: c.Priority})
+		}
+		mapped, err := st.UserRoles(ctx, u.ID)
+		if err != nil {
+			return nil, err
+		}
+		ur.RealmRoles, ur.ClientRoles = splitRoles(mapped)
+		ug, err := st.UserGroups(ctx, u.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, g := range ug {
+			ur.Groups = append(ur.Groups, paths[g.ID])
+		}
+		sort.Strings(ur.Groups)
+		out = append(out, ur)
+	}
+	return out, nil
+}
+
+// partialExport implements POST /admin/realms/{realm}/partial-export. Like
+// Keycloak it never includes users, and client secrets are masked.
+func (h *Handler) partialExport(w http.ResponseWriter, r *http.Request, p *principal) error {
+	realm, err := h.realmFor(r, p, permViewRealm)
+	if err != nil {
+		return err
+	}
+	q := r.URL.Query()
+	opts := ExportOptions{Clients: q.Get("exportClients") == "true", Groups: q.Get("exportGroupsAndRoles") == "true"}
+	if opts.Clients && !p.can(realm, permViewClients) {
+		return forbidden()
+	}
+	rep, err := Export(r.Context(), h.Svc, realm, opts)
+	if err != nil {
+		return err
+	}
+	return ok(w, rep)
+}

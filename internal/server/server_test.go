@@ -14,7 +14,6 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -32,7 +31,7 @@ type env struct {
 func newEnv(t *testing.T) *env {
 	t.Helper()
 	app, err := New(context.Background(), Config{
-		DBPath: filepath.Join(t.TempDir(), "test.db"), AdminUser: "admin", AdminPassword: "admin",
+		DB: testDB(t), AdminUser: "admin", AdminPassword: "admin",
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	if err != nil {

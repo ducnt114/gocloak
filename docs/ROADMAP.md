@@ -25,7 +25,7 @@ SQLite storage, CLI. See the README for details.
 
 ---
 
-## M0 — Foundations (M)
+## M0 — Foundations (M) ✅ done
 
 Everything after this builds on it.
 

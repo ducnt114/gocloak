@@ -23,6 +23,7 @@ func Import(ctx context.Context, svc *service.Service, rep *RealmRep) (*model.Re
 		realm.ID = *rep.ID
 	}
 	applyRealmRep(realm, rep)
+	realm.Settings = rep.RealmSettings
 	err := svc.Store.WithTx(ctx, func(tx *store.Store) error {
 		if err := svc.CreateRealm(ctx, tx, realm); err != nil {
 			return err
@@ -121,9 +122,15 @@ func importContent(ctx context.Context, svc *service.Service, tx *store.Store, r
 		}
 	}
 	if rep.DefaultRole != nil && rep.DefaultRole.Name != nil {
+		// The export names its own default role (e.g. when a realm is
+		// imported under a new name): use it and drop the generated one.
 		if role, err := tx.GetRoleByName(ctx, realm.ID, "", *rep.DefaultRole.Name); err == nil && role.ID != realm.DefaultRoleID {
+			generated := realm.DefaultRoleID
 			realm.DefaultRoleID = role.ID
 			if err := tx.UpdateRealm(ctx, realm); err != nil {
+				return err
+			}
+			if err := tx.DeleteRole(ctx, generated); err != nil {
 				return err
 			}
 		}

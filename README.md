@@ -5,8 +5,8 @@ An identity and access management server written in Go, modelled on
 representations, role model and token format, so applications using standard
 OIDC and scripts using the core admin endpoints can switch with little or no change.
 
-It is a single static binary with an embedded SQLite database: no JVM, no
-external database, starts in milliseconds.
+It is a single static binary: no JVM. It runs on an embedded SQLite database
+out of the box, or on PostgreSQL for production.
 
 > Status: early. The core OpenID Connect flows and the admin REST API for
 > realms, users, clients, roles and groups are implemented and tested. Many
@@ -58,13 +58,16 @@ docker run -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADM
 | `gocloak start-dev` | Development mode: HTTP, hostname taken from each request, debug logs. |
 | `gocloak start --hostname https://sso.example.com` | Production mode; `--hostname` is required (or `--hostname-strict=false`). |
 | `gocloak import --file realm.json` / `--dir dir/` | Import Keycloak realm exports and exit. Existing realms are skipped. |
+| `gocloak export --realm demo --file demo.json` / `--dir dir/` | Export one or all realms (with users and secrets; `--users skip` leaves users out) and exit. |
 | `gocloak bootstrap-admin --username admin --password ...` | Create or reset a master realm admin and exit. |
 
 Main options (flag / environment variable):
 
 | Flag | Env | Default |
 | --- | --- | --- |
-| `--db` | `GOCLOAK_DB` | `data/gocloak.db` |
+| `--db` | `KC_DB` | `sqlite` (or `postgres`) |
+| `--db-url` | `KC_DB_URL` | `data/gocloak.db` for SQLite; for PostgreSQL `postgres://host:5432/db` or Keycloak's `jdbc:postgresql://host:5432/db` |
+| `--db-username`, `--db-password` | `KC_DB_USERNAME`, `KC_DB_PASSWORD` | PostgreSQL credentials |
 | `--http-host`, `--http-port` | `KC_HTTP_HOST`, `KC_HTTP_PORT` | `0.0.0.0`, `8080` |
 | `--https-certificate-file`, `--https-certificate-key-file`, `--https-port` | `KC_HTTPS_CERTIFICATE_FILE`, `KC_HTTPS_CERTIFICATE_KEY_FILE`, `KC_HTTPS_PORT` | HTTPS off, `8443` |
 | `--hostname` | `KC_HOSTNAME` | derived from the request |
@@ -95,7 +98,7 @@ Main options (flag / environment variable):
 **Admin REST API** (`/admin/realms/...`, Keycloak paths and JSON)
 
 - Realms: list, create (including full realm import with nested roles, clients, groups, users),
-  get, partial update, delete, `logout-all`, `keys`
+  get, partial update, delete, `logout-all`, `keys`, `partial-export`
 - Users: search (`search`, `username`, `email`, `firstName`, `lastName`, `exact`, `enabled`,
   `first`, `max`), count, CRUD with partial updates, `reset-password`, credentials, sessions,
   logout, group membership, role mappings (realm, client, composite, available)
@@ -124,7 +127,7 @@ SAML, identity brokering / social login, LDAP/Kerberos user federation, client s
 protocol mappers as configurable entities (the default `profile`/`email`/`roles` behaviour is
 built in), fine-grained authorization services (UMA), consent, offline tokens, OTP/WebAuthn,
 registration and reset-password emails, brute force detection, events, themes, the admin and
-account consoles, clustering (SQLite is single-node), JWT client authentication, token exchange,
+account consoles, clustering, JWT client authentication, token exchange,
 device flow, CIBA, PAR.
 
 The plan for these is in [docs/ROADMAP.md](docs/ROADMAP.md).
@@ -134,7 +137,7 @@ The plan for these is in [docs/ROADMAP.md](docs/ROADMAP.md).
 ```
 cmd/gocloak          CLI entry point
 internal/model       domain types
-internal/store       SQLite persistence (schema.sql)
+internal/store       SQLite / PostgreSQL persistence, versioned migrations (migrations/)
 internal/password    Keycloak-compatible password hashing
 internal/jwt         RS256 JWS and JWK
 internal/service     realm provisioning, users, roles, keys, token verification
@@ -147,7 +150,15 @@ internal/server      wiring, bootstrap, health, import on startup
 
 ```sh
 go test ./...
+
+# the same suite against PostgreSQL (each test gets its own schema)
+GOCLOAK_TEST_POSTGRES_URL='postgres://user:pass@localhost:5432/gocloak?sslmode=disable' go test ./...
 ```
+
+Schema changes go into a new numbered file in `internal/store/migrations/`;
+migrations are applied automatically at startup and must work on both SQLite
+and PostgreSQL. CI (`.github/workflows/ci.yml`) runs lint, both test suites
+and a Docker smoke test.
 
 The tests in `internal/server` run the real HTTP stack end to end: browser login with PKCE,
 SSO, refresh, logout, client credentials, introspection and revocation, temporary passwords,

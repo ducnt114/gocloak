@@ -71,7 +71,7 @@ func (s *Store) AddComposite(ctx context.Context, parentID, childID string) erro
 		if err := tx.exec(ctx, `INSERT INTO composite_roles (parent_id, child_id) VALUES (?,?) ON CONFLICT DO NOTHING`, parentID, childID); err != nil {
 			return err
 		}
-		return tx.exec(ctx, `UPDATE roles SET composite=1 WHERE id=?`, parentID)
+		return tx.exec(ctx, `UPDATE roles SET composite=? WHERE id=?`, true, parentID)
 	})
 }
 
