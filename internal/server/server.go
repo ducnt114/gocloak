@@ -141,7 +141,7 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 	}
 	console.Register(mux)
 	mux.HandleFunc("GET /health", s.health)
-	mux.HandleFunc("GET /health/live", s.health)
+	mux.HandleFunc("GET /health/live", live)
 	mux.HandleFunc("GET /health/ready", s.health)
 	mux.HandleFunc("GET /{$}", s.welcome)
 	var h http.Handler = mux
@@ -176,9 +176,10 @@ func resourceVersion(version string) string {
 // health checks, and the metrics when they are enabled.
 func (s *Server) ManagementHandler() http.Handler {
 	mux := http.NewServeMux()
-	for _, p := range []string{"/health", "/health/live", "/health/ready", "/health/started"} {
+	for _, p := range []string{"/health", "/health/ready", "/health/started"} {
 		mux.HandleFunc("GET "+p, s.health)
 	}
+	mux.HandleFunc("GET /health/live", live)
 	if s.Metrics != nil {
 		mux.Handle("GET /metrics", s.Metrics.Handler())
 	}
@@ -315,6 +316,13 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Fprint(w, `{"status":"UP","checks":[{"name":"database","status":"UP"}]}`)
+}
+
+// live answers the liveness check: the process serves requests. It does not
+// check the database, whose outage restarting the server would not fix.
+func live(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprint(w, `{"status":"UP","checks":[]}`)
 }
 
 func (s *Server) welcome(w http.ResponseWriter, r *http.Request) {
