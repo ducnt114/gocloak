@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ducnt114/gocloak/internal/jwt"
 	"github.com/ducnt114/gocloak/internal/model"
@@ -53,8 +54,12 @@ func (k *RealmKey) Status() string {
 }
 
 type keySet struct {
-	keys []*RealmKey // sorted by priority, highest first
+	keys   []*RealmKey // sorted by priority, highest first
+	loaded time.Time
 }
+
+// keyCacheTTL bounds how long a node keeps keys without reloading them.
+const keyCacheTTL = 5 * time.Minute
 
 func configBool(c *model.Component, key string, def bool) bool {
 	switch c.Get(key) {
@@ -283,8 +288,20 @@ func (s *Service) CreateDefaultKeys(ctx context.Context, st *store.Store, realm 
 
 // InvalidateKeys drops the cached keys of a realm.
 func (s *Service) InvalidateKeys(realmID string) {
+	s.invalidateKeysLocal(realmID)
+	// other nodes of a cluster drop their copy too
+	if err := s.Store.Notify(context.Background(), topicKeys, realmID); err != nil {
+		s.logger().Warn("cluster invalidation", "err", err)
+	}
+}
+
+func (s *Service) invalidateKeysLocal(realmID string) {
 	s.mu.Lock()
-	delete(s.keys, realmID)
+	if realmID == "" {
+		s.keys = map[string]*keySet{}
+	} else {
+		delete(s.keys, realmID)
+	}
 	s.mu.Unlock()
 }
 
@@ -292,14 +309,16 @@ func (s *Service) loadKeys(ctx context.Context, realmID string) (*keySet, error)
 	s.mu.RLock()
 	ks := s.keys[realmID]
 	s.mu.RUnlock()
-	if ks != nil {
+	// cached keys are refreshed now and then, in case an invalidation from
+	// another node was missed
+	if ks != nil && time.Since(ks.loaded) < keyCacheTTL {
 		return ks, nil
 	}
 	comps, err := s.Store.ListComponents(ctx, realmID, KeyProviderType)
 	if err != nil {
 		return nil, err
 	}
-	ks = &keySet{}
+	ks = &keySet{loaded: time.Now()}
 	for _, c := range comps {
 		k, err := keyFromComponent(c)
 		if err != nil {

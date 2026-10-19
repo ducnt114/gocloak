@@ -93,6 +93,9 @@ type Store struct {
 	q      querier
 	driver string
 	inTx   bool
+
+	// OnListenError reports a lost invalidation connection (see Listen).
+	OnListenError func(error)
 }
 
 // Open opens the database and applies pending migrations.

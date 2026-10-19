@@ -256,12 +256,17 @@ func (s *Server) RunJanitor(ctx context.Context, every time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			unlock, ok, err := s.Svc.Store.TryLock(ctx, "janitor")
+			if err != nil || !ok {
+				continue
+			}
 			if err := s.Svc.Store.PurgeExpired(ctx, s.Svc.Now()); err != nil && ctx.Err() == nil {
 				s.Log.Error("purge expired", "err", err)
 			}
 			if err := s.Svc.PurgeExpiredEvents(ctx); err != nil && ctx.Err() == nil {
 				s.Log.Error("purge events", "err", err)
 			}
+			unlock()
 		}
 	}
 }

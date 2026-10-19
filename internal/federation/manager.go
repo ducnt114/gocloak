@@ -585,6 +585,12 @@ func (m *Manager) RunPeriodicSync(ctx context.Context, every time.Duration) {
 }
 
 func (m *Manager) periodicSync(ctx context.Context) {
+	// one node of a cluster synchronizes at a time
+	unlock, ok, err := m.Svc.Store.TryLock(ctx, "federation-sync")
+	if err != nil || !ok {
+		return
+	}
+	defer unlock()
 	realms, err := m.Svc.Store.ListRealms(ctx)
 	if err != nil {
 		return
