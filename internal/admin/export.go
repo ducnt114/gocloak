@@ -185,6 +185,21 @@ func Export(ctx context.Context, svc *service.Service, realm *model.Realm, opts 
 		return nil, err
 	}
 
+	idps, err := st.ListIdentityProviders(ctx, realm.ID)
+	if err != nil {
+		return nil, err
+	}
+	for _, idp := range idps {
+		rep.IdentityProviders = append(rep.IdentityProviders, idpToRep(idp, opts.Secrets))
+		ms, err := st.ListIdPMappers(ctx, realm.ID, idp.Alias)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range ms {
+			rep.IdentityProviderMappers = append(rep.IdentityProviderMappers, idpMapperToRep(m))
+		}
+	}
+
 	if opts.Users {
 		users, err := exportUsers(ctx, svc, realm, clientByID, splitRoles)
 		if err != nil {
@@ -237,6 +252,14 @@ func exportUsers(ctx context.Context, svc *service.Service, realm *model.Realm, 
 			ur.Groups = append(ur.Groups, paths[g.ID])
 		}
 		sort.Strings(ur.Groups)
+		links, err := st.ListFederatedIdentities(ctx, u.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, l := range links {
+			ur.FederatedIdentities = append(ur.FederatedIdentities, FederatedIdentityRep{IdentityProvider: l.IdentityProvider,
+				UserID: l.FederatedUserID, UserName: l.FederatedUsername})
+		}
 		out = append(out, ur)
 	}
 	return out, nil

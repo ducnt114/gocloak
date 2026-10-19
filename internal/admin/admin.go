@@ -497,6 +497,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	add := func(pattern string, fn handlerFunc) { mux.HandleFunc(pattern, h.wrap(fn)) }
 	h.registerScopeRoutes(R, add)
 	h.registerAuthenticationRoutes(R, add)
+	h.registerBrokeringRoutes(R, add)
 	add("GET "+R+"/users/profile", h.getUserProfile)
 	add("PUT "+R+"/users/profile", h.putUserProfile)
 	add("GET "+R+"/users/profile/metadata", h.getUserProfileMetadata)

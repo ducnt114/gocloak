@@ -24,3 +24,22 @@
 </form>
 </body>
 </html>{{end}}
+
+{{define "social"}}{{if .Providers}}
+<div id="kc-social-providers" class="social">
+  <p class="center muted">{{.T "identity-provider-login-label"}}</p>
+  {{range .Providers}}<a id="social-{{.Alias}}" class="social-link social-{{.ProviderID}}" href="{{.URL}}">{{.DisplayName}}</a>
+  {{end}}
+</div>{{end}}{{end}}
+
+{{define "login-idp-link-confirm.html"}}{{template "header" .}}
+<form id="kc-register-form" method="post" action="{{.Action}}">
+  <button type="submit" class="secondary" name="submitAction" id="updateProfile" value="updateProfile">{{.T "confirmLinkIdpReviewProfile"}}</button>
+  <button type="submit" name="submitAction" id="linkAccount" value="linkAccount">{{.T "confirmLinkIdpContinue"}}</button>
+</form>
+{{template "footer" .}}{{end}}
+
+{{define "login-idp-link-email.html"}}{{template "header" .}}
+<p id="instruction1">{{.T "emailLinkIdp2"}} <a href="{{.LinkURL}}&amp;resend=true">{{.T "emailLinkIdp3"}}</a></p>
+<p id="instruction2">{{.T "emailLinkIdp4"}} <a id="kc-continue" href="{{.LinkURL}}">{{.T "emailLinkIdp5"}}</a></p>
+{{template "footer" .}}{{end}}

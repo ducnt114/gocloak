@@ -188,6 +188,10 @@ func (s *Service) CreateRealm(ctx context.Context, st *store.Store, r *model.Rea
 		return err
 	}
 
+	if err := s.createBrokerClient(ctx, st, r); err != nil {
+		return err
+	}
+
 	mgmt := &model.Client{ID: NewID(), RealmID: r.ID, ClientID: RealmManagementClient, Name: "${client_realm-management}",
 		Enabled: true, BearerOnly: true, FullScopeAllowed: false, Protocol: "openid-connect"}
 	if err := st.CreateClient(ctx, mgmt); err != nil {

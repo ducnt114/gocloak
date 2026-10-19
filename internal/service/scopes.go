@@ -252,6 +252,9 @@ func (s *Service) UpgradeRealms(ctx context.Context) error {
 		return err
 	}
 	for _, r := range realms {
+		if err := s.ensureBrokerClient(ctx, r); err != nil {
+			return err
+		}
 		n, err := s.Store.CountClientScopes(ctx, r.ID)
 		if err != nil {
 			return err

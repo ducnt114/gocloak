@@ -27,15 +27,25 @@ type authenticatorDef struct {
 
 var authenticators map[string]*authenticatorDef
 
-func attempted(*flowContext) (result, error) { return resAttempted, nil }
-func succeed(*flowContext) (result, error)   { return resSuccess, nil }
+func attempted(*flowContext) (result, error)        { return resAttempted, nil }
+func never(*flowContext, *model.User) (bool, error) { return false, nil }
+func succeed(*flowContext) (result, error)          { return resSuccess, nil }
 
 func init() {
 	authenticators = map[string]*authenticatorDef{
-		"auth-cookie":                  {authenticate: cookieAuthenticate},
-		"auth-spnego":                  {authenticate: attempted},
-		"identity-provider-redirector": {authenticate: attempted},
-		"organization":                 {authenticate: attempted},
+		"auth-cookie":                     {authenticate: cookieAuthenticate},
+		"auth-spnego":                     {authenticate: attempted},
+		"identity-provider-redirector":    {authenticate: idpRedirector},
+		"idp-review-profile":              {authenticate: idpReviewProfile, action: idpReviewProfileAction},
+		"idp-create-user-if-unique":       {authenticate: idpCreateUserIfUnique},
+		"idp-detect-existing-broker-user": {authenticate: idpDetectExistingUser},
+		"idp-auto-link":                   {authenticate: idpAutoLink},
+		"idp-confirm-link":                {authenticate: idpConfirmLink, action: idpConfirmLinkAction},
+		"idp-email-verification":          {authenticate: idpEmailVerification},
+		"idp-username-password-form": {authenticate: idpPasswordForm, action: idpPasswordAction,
+			configuredFor: hasCredential(model.CredentialPassword)},
+		"idp-add-organization-member": {authenticate: succeed, configuredFor: never},
+		"organization":                {authenticate: attempted},
 		"auth-username-password-form": {authenticate: usernamePasswordForm, action: usernamePasswordAction,
 			configuredFor: hasCredential(model.CredentialPassword)},
 		"auth-username-form": {authenticate: usernameForm, action: usernameAction},
@@ -154,9 +164,16 @@ func (fc *flowContext) renderLogin(page, username, errMsg string, status int) (r
 	if fc.realm.Settings.RegistrationEmailAsUsername {
 		label = "email"
 	}
+	if errMsg == "" && fc.as.Params[keyFlashError] != "" {
+		errMsg = fc.as.Params[keyFlashError]
+	}
+	delete(fc.as.Params, keyFlashError)
 	d := pageData{realm: fc.realm, r: fc.r, user: fc.user, Title: "loginAccountTitle", Error: errMsg, Username: username,
 		UsernameLabel: label, Action: fc.actionURL(), RememberMe: fc.realm.Settings.RememberMe,
-		Remembered: fc.as.Params[keyRemember] == "true"}
+		Remembered: fc.as.Params[keyRemember] == "true", Message: fc.message, MessageArgs: fc.messageArgs}
+	if page == "login" || page == "login-username" {
+		d.Providers = fc.h.loginProviders(fc.r, fc.realm, fc.as)
+	}
 	if fc.realm.RegistrationAllowed {
 		d.RegisterURL = fc.h.loginActionURL(fc.r, fc.realm, "registration", fc.as.ID)
 	}

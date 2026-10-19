@@ -28,6 +28,9 @@ func (h *Handler) page(fn pageFunc) http.HandlerFunc {
 		q := r.URL.Query()
 		if q.Has("code") || q.Has("error") {
 			// back from the login: the SSO cookie is set, drop the OAuth parameters
+			if q.Has("error") && strings.HasSuffix(r.URL.Path, "/linked-accounts") {
+				q.Set("linkError", q.Get("error")) // back from linking an account
+			}
 			for _, k := range []string{"code", "state", "session_state", "iss", "error", "error_description"} {
 				q.Del(k)
 			}
@@ -92,6 +95,7 @@ type accountPage struct {
 	Credentials           []credentialGroup
 	Applications          []applicationRep
 	Groups                []map[string]string
+	LinkedAccounts        []linkedAccountRep
 	ShowGroups            bool
 
 	StateChecker, BaseURL, LogoutURL string

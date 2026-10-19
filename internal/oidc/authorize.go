@@ -128,6 +128,7 @@ func (h *Handler) authorizeWith(w http.ResponseWriter, r *http.Request, binding 
 		"prompt":                q("prompt"),
 		"max_age":               q("max_age"),
 		"kc_action":             q("kc_action"),
+		"kc_idp_hint":           q("kc_idp_hint"),
 	}
 
 	if strings.Contains(q("prompt"), "none") {
@@ -255,9 +256,13 @@ func (h *Handler) finishLogin(w http.ResponseWriter, r *http.Request, realm *mod
 	ctx := r.Context()
 	var err error
 	if us == nil {
-		if us, err = h.newSession(r, realm, user, client, map[string]string{
-			"AUTH_TIME": strconv.FormatInt(h.Svc.Now().Unix(), 10),
-		}); err != nil {
+		notes := map[string]string{"AUTH_TIME": strconv.FormatInt(h.Svc.Now().Unix(), 10)}
+		for k, v := range params {
+			if strings.HasPrefix(k, notePrefix) {
+				notes[strings.TrimPrefix(k, notePrefix)] = v
+			}
+		}
+		if us, err = h.newSession(r, realm, user, client, notes); err != nil {
 			h.serverErrorPage(w, r, err)
 			return
 		}
@@ -313,6 +318,9 @@ func (h *Handler) redirectResult(w http.ResponseWriter, r *http.Request, redirec
 		sep := "?"
 		if strings.Contains(redirectURI, "?") {
 			sep = "&"
+		}
+		if len(v) == 0 {
+			sep = ""
 		}
 		http.Redirect(w, r, redirectURI+sep+v.Encode(), http.StatusFound)
 	}
@@ -387,6 +395,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var client *model.Client
+	hintSession := ""
 	if hint := r.FormValue("id_token_hint"); hint != "" {
 		// Expired ID tokens are acceptable as hints, so only the signature is checked.
 		claims, err := jwt.Verify(hint, func(kid, alg string) *jwt.Key { return h.Svc.VerificationKey(ctx, realm.ID, kid, alg) })
@@ -397,6 +406,14 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 		if client, err = h.Svc.Store.GetClientByClientID(ctx, realm.ID, claims.String("azp")); err != nil {
 			h.errorPage(w, r, http.StatusBadRequest, "invalidIdTokenHintMessage")
 			return
+		}
+		hintSession = claims.String("sid")
+		if hintSession != "" {
+			// without the SSO cookie (e.g. a broker's back-channel logout),
+			// the session of the hint is logged out, as Keycloak does
+			if s, err := h.Svc.Store.GetUserSession(ctx, hintSession); err != nil || s.UserID != claims.String("sub") {
+				hintSession = ""
+			}
 		}
 	}
 	if cid := r.FormValue("client_id"); cid != "" {
@@ -414,6 +431,9 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	us, _ := h.ssoSession(r, realm)
+	if us == nil && hintSession != "" {
+		us, _ = h.Svc.Store.GetUserSession(ctx, hintSession)
+	}
 	// Without an id_token_hint the user must confirm, which also protects
 	// against cross-site logout requests.
 	if us != nil && r.FormValue("id_token_hint") == "" && !h.logoutConfirmed(r) {
@@ -428,7 +448,9 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 			Action: h.URLs.Issuer(r, realm.Name) + "/protocol/openid-connect/logout", Fields: fields})
 		return
 	}
+	front := ""
 	if us != nil {
+		front = h.idpLogout(r, realm, us, true, redirect, r.FormValue("state"))
 		if err := h.Svc.Store.DeleteUserSession(ctx, us.ID); err != nil {
 			h.serverErrorPage(w, r, err)
 			return
@@ -437,6 +459,10 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 			details: map[string]string{"redirect_uri": redirect}})
 	}
 	h.clearCookie(w, r, realm, identityCookie)
+	if front != "" {
+		http.Redirect(w, r, front, http.StatusFound)
+		return
+	}
 	if redirect != "" {
 		v := url.Values{}
 		if s := r.FormValue("state"); s != "" {
@@ -484,6 +510,7 @@ func (h *Handler) backchannelLogout(w http.ResponseWriter, r *http.Request, real
 		return
 	}
 	if vt.Session != nil {
+		h.idpLogout(r, realm, vt.Session, false, "", "")
 		if err := h.Svc.Store.DeleteSession(r.Context(), vt.Session); err != nil {
 			h.writeError(w, err)
 			return

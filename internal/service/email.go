@@ -196,19 +196,36 @@ func emailLocale(realm *model.Realm, u *model.User) string {
 // language. The body messages get Keycloak's arguments: {0} link, {1}
 // lifespan in minutes, {2} realm name, {3} lifespan as text, {4} actions.
 func (s *Service) EmailMessage(realm *model.Realm, u *model.User, kind, link string, lifespan int, actions []string) (Email, error) {
+	return s.EmailMessageWith(realm, u, kind, link, func(th *theme.Theme, locale string) []any {
+		names := make([]string, len(actions))
+		for i, a := range actions {
+			names[i] = th.Message(locale, "requiredAction."+a)
+		}
+		return []any{link, lifespan / 60, realmDisplay(realm), lifespanText(th, locale, lifespan), strings.Join(names, ", ")}
+	})
+}
+
+// IdPLinkEmail is the email that verifies an account before it is linked to
+// an identity provider account: {0} provider, {1} realm, {2} the provider
+// username, {3} link, {4} lifespan in minutes, {5} lifespan as text.
+func (s *Service) IdPLinkEmail(realm *model.Realm, u *model.User, provider, providerUser, link string, lifespan int) (Email, error) {
+	return s.EmailMessageWith(realm, u, "identityProviderLink", link, func(th *theme.Theme, locale string) []any {
+		return []any{provider, realmDisplay(realm), providerUser, link, lifespan / 60, lifespanText(th, locale, lifespan)}
+	})
+}
+
+// EmailMessageWith builds an email of the realm's email theme with the
+// message arguments returned by args.
+func (s *Service) EmailMessageWith(realm *model.Realm, u *model.User, kind, link string, args func(*theme.Theme, string) []any) (Email, error) {
 	th, err := s.Themes.Get(theme.Email, realm.Settings.EmailTheme)
 	if err != nil {
 		return Email{}, err
 	}
 	locale := emailLocale(realm, u)
-	names := make([]string, len(actions))
-	for i, a := range actions {
-		names[i] = th.Message(locale, "requiredAction."+a)
-	}
-	args := []any{link, lifespan / 60, realmDisplay(realm), lifespanText(th, locale, lifespan), strings.Join(names, ", ")}
-	e := Email{To: u.Email, Subject: th.Message(locale, kind+"Subject", args...), Text: th.Message(locale, kind+"Body", args...)}
+	a := args(th, locale)
+	e := Email{To: u.Email, Subject: th.Message(locale, kind+"Subject", a...), Text: th.Message(locale, kind+"Body", a...)}
 	if th.HasMessage(locale, kind+"BodyHtml") {
-		e.HTML = th.Message(locale, kind+"BodyHtml", args...)
+		e.HTML = th.Message(locale, kind+"BodyHtml", a...)
 	} else {
 		e.HTML = textToHTML(e.Text, link, th.Message(locale, kind+"Link"))
 	}

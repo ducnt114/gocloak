@@ -57,17 +57,20 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE "+A+"/credentials/{id}", h.api(h.apiDeleteCredential))
 	mux.HandleFunc("PUT "+A+"/credentials/{id}/label", h.api(h.apiCredentialLabel))
 	mux.HandleFunc("DELETE "+A+"/applications/{clientId}/consent", h.api(h.apiRevokeConsent))
-	mux.HandleFunc("GET "+A+"/linked-accounts", h.api(func(w http.ResponseWriter, r *http.Request, c *caller) error {
-		return writeJSON(w, http.StatusOK, []any{})
-	}))
+	mux.HandleFunc("GET "+A+"/linked-accounts", h.dispatch(h.linkedAccountsPage, h.apiLinkedAccounts))
+	mux.HandleFunc("POST "+A+"/linked-accounts/{alias}/link", h.page(h.linkPage))
+	mux.HandleFunc("POST "+A+"/linked-accounts/{alias}/unlink", h.page(h.unlinkPage))
+	mux.HandleFunc("GET "+A+"/linked-accounts/{alias}", h.api(h.apiLinkURI))
+	mux.HandleFunc("DELETE "+A+"/linked-accounts/{alias}", h.api(h.apiUnlink))
 }
 
 // caller is the authenticated user of a request.
 type caller struct {
-	realm   *model.Realm
-	user    *model.User
-	session *model.UserSession
-	roles   map[string]bool // account client roles
+	realm    *model.Realm
+	user     *model.User
+	session  *model.UserSession
+	roles    map[string]bool // account client roles
+	clientID string          // client the token was issued to
 }
 
 // can checks an account role; manage-account includes view-profile.
@@ -154,7 +157,7 @@ func (h *Handler) api(fn apiFunc) http.HandlerFunc {
 			if err != nil {
 				return err
 			}
-			c := &caller{realm: realm, user: vt.User, session: vt.Session, roles: roles}
+			c := &caller{realm: realm, user: vt.User, session: vt.Session, roles: roles, clientID: vt.Claims.String("azp")}
 			need := "manage-account"
 			if r.Method == http.MethodGet {
 				need = "view-profile"

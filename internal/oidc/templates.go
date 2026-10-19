@@ -23,6 +23,7 @@ var TemplateFuncs = template.FuncMap{
 type pageData struct {
 	Realm         string
 	Title         string
+	TitleArgs     []any
 	Error         string
 	ErrorArgs     []any
 	Message       string
@@ -35,6 +36,9 @@ type pageData struct {
 	// Links of the login page.
 	RegisterURL, ResetURL, LoginURL, RestartURL string
 	RememberMe, Remembered                      bool
+
+	// Identity provider buttons of the login page.
+	Providers []providerLink
 
 	// A link shown on info pages.
 	LinkURL, LinkText string
@@ -99,7 +103,7 @@ func (d pageData) T(key string, args ...any) string {
 // ErrorText, MessageText and TitleText are the translated page texts.
 func (d pageData) ErrorText() string   { return d.T(d.Error, d.ErrorArgs...) }
 func (d pageData) MessageText() string { return d.T(d.Message, d.MessageArgs...) }
-func (d pageData) TitleText() string   { return d.T(d.Title) }
+func (d pageData) TitleText() string   { return d.T(d.Title, d.TitleArgs...) }
 
 // FieldText translates the error of a profile field.
 func (d pageData) FieldText(f profileField) string { return d.T(f.Error, f.ErrorArgs...) }

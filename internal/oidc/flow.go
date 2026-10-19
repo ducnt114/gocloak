@@ -70,6 +70,10 @@ type flowContext struct {
 
 	direct    bool  // direct grant: no pages
 	directErr error // error to return to the direct grant client
+
+	// message shown on the login form (with its arguments)
+	message     string
+	messageArgs []any
 }
 
 func (fc *flowContext) ctx() context.Context { return fc.r.Context() }
@@ -378,7 +382,13 @@ func (h *Handler) continueFlow(w http.ResponseWriter, r *http.Request, realm *mo
 	if binding == "" {
 		binding = "browser"
 	}
-	flow, err := h.flowFor(r.Context(), realm, client, binding)
+	var flow *model.AuthFlow
+	var err error
+	if binding == bindingFirstBroker || binding == bindingPostBroker {
+		flow, err = h.brokerFlow(r, realm, as, binding)
+	} else {
+		flow, err = h.flowFor(r.Context(), realm, client, binding)
+	}
 	if err != nil {
 		h.serverErrorPage(w, r, fmt.Errorf("flow %s: %w", binding, err))
 		return
@@ -393,6 +403,10 @@ func (h *Handler) continueFlow(w http.ResponseWriter, r *http.Request, realm *mo
 	}
 	switch res {
 	case resSuccess:
+		if binding == bindingFirstBroker {
+			h.afterFirstBrokerLogin(fc)
+			return
+		}
 		h.afterAuthentication(fc)
 	case resAttempted:
 		h.errorPage(w, r, http.StatusBadRequest, "noAuthenticationMethodMessage")

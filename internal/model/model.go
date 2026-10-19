@@ -501,3 +501,43 @@ type AuthenticatorConfig struct {
 	Alias   string
 	Config  map[string]string
 }
+
+// IdentityProvider is an external identity provider users can log in with.
+type IdentityProvider struct {
+	InternalID                string
+	RealmID                   string
+	Alias                     string
+	DisplayName               string
+	ProviderID                string // oidc, keycloak-oidc, oauth2, google, github, microsoft, gitlab, facebook
+	Enabled                   bool
+	TrustEmail                bool
+	StoreToken                bool
+	AddReadTokenRoleOnCreate  bool
+	LinkOnly                  bool
+	HideOnLogin               bool
+	AuthenticateByDefault     bool
+	FirstBrokerLoginFlowAlias string
+	PostBrokerLoginFlowAlias  string
+	GUIOrder                  string
+	Config                    map[string]string
+}
+
+// IdentityProviderMapper imports data from an identity provider.
+type IdentityProviderMapper struct {
+	ID       string
+	RealmID  string
+	IdPAlias string
+	Name     string
+	Type     string
+	Config   map[string]string
+}
+
+// FederatedIdentity links a user to an account at an identity provider.
+type FederatedIdentity struct {
+	UserID            string
+	RealmID           string
+	IdentityProvider  string // alias
+	FederatedUserID   string
+	FederatedUsername string
+	Token             string // stored token response, when the provider stores tokens
+}

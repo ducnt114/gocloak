@@ -18,6 +18,7 @@ const (
 	tokenVerifyEmail      = "verify-email"
 	tokenResetCredentials = "reset-credentials"
 	tokenExecuteActions   = "execute-actions"
+	tokenIdPVerifyAccount = "idp-verify-account-via-email"
 	keyResetVerified      = "_reset_verified"
 )
 
@@ -28,6 +29,7 @@ type actionTokenClaims struct {
 	redirect    string
 	actions     []string
 	lifespan    int // seconds
+	extra       map[string]any
 }
 
 // ActionTokenLink builds a signed, single-use link for an emailed action
@@ -75,6 +77,9 @@ func (h *Handler) actionTokenLink(r *http.Request, realm *model.Realm, client *m
 	if c.email != "" {
 		claims["eml"] = c.email
 	}
+	for k, v := range c.extra {
+		claims[k] = v
+	}
 	return signedLink(iss, client.ClientID, claims, key)
 }
 
@@ -97,7 +102,7 @@ func (h *Handler) actionToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	typ := claims.String("typ")
-	if !slices.Contains([]string{tokenVerifyEmail, tokenResetCredentials, tokenExecuteActions}, typ) {
+	if !slices.Contains([]string{tokenVerifyEmail, tokenResetCredentials, tokenExecuteActions, tokenIdPVerifyAccount}, typ) {
 		expired()
 		return
 	}
@@ -132,6 +137,28 @@ func (h *Handler) actionToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch typ {
+	case tokenIdPVerifyAccount:
+		// The login linking the account may run in another browser: its auth
+		// session is found by id, and continues when that browser comes back.
+		s, err := h.Svc.Store.GetAuthSession(ctx, claims.String("asid"))
+		if err != nil || s.RealmID != realm.ID || h.Svc.Now().After(s.ExpiresAt) || s.Params[keyIdPExisting] != user.ID ||
+			s.Params[keyIdP] != claims.String("idpa") {
+			expired()
+			return
+		}
+		s.Params[keyIdPEmailOK] = "true"
+		if err := h.Svc.Store.UpdateAuthSession(ctx, s); err != nil {
+			h.serverErrorPage(w, r, err)
+			return
+		}
+		h.event(r, realm, "IDENTITY_PROVIDER_LINK_ACCOUNT", &eventInfo{client: client, userID: user.ID, details: map[string]string{
+			"identity_provider": claims.String("idpa"), "identity_provider_identity": claims.String("idpu")}})
+		if as != nil && as.ID == s.ID {
+			h.continueFlow(w, r, realm, client, s, "")
+			return
+		}
+		h.render(w, http.StatusOK, "info", pageData{realm: realm, r: r, Title: "identityProviderLinkSuccess"})
+
 	case tokenVerifyEmail:
 		if !strings.EqualFold(claims.String("eml"), user.Email) {
 			expired()

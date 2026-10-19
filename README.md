@@ -125,6 +125,24 @@ Main options (flag / environment variable):
   permissions and `unmanagedAttributePolicy`
 - Emails over SMTP (SSL / STARTTLS / authentication) with Keycloak's messages
 
+**Identity brokering** (`/realms/{realm}/broker/{alias}/...`)
+
+- Identity providers: generic OpenID Connect (`oidc`, `keycloak-oidc`) and OAuth 2.0 (`oauth2`),
+  and the Google, GitHub (and Enterprise), Microsoft, GitLab, Facebook and Apple presets; client
+  authentication `client_secret_post` / `basic` / `jwt` and `private_key_jwt`, PKCE, ID token
+  validation with the provider's JWKS or a configured key, userinfo, stored tokens
+- Provider buttons on the login page, `kc_idp_hint` and the `identity-provider-redirector`
+  default provider, link-only and hidden providers
+- The first broker login flow: review profile, create the user if unique, or confirm and link an
+  existing account after email verification or re-authentication (with OTP); post broker login
+  flows; `trustEmail`, `addReadTokenRoleOnCreate`, sync modes `IMPORT` / `LEGACY` / `FORCE`
+- Mappers: attribute importer (claims and social JSON fields), username template, hardcoded
+  attribute / role / group / session attribute, claim to role, advanced claim to role / group,
+  session notes
+- Federated identities: account linking from the account console and from applications
+  (`/broker/{alias}/link`), unlinking, stored provider tokens at `/broker/{alias}/token`
+  (`broker/read-token` role), front-channel and back-channel logout at the provider
+
 **Themes, languages and account console**
 
 - Login, email and account themes: built-in theme embedded in the binary, custom themes from
@@ -137,9 +155,9 @@ Main options (flag / environment variable):
   `Accept-Language`, a language selector on login pages, emails in the user's language
 - Account console at `/realms/{realm}/account`: personal info (user profile), account security
   (password, OTP, security keys and passkeys through application initiated actions), device
-  activity with sign out, applications with offline access revocation, groups
+  activity with sign out, linked accounts, applications with offline access revocation, groups
 - Account REST API on the same paths (`Accept: application/json` or a bearer token): account,
-  sessions and devices, credentials and labels, applications and consents, groups
+  sessions and devices, credentials and labels, applications and consents, groups, linked accounts
 - Client scopes and protocol mappers, as in Keycloak: the built-in scopes (`profile`, `email`,
   `roles`, `web-origins`, `acr`, `basic`, `address`, `phone`, `offline_access`, `microprofile-jwt`),
   default and optional scopes per realm and client, `invalid_scope` for unknown scopes, and
@@ -170,6 +188,9 @@ Main options (flag / environment variable):
 - Client scopes: CRUD, protocol mappers, scope mappings, realm default / optional scopes
 - Roles: realm and client roles CRUD, composites, users in role, `roles-by-id`
 - Groups: tree listing, count, `group-by-path`, CRUD, children, members, role mappings
+- Identity providers: `identity-provider/instances` CRUD, mappers, `mapper-types`,
+  `providers/{id}`, `import-config`; users' `federated-identity` links and the `idpAlias` /
+  `idpUserId` user search
 - Authorization exactly by Keycloak's roles: master `admin` (all realms), master `create-realm`,
   and `realm-management` client roles (`realm-admin`, `manage-users`, `view-users`,
   `manage-clients`, `view-clients`, `manage-realm`, `view-realm`, `query-*`, `create-client`).
@@ -179,7 +200,7 @@ Main options (flag / environment variable):
 
 - New realms get the same built-ins as Keycloak: `default-roles-{realm}` (with `offline_access`,
   `uma_authorization`, `account/view-profile`, `account/manage-account`), the `account`,
-  `admin-cli` and `realm-management` clients and their roles.
+  `admin-cli`, `broker` and `realm-management` clients and their roles.
 - Passwords are stored in Keycloak's credential format. New passwords use argon2id with
   Keycloak's parameters; `argon2`, `pbkdf2-sha512`, `pbkdf2-sha256` and `pbkdf2` hashes from a
   Keycloak export are verified as is, so users keep their passwords after migration.
@@ -187,7 +208,7 @@ Main options (flag / environment variable):
 
 ## Not implemented yet
 
-SAML, identity brokering / social login, LDAP/Kerberos user federation, script mappers,
+SAML, LDAP/Kerberos user federation, script mappers,
 fine-grained authorization services (UMA), consent screens, reCAPTCHA, organizations, the admin
 console, FreeMarker themes (gocloak themes use Go templates; Keycloak message bundles work as is),
 clustering, token exchange, device flow, CIBA, PAR.

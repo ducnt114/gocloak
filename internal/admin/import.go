@@ -159,6 +159,9 @@ func importContent(ctx context.Context, svc *service.Service, tx *store.Store, r
 		}
 	}
 
+	if err := importIdentityProviders(ctx, tx, realm, rep); err != nil {
+		return err
+	}
 	for i := range rep.Groups {
 		if err := importGroup(ctx, tx, realm, "", &rep.Groups[i]); err != nil {
 			return err
@@ -256,6 +259,16 @@ func importUser(ctx context.Context, svc *service.Service, tx *store.Store, real
 		return tx.GrantUserRole(ctx, u.ID, id)
 	}); err != nil {
 		return nil, err
+	}
+
+	for _, fi := range ur.FederatedIdentities {
+		if _, err := tx.GetIdentityProvider(ctx, realm.ID, fi.IdentityProvider); err != nil {
+			return nil, badRequest("Identity provider " + fi.IdentityProvider + " not found")
+		}
+		if err := tx.CreateFederatedIdentity(ctx, &model.FederatedIdentity{UserID: u.ID, RealmID: realm.ID,
+			IdentityProvider: fi.IdentityProvider, FederatedUserID: fi.UserID, FederatedUsername: fi.UserName}); err != nil {
+			return nil, err
+		}
 	}
 
 	if len(ur.Groups) > 0 {
@@ -531,6 +544,66 @@ func importComponents(ctx context.Context, svc *service.Service, tx *store.Store
 			return badRequest(err.Error())
 		}
 		if err := svc.SetUserProfile(ctx, tx, realm, cfg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// importIdentityProviders creates or updates the providers and mappers of
+// a realm representation.
+func importIdentityProviders(ctx context.Context, tx *store.Store, realm *model.Realm, rep *RealmRep) error {
+	for i := range rep.IdentityProviders {
+		ir := &rep.IdentityProviders[i]
+		if ir.Alias == nil || *ir.Alias == "" {
+			return badRequest("Missing alias")
+		}
+		idp, err := tx.GetIdentityProvider(ctx, realm.ID, *ir.Alias)
+		switch {
+		case err == nil:
+			applyIdPRep(idp, ir)
+			err = tx.UpdateIdentityProvider(ctx, idp)
+		case errors.Is(err, store.ErrNotFound):
+			idp = &model.IdentityProvider{InternalID: service.NewID(), RealmID: realm.ID, Alias: *ir.Alias, Enabled: true}
+			if ir.InternalID != nil && *ir.InternalID != "" {
+				idp.InternalID = *ir.InternalID
+			}
+			applyIdPRep(idp, ir)
+			if err = validateIdP(realm, idp); err == nil {
+				err = tx.CreateIdentityProvider(ctx, idp)
+			}
+		}
+		if err != nil {
+			return err
+		}
+	}
+	for _, mr := range rep.IdentityProviderMappers {
+		existing, err := tx.ListIdPMappers(ctx, realm.ID, mr.IdentityProviderAlias)
+		if err != nil {
+			return err
+		}
+		var m *model.IdentityProviderMapper
+		for _, e := range existing {
+			if e.Name == mr.Name {
+				m = e
+			}
+		}
+		if mr.Config == nil {
+			mr.Config = map[string]string{}
+		}
+		if m != nil {
+			m.Type, m.Config = mr.IdentityProviderMapper, mr.Config
+			if err := tx.UpdateIdPMapper(ctx, m); err != nil {
+				return err
+			}
+			continue
+		}
+		id := mr.ID
+		if id == "" {
+			id = service.NewID()
+		}
+		if err := tx.CreateIdPMapper(ctx, &model.IdentityProviderMapper{ID: id, RealmID: realm.ID, IdPAlias: mr.IdentityProviderAlias,
+			Name: mr.Name, Type: mr.IdentityProviderMapper, Config: mr.Config}); err != nil {
 			return err
 		}
 	}

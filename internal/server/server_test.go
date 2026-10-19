@@ -14,6 +14,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"regexp"
 	"slices"
 	"strings"
@@ -38,7 +39,7 @@ func newEnvWith(t *testing.T, configure func(*Config)) *env {
 	t.Helper()
 	cfg := Config{
 		DB: testDB(t), AdminUser: "admin", AdminPassword: "admin",
-		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Log: slog.New(slog.NewTextHandler(testLogOut(), nil)),
 	}
 	if configure != nil {
 		configure(&cfg)
@@ -636,4 +637,12 @@ func formAction(t *testing.T, body []byte) string {
 		t.Fatalf("no form in %s", body)
 	}
 	return strings.ReplaceAll(string(m[1]), "&amp;", "&")
+}
+
+// testLogOut is where servers of tests log: GOCLOAK_TEST_LOG=1 shows the logs.
+func testLogOut() io.Writer {
+	if os.Getenv("GOCLOAK_TEST_LOG") != "" {
+		return os.Stderr
+	}
+	return io.Discard
 }

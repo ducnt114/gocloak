@@ -481,6 +481,10 @@ func resourceType(path string) string {
 		return "CLIENT_SCOPE_CLIENT_MAPPING"
 	case has("default-default-client-scopes") || has("default-optional-client-scopes"):
 		return "REALM_SCOPE_MAPPING"
+	case seg[0] == "identity-provider" && has("mappers"):
+		return "IDENTITY_PROVIDER_MAPPER"
+	case seg[0] == "identity-provider":
+		return "IDENTITY_PROVIDER"
 	case seg[0] == "users" && has("groups"):
 		return "GROUP_MEMBERSHIP"
 	case seg[0] == "attack-detection":
@@ -503,7 +507,7 @@ func resourceType(path string) string {
 	return "REALM"
 }
 
-var secretFields = map[string]bool{"value": true, "secret": true, "password": true, "privateKey": true, "secretData": true, "credentials": true}
+var secretFields = map[string]bool{"clientSecret": true, "p8Key": true, "value": true, "secret": true, "password": true, "privateKey": true, "secretData": true, "credentials": true}
 
 // scrub removes secrets from a JSON representation before it is stored.
 func scrub(body []byte) string {

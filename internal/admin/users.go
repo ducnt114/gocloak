@@ -25,6 +25,7 @@ func userQuery(r *http.Request) store.UserQuery {
 		Search: q.Get("search"), Username: q.Get("username"), Email: q.Get("email"),
 		FirstName: q.Get("firstName"), LastName: q.Get("lastName"), Enabled: boolParam(r, "enabled"),
 		Exact: q.Get("exact") == "true", First: intParam(r, "first", 0), Max: intParam(r, "max", 100),
+		IdPAlias: q.Get("idpAlias"), IdPUserID: q.Get("idpUserId"),
 	}
 	// q=key1:value1 key2:value2 matches exact attribute values.
 	for _, pair := range strings.Fields(q.Get("q")) {

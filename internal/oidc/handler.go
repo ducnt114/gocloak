@@ -90,6 +90,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /realms/{realm}/login-actions/restart", h.restartEndpoint)
 	mux.HandleFunc("GET /realms/{realm}/login-actions/action-token", h.actionToken)
 	mux.HandleFunc("GET /resources/{theme}/{type}/{path...}", h.resources)
+	h.registerBroker(mux)
 }
 
 // ---------------------------------------------------------------- helpers

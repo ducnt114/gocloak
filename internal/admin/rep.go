@@ -44,6 +44,8 @@ type RealmRep struct {
 	AuthenticatorConfig         []authConfigRep              `json:"authenticatorConfig,omitempty"`
 	RequiredActions             []requiredActionRep          `json:"requiredActions,omitempty"`
 	Components                  map[string][]componentExport `json:"components,omitempty"`
+	IdentityProviders           []IdentityProviderRep        `json:"identityProviders,omitempty"`
+	IdentityProviderMappers     []IdPMapperRep               `json:"identityProviderMappers,omitempty"`
 }
 
 // componentExport is a component in a realm export (with its secrets).
@@ -121,10 +123,11 @@ type UserRep struct {
 	UserProfileMetadata *profileMetadata `json:"userProfileMetadata,omitempty"`
 
 	// Only used for create/import.
-	Credentials []CredentialRep     `json:"credentials,omitempty"`
-	Groups      []string            `json:"groups,omitempty"`
-	RealmRoles  []string            `json:"realmRoles,omitempty"`
-	ClientRoles map[string][]string `json:"clientRoles,omitempty"`
+	Credentials         []CredentialRep        `json:"credentials,omitempty"`
+	FederatedIdentities []FederatedIdentityRep `json:"federatedIdentities,omitempty"`
+	Groups              []string               `json:"groups,omitempty"`
+	RealmRoles          []string               `json:"realmRoles,omitempty"`
+	ClientRoles         map[string][]string    `json:"clientRoles,omitempty"`
 }
 
 type RoleRep struct {

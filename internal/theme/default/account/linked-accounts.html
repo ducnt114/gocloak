@@ -1,0 +1,13 @@
+{{template "header" .}}
+{{if .LinkedAccounts}}
+<table>
+  <tr><th>{{.T "identityProvider"}}</th><th>{{.T "username"}}</th><th></th></tr>
+  {{range .LinkedAccounts}}<tr id="linked-{{.ProviderAlias}}">
+    <td>{{.DisplayName}}</td>
+    <td>{{if .Connected}}{{.LinkedUsername}}{{else}}<span class="muted">{{$.T "notLinked"}}</span>{{end}}</td>
+    <td>{{if .Connected}}<form method="post" action="{{$.BaseURL}}/linked-accounts/{{.ProviderAlias}}/unlink"><input type="hidden" name="stateChecker" value="{{$.StateChecker}}"><button class="link" type="submit">{{$.T "unLink"}}</button></form>
+    {{else}}<form method="post" action="{{$.BaseURL}}/linked-accounts/{{.ProviderAlias}}/link"><input type="hidden" name="stateChecker" value="{{$.StateChecker}}"><button class="link" type="submit">{{$.T "link"}}</button></form>{{end}}</td>
+  </tr>{{end}}
+</table>
+{{else}}<p class="muted">{{.T "noLinkedAccounts"}}</p>{{end}}
+{{template "footer" .}}

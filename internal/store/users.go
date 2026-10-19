@@ -92,6 +92,8 @@ type UserQuery struct {
 	Enabled   *bool
 	// Attributes requires exact attribute values (the "q" parameter).
 	Attributes map[string]string
+	IdPAlias   string // linked to this identity provider
+	IdPUserID  string // with this user id at the provider
 	Exact      bool
 	First      int
 	Max        int
@@ -136,6 +138,18 @@ func (q UserQuery) where(realmID string) (string, []any) {
 	for name, value := range q.Attributes {
 		w += ` AND EXISTS (SELECT 1 FROM user_attributes ua WHERE ua.user_id=users.id AND ua.name=? AND ua.value=?)`
 		args = append(args, name, value)
+	}
+	if q.IdPAlias != "" || q.IdPUserID != "" {
+		w += ` AND EXISTS (SELECT 1 FROM federated_identities fi WHERE fi.user_id=users.id`
+		if q.IdPAlias != "" {
+			w += ` AND fi.identity_provider=?`
+			args = append(args, q.IdPAlias)
+		}
+		if q.IdPUserID != "" {
+			w += ` AND fi.federated_user_id=?`
+			args = append(args, q.IdPUserID)
+		}
+		w += `)`
 	}
 	return w, args
 }

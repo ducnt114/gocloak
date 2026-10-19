@@ -180,7 +180,7 @@ Done notes: themes use Go templates rather than FreeMarker, so Keycloak's
 `.ftl` templates do not apply; their message bundles and resources do.
 Linked accounts in the console come with identity brokering (M5).
 
-## M5 — Identity brokering (L)
+## M5 — Identity brokering (L) ✅ done
 
 - **Identity providers**: generic OpenID Connect and OAuth 2.0, plus presets for
   Google, GitHub, Microsoft, GitLab, Facebook, Apple. `/identity-provider/instances`
@@ -195,6 +195,17 @@ Linked accounts in the console come with identity brokering (M5).
 Acceptance: log in with an external OIDC provider (tested against a second
 gocloak instance acting as IdP), link an existing account, and get the mapped
 roles in the token.
+
+Done notes: the admin representations (providers, mappers, mapper types,
+federated identities) and the login page links match Keycloak 26.0.7. Beyond
+the plan: the `oauth2` generic provider, `idp-auto-link` and
+`idp-detect-existing-broker-user`, the advanced claim to role / group and
+session note mappers, client initiated account linking (`/broker/{alias}/link`),
+`/identity-provider/import-config`, and logout of the provider session found
+from an `id_token_hint` without SSO cookie. Social presets other than GitHub
+are tested only through the generic code paths, not against the real services.
+Not done: SAML providers (M9), token exchange with external tokens (M10), the
+organization authenticators.
 
 ## M6 — LDAP user federation (L)
 

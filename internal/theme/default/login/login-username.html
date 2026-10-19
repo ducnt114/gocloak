@@ -6,4 +6,5 @@
   <button type="submit" id="kc-login">{{.T "doLogIn"}}</button>
 </form>
 {{if .RegisterURL}}<p class="center">{{.T "noAccount"}} <a href="{{.RegisterURL}}">{{.T "doRegister"}}</a></p>{{end}}
+{{template "social" .}}
 {{template "footer" .}}
