@@ -204,7 +204,7 @@ session note mappers, client initiated account linking (`/broker/{alias}/link`),
 `/identity-provider/import-config`, and logout of the provider session found
 from an `id_token_hint` without SSO cookie. Social presets other than GitHub
 are tested only through the generic code paths, not against the real services.
-Not done: SAML providers (M9), token exchange with external tokens (M10), the
+Not done: SAML providers (M9), token exchange with external tokens, the
 organization authenticators.
 
 ## M6 — LDAP user federation (L) ✅ done
@@ -322,7 +322,7 @@ brokering (gocloak as SP), the artifact binding, ECP (the `saml ecp` flow of
 Keycloak exports is accepted but not run), `keycloak-saml` and
 `mod-auth-mellon` adapter downloads.
 
-## M10 — Additional OAuth specs (M, can be split)
+## M10 — Additional OAuth specs (M, can be split) ✅ done
 
 Device authorization grant, token exchange (RFC 8693, internal-to-internal
 first), Pushed Authorization Requests, request objects (`request`,
@@ -334,6 +334,22 @@ tokens (`client.use.lightweight.access.token.enabled`, which Keycloak 26 sets on
 
 Acceptance: the OpenID Foundation conformance suite passes the "Basic OP",
 "Config OP" and "Form Post OP" profiles.
+
+Done notes: the conformance suite (release v5.3.1) runs the three plans in CI
+(`scripts/conformance`, job `oidc-conformance`): no module fails; the warnings
+are about claims Keycloak's default client scopes put in ID tokens (gocloak
+issues the same claims as Keycloak), and the prompt=login, max_age=1 and
+unregistered redirect URI modules end in REVIEW with the page snapshots the
+certification reviewers look at. Running it found one bug: a reused
+authorization code now ends the session it created. Consent, PAR, request
+objects, the device grant, CIBA, client logout, lightweight tokens and
+dynamic client registration were compared with Keycloak 26.0.7 (pages,
+errors, representations, events). Keycloak 26.0.7 has token exchange and DPoP
+only as preview features: token exchange follows Keycloak's later "standard
+token exchange" (V2) rules, DPoP RFC 9449. Not done: token exchange with
+external tokens (identity providers), encrypted request objects, mutual TLS
+client authentication and bound tokens, JARM, the implicit and hybrid flows,
+the account console page of consents (the account API has them).
 
 ## M11 — Operations and scale (M)
 

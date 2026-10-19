@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/ducnt114/gocloak/internal/model"
@@ -144,15 +145,33 @@ func (s *Store) CreateAuthCode(ctx context.Context, c *model.AuthCode) error {
 
 // ConsumeAuthCode atomically fetches and deletes a code, so it can only be
 // used once even when two requests race.
+// ErrCodeReused is returned by ConsumeAuthCode for a code exchanged before;
+// SessionID is the session the code belongs to.
+type ErrCodeReused struct{ SessionID string }
+
+func (e *ErrCodeReused) Error() string { return "authorization code already used" }
+
 func (s *Store) ConsumeAuthCode(ctx context.Context, code string) (*model.AuthCode, error) {
 	c := &model.AuthCode{}
 	var exp int64
-	err := s.q.QueryRowContext(ctx, `DELETE FROM auth_codes WHERE code=? RETURNING code, realm_id, client_id, user_id,
-		session_id, redirect_uri, scope, nonce, code_challenge, code_challenge_method, expires_at`, code).
-		Scan(&c.Code, &c.RealmID, &c.ClientID, &c.UserID, &c.SessionID, &c.RedirectURI, &c.Scope, &c.Nonce,
-			&c.CodeChallenge, &c.CodeChallengeMethod, &exp)
+	err := s.WithTx(ctx, func(tx *Store) error {
+		err := tx.q.QueryRowContext(ctx, `DELETE FROM auth_codes WHERE code=? RETURNING code, realm_id, client_id, user_id,
+			session_id, redirect_uri, scope, nonce, code_challenge, code_challenge_method, expires_at`, code).
+			Scan(&c.Code, &c.RealmID, &c.ClientID, &c.UserID, &c.SessionID, &c.RedirectURI, &c.Scope, &c.Nonce,
+				&c.CodeChallenge, &c.CodeChallengeMethod, &exp)
+		if err != nil {
+			return mapErr(err)
+		}
+		return tx.exec(ctx, `INSERT INTO used_auth_codes (code, session_id, expires_at) VALUES (?,?,?)`, code, c.SessionID, exp)
+	})
+	if errors.Is(err, ErrNotFound) {
+		var sid string
+		if s.q.QueryRowContext(ctx, `SELECT session_id FROM used_auth_codes WHERE code=?`, code).Scan(&sid) == nil {
+			return nil, &ErrCodeReused{SessionID: sid}
+		}
+	}
 	if err != nil {
-		return nil, mapErr(err)
+		return nil, err
 	}
 	c.ExpiresAt = time.Unix(exp, 0)
 	return c, nil
@@ -179,6 +198,7 @@ func (s *Store) PurgeExpired(ctx context.Context, now time.Time) error {
 		`DELETE FROM revoked_tokens WHERE expires_at < ?`,
 		`DELETE FROM device_codes WHERE expires_at < ?`,
 		`DELETE FROM ciba_requests WHERE expires_at < ?`,
+		`DELETE FROM used_auth_codes WHERE expires_at < ?`,
 	} {
 		if err := s.exec(ctx, q, n); err != nil {
 			return err

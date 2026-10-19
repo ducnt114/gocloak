@@ -111,3 +111,40 @@ jobs:
       - run: python3 scripts/compat/saml_sp.py --keycloak http://localhost:8180 --gocloak http://localhost:8080
       - if: failure()
         run: docker logs keycloak 2>&1 | tail -80; tail -80 gocloak.log
+
+  oidc-conformance:
+    # The OpenID Foundation conformance suite: the Config OP, Basic OP and
+    # Form Post OP certification plans (scripts/conformance).
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      mongo:
+        image: mongo:6.0
+        ports: ["27017:27017"]
+    env:
+      SUITE_VERSION: release-v5.3.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/cache@v4
+        id: suite
+        with:
+          path: conformance-suite
+          key: conformance-suite-${{ env.SUITE_VERSION }}
+      - name: build the conformance suite
+        if: steps.suite.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$SUITE_VERSION" https://gitlab.com/openid/conformance-suite.git conformance-suite
+          cd conformance-suite && mvn -B -q -DskipTests package
+      - name: runner dependencies
+        run: python3 -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install -q httpx pyparsing
+      - name: run the certification plans
+        run: SUITE_DIR=$PWD/conformance-suite PYTHON=$RUNNER_TEMP/venv/bin/python WORK=$RUNNER_TEMP scripts/conformance/run.sh
+      - if: failure()
+        run: tail -n 60 "$RUNNER_TEMP/run.log" "$RUNNER_TEMP/gocloak.log" "$RUNNER_TEMP/suite.log"

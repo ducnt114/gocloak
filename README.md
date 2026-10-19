@@ -116,7 +116,25 @@ Main options (flag / environment variable):
   expiration, and per IP rate limiting of `/realms` and `/admin`
 - `userinfo`, token introspection, token revocation (RFC 7009)
 - RP-initiated logout (`id_token_hint`, `post_logout_redirect_uri`, confirmation page) and
-  Keycloak's back-channel logout with a refresh token
+  Keycloak's back-channel logout with a refresh token; OpenID Connect front-channel logout
+  (`frontchannelLogout`, `frontchannel.logout.url`) and back-channel logout tokens
+  (`backchannel.logout.url`) sent to clients when sessions end
+- Consent: `consentRequired` clients, the "Grant Access" page, stored consents (admin and account
+  APIs, realm export), `prompt=consent`
+- Pushed Authorization Requests (RFC 9126, `require.pushed.authorization.requests`) and request
+  objects (`request`, registered `request_uri`; unsigned, HMAC or client keys)
+- Device authorization grant (RFC 8628) with the `/realms/{realm}/device` page; CIBA (poll and ping)
+  through Keycloak's HTTP authentication channel (`--ciba-auth-channel-uri`)
+- Token exchange between clients (RFC 8693, Keycloak's standard token exchange:
+  `standard.token.exchange.enabled`, audiences, refresh tokens of the same session)
+- DPoP (RFC 9449): proofs at the token endpoint, `cnf.jkt` bound access tokens and public clients'
+  refresh tokens, `dpop.bound.access.tokens`, DPoP-bound tokens checked at userinfo and the admin
+  and account APIs
+- Lightweight access tokens (`client.use.lightweight.access.token.enabled`, on for `admin-cli`
+  and the console as in Keycloak 26), expanded by introspection
+- Dynamic client registration (RFC 7591/7592 at `/clients-registrations/openid-connect`, and
+  Keycloak's `default` provider), initial access tokens, registration access tokens and client
+  registration policies
 - CORS from the client's web origins (including `+`)
 - Authentication flows as in Keycloak: the built-in browser, direct grant, registration, reset
   credentials and client flows, custom flows and per-client bindings, executions with REQUIRED /
@@ -294,9 +312,9 @@ Main options (flag / environment variable):
 ## Not implemented yet
 
 SAML identity brokering (gocloak as a SAML service provider), the SAML artifact binding and ECP,
-Kerberos, script mappers, admin fine-grained permissions, consent screens, reCAPTCHA, organizations,
+Kerberos, script mappers, admin fine-grained permissions, reCAPTCHA, organizations,
 FreeMarker themes (gocloak themes use Go templates; Keycloak message bundles work as is),
-clustering, token exchange, device flow, CIBA, PAR.
+clustering, external token exchange (from identity providers), mutual TLS, JARM, implicit and hybrid flows.
 
 The plan for these is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -316,6 +334,10 @@ scripts/compat/tokens.py --keycloak http://localhost:8180 --gocloak http://local
 The Keycloak side of that run is checked in under `internal/server/testdata/keycloak`
 (recorded from Keycloak 26.0.7), and `TestKeycloakCompatibility` compares gocloak against it on
 every test run.
+
+The OpenID Foundation conformance suite runs in CI against gocloak with the Config OP, Basic OP
+and Form Post OP certification plans (`scripts/conformance/run.sh`; it needs a build of the suite,
+Java 21 and MongoDB), and `scripts/compat/saml_sp.py` uses a real Keycloak as SAML service provider.
 
 ## Layout
 

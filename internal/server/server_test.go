@@ -320,6 +320,9 @@ func TestAuthorizationCodeFlowWithPKCE(t *testing.T) {
 	}
 	e.expect(exchange(code, strings.Repeat("w", 50)), 400) // wrong verifier consumes the code
 	e.expect(exchange(code, verifier), 400)                // codes are single use
+	// a reused code ends its session: log in again
+	r = e.expect(e.do(browser, "GET", authURL, "", nil, nil), 200)
+	e.expect(e.do(browser, "POST", formAction(t, r.body), "", nil, url.Values{"username": {"alice"}, "password": {"wonderland"}}), 302)
 
 	// Second login: the SSO cookie skips the login form.
 	r = e.expect(e.do(browser, "GET", authURL, "", nil, nil), 302)

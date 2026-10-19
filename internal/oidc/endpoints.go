@@ -221,6 +221,16 @@ func (h *Handler) grantAuthorizationCode(r *http.Request, realm *model.Realm, cl
 		return fail("invalid_code", errInvalidRequest("Missing parameter: code"))
 	}
 	ac, err := h.Svc.Store.ConsumeAuthCode(ctx, code)
+	var reused *store.ErrCodeReused
+	if errors.As(err, &reused) {
+		// a code exchanged twice was likely stolen: end the session it created,
+		// which revokes the tokens issued for it
+		if us, err := h.Svc.Store.GetUserSession(ctx, reused.SessionID); err == nil && us.RealmID == realm.ID {
+			h.BackchannelLogout(ctx, h.URLs.Base(r), realm, []*model.UserSession{us})
+			_ = h.Svc.Store.DeleteSession(ctx, us)
+		}
+		return fail("invalid_code", errInvalidGrant("Code not valid"))
+	}
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			return fail("invalid_code", errInvalidGrant("Code not valid"))
