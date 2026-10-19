@@ -106,7 +106,23 @@ Main options (flag / environment variable):
 - RP-initiated logout (`id_token_hint`, `post_logout_redirect_uri`, confirmation page) and
   Keycloak's back-channel logout with a refresh token
 - CORS from the client's web origins (including `+`)
-- Required action `UPDATE_PASSWORD` (temporary passwords)
+- Authentication flows as in Keycloak: the built-in browser, direct grant, registration, reset
+  credentials and client flows, custom flows and per-client bindings, executions with REQUIRED /
+  ALTERNATIVE / CONDITIONAL / DISABLED, and the authenticators cookie, username password form,
+  username form, password form, OTP form, WebAuthn (two-factor and passwordless passkeys),
+  conditional user configured / role / attribute, allow / deny access, direct grant username /
+  password / OTP, and the reset credentials steps
+- Required actions: `UPDATE_PASSWORD`, `UPDATE_PROFILE`, `VERIFY_PROFILE`, `VERIFY_EMAIL`,
+  `CONFIGURE_TOTP` (QR code), `TERMS_AND_CONDITIONS`, `UPDATE_EMAIL`, `webauthn-register`,
+  `webauthn-register-passwordless`, default actions for new users and `kc_action`
+- Self-registration, forgot password by email, email verification, admin requested actions by
+  email (single-use action tokens), remember me
+- OTP (TOTP / HOTP) with the realm OTP policy and code reuse protection
+- Declarative user profile: Keycloak's default attributes and validators (`length`, `email`,
+  `pattern`, `username-prohibited-characters`, `person-name-prohibited-characters`, `integer`,
+  `double`, `uri`, `options`, `local-date`, `multivalued`), required attributes per context,
+  permissions and `unmanagedAttributePolicy`
+- Emails over SMTP (SSL / STARTTLS / authentication) with Keycloak's messages
 - Client scopes and protocol mappers, as in Keycloak: the built-in scopes (`profile`, `email`,
   `roles`, `web-origins`, `acr`, `basic`, `address`, `phone`, `offline_access`, `microprofile-jwt`),
   default and optional scopes per realm and client, `invalid_scope` for unknown scopes, and
@@ -126,6 +142,11 @@ Main options (flag / environment variable):
   `q` attribute queries, `briefRepresentation`, `first`, `max`), count, CRUD with partial updates, `reset-password`, credentials, sessions,
   logout, group membership, role mappings (realm, client, composite, available), offline sessions,
   consents (offline tokens)
+- Authentication: flows (list, create, copy, delete), executions (add, sub flows, requirement,
+  priority, configs), authenticator / form / client authenticator providers, required actions
+  (list, update, priority, register)
+- User profile: `users/profile`, `users/profile/metadata`, `userProfileMetadata` on users;
+  `execute-actions-email`, `send-verify-email`, `testSMTPConnection`, credential labels
 - Clients: search, CRUD, client secret get / regenerate, service account user, user sessions,
   client roles, protocol mappers, default / optional client scopes, scope mappings,
   `evaluate-scopes` (example access token, ID token, userinfo, applied mappers)
@@ -149,11 +170,9 @@ Main options (flag / environment variable):
 
 ## Not implemented yet
 
-SAML, identity brokering / social login, LDAP/Kerberos user federation, the declarative user
-profile (gocloak keeps any user attribute, while Keycloak 26 drops undeclared ones by default),
-script mappers, fine-grained authorization services (UMA), consent screens, OTP/WebAuthn, registration and
-reset-password emails, themes, the admin and account consoles, clustering, token exchange,
-device flow, CIBA, PAR.
+SAML, identity brokering / social login, LDAP/Kerberos user federation, script mappers,
+fine-grained authorization services (UMA), consent screens, reCAPTCHA, organizations, themes,
+the admin and account consoles, clustering, token exchange, device flow, CIBA, PAR.
 
 The plan for these is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -163,7 +182,8 @@ The plan for these is in [docs/ROADMAP.md](docs/ROADMAP.md).
 admin REST API, requests tokens for several scenarios (default scopes, optional scopes, no
 `openid`, a client without full scope, client credentials, an invalid scope) and diffs the
 claims of access tokens, ID tokens, refresh and offline tokens and userinfo, as well as the
-responses for password policy violations, brute force lockouts and refresh token reuse:
+responses for password policy violations, brute force lockouts, refresh token reuse, user
+profile validation, and the built-in required actions and authentication flows:
 
 ```sh
 scripts/compat/tokens.py --keycloak http://localhost:8180 --gocloak http://localhost:8080
@@ -181,9 +201,11 @@ internal/model       domain types
 internal/store       SQLite / PostgreSQL persistence, versioned migrations (migrations/)
 internal/password    Keycloak-compatible password hashing
 internal/policy      password policies
+internal/otp         TOTP / HOTP
+internal/userprofile declarative user profile and validators
 internal/jwt         JWS (RS/PS/ES/HS), JWK, key generation
 internal/service     realm provisioning, users, roles, keys, token verification
-internal/oidc        protocol endpoints and login pages (templates/)
+internal/oidc        protocol endpoints, authentication flow engine, required actions, login pages (templates/)
 internal/admin       admin REST API and realm import
 internal/server      wiring, bootstrap, health, import on startup
 ```

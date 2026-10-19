@@ -126,7 +126,7 @@ golden files. Not done: `tls_client_auth` (needs mTLS termination), AES and
 RSA-OAEP keys (only used for encrypted tokens), `quickLoginCheck` with
 millisecond-exact Keycloak timing beyond what the golden scenarios cover.
 
-## M3 — Account lifecycle and MFA (L)
+## M3 — Account lifecycle and MFA (L) ✅ done
 
 - **Email**: SMTP settings per realm (`smtpServer`), templated emails (HTML +
   text), `/testSMTPConnection`.
@@ -156,6 +156,12 @@ millisecond-exact Keycloak timing beyond what the golden scenarios cover.
 Acceptance: a new user can register, verify email, set up TOTP and log in with
 it; an admin can force a password reset by email; flows from a Keycloak export
 using only supported authenticators behave the same.
+
+Done notes: default user profile, required actions and flow trees, profile
+validation errors and authentication API errors match Keycloak 26.0.7 (golden
+files). Not done: reCAPTCHA, `delete_account`, `delete_credential`,
+`update_user_locale` (accepted and skipped), the organization authenticators,
+X.509 and Kerberos authenticators, configurable email templates (themes, M4).
 
 ## M4 — Login theming and account console (M)
 

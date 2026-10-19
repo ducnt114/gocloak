@@ -1,0 +1,7 @@
+{{template "header" .}}
+<form id="kc-update-email-form" method="post" action="{{.Action}}">
+  <label for="email">Email</label>
+  <input id="email" name="email" type="email" value="{{.Username}}" autocomplete="email" autofocus>
+  <button type="submit">Submit</button>
+</form>
+{{template "footer" .}}

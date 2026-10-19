@@ -1,0 +1,24 @@
+{
+  "body": {
+    "errors": [
+      {
+        "errorMessage": "error-invalid-length",
+        "field": "username",
+        "params": [
+          "username",
+          3,
+          255
+        ]
+      },
+      {
+        "errorMessage": "error-invalid-email",
+        "field": "email",
+        "params": [
+          "email",
+          "nope"
+        ]
+      }
+    ]
+  },
+  "status": 400
+}

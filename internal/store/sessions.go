@@ -81,6 +81,10 @@ func (s *Store) ListRealmSessions(ctx context.Context, realmID string) ([]*model
 	return s.listSessions(ctx, false, `realm_id=?`, realmID)
 }
 
+func (s *Store) SetSessionRememberMe(ctx context.Context, id string) error {
+	return s.execOne(ctx, `UPDATE user_sessions SET remember_me=? WHERE id=?`, true, id)
+}
+
 func (s *Store) DeleteUserSession(ctx context.Context, id string) error {
 	return s.exec(ctx, `DELETE FROM user_sessions WHERE id=?`, id)
 }

@@ -1,0 +1,6 @@
+{
+  "body": {
+    "errorMessage": "User email missing"
+  },
+  "status": 400
+}

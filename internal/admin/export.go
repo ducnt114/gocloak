@@ -172,6 +172,19 @@ func Export(ctx context.Context, svc *service.Service, realm *model.Realm, opts 
 		}
 	}
 
+	if opts.Groups || opts.Clients {
+		if err := exportAuthentication(ctx, st, realm, &rep); err != nil {
+			return nil, err
+		}
+	}
+	if opts.Secrets {
+		if err := exportComponents(ctx, st, realm, &rep); err != nil {
+			return nil, err
+		}
+	} else if err := exportUserProfile(ctx, st, realm, &rep); err != nil {
+		return nil, err
+	}
+
 	if opts.Users {
 		users, err := exportUsers(ctx, svc, realm, clientByID, splitRoles)
 		if err != nil {
@@ -323,6 +336,70 @@ func exportScopes(ctx context.Context, st *store.Store, realm *model.Realm, rep 
 		if err := addMappings(cs.ID, ScopeMappingRep{ClientScope: cs.Name}); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func exportAuthentication(ctx context.Context, st *store.Store, realm *model.Realm, rep *RealmRep) error {
+	flows, err := st.ListFlows(ctx, realm.ID)
+	if err != nil {
+		return err
+	}
+	for _, f := range flows {
+		fr, err := flowToRep(ctx, st, f)
+		if err != nil {
+			return err
+		}
+		rep.AuthenticationFlows = append(rep.AuthenticationFlows, fr)
+	}
+	configs, err := st.ListAuthConfigs(ctx, realm.ID)
+	if err != nil {
+		return err
+	}
+	for _, c := range configs {
+		rep.AuthenticatorConfig = append(rep.AuthenticatorConfig, authConfigRep{ID: c.ID, Alias: c.Alias, Config: c.Config})
+	}
+	actions, err := st.ListRequiredActions(ctx, realm.ID)
+	if err != nil {
+		return err
+	}
+	for _, a := range actions {
+		rep.RequiredActions = append(rep.RequiredActions, requiredActionToRep(a))
+	}
+	return nil
+}
+
+func componentToExport(c *model.Component) componentExport {
+	return componentExport{ID: c.ID, Name: c.Name, ProviderID: c.ProviderID, SubType: c.SubType,
+		SubComponents: map[string][]componentExport{}, Config: c.Config}
+}
+
+// exportComponents exports key providers (with private keys, as Keycloak's
+// full export does) and the user profile.
+func exportComponents(ctx context.Context, st *store.Store, realm *model.Realm, rep *RealmRep) error {
+	comps, err := st.ListComponents(ctx, realm.ID, "")
+	if err != nil {
+		return err
+	}
+	for _, c := range comps {
+		if rep.Components == nil {
+			rep.Components = map[string][]componentExport{}
+		}
+		rep.Components[c.ProviderType] = append(rep.Components[c.ProviderType], componentToExport(c))
+	}
+	return nil
+}
+
+func exportUserProfile(ctx context.Context, st *store.Store, realm *model.Realm, rep *RealmRep) error {
+	comps, err := st.ListComponents(ctx, realm.ID, service.UserProfileProviderType)
+	if err != nil {
+		return err
+	}
+	for _, c := range comps {
+		if rep.Components == nil {
+			rep.Components = map[string][]componentExport{}
+		}
+		rep.Components[c.ProviderType] = append(rep.Components[c.ProviderType], componentToExport(c))
 	}
 	return nil
 }

@@ -202,7 +202,10 @@ func (s *Service) CreateRealm(ctx context.Context, st *store.Store, r *model.Rea
 			return err
 		}
 	}
-	return s.ProvisionClientScopes(ctx, st, r)
+	if err := s.ProvisionClientScopes(ctx, st, r); err != nil {
+		return err
+	}
+	return s.ProvisionAuthentication(ctx, st, r)
 }
 
 func (s *Service) createClientRoles(ctx context.Context, st *store.Store, c *model.Client, names []string, composites map[string][]string) (map[string]*model.Role, error) {
@@ -304,6 +307,18 @@ func (s *Service) CreateUser(ctx context.Context, st *store.Store, u *model.User
 	}
 	if u.CreatedTimestamp == 0 {
 		u.CreatedTimestamp = s.nowMillis()
+	}
+	if u.ServiceAccountClientID == "" {
+		// required actions marked "default action" apply to every new user
+		actions, err := st.ListRequiredActions(ctx, realm.ID)
+		if err != nil {
+			return err
+		}
+		for _, a := range actions {
+			if a.DefaultAction && a.Enabled {
+				u.RequiredActions, _ = addAction(u.RequiredActions, a.Alias)
+			}
+		}
 	}
 	if err := st.CreateUser(ctx, u); err != nil {
 		if errors.Is(err, store.ErrConflict) {
@@ -684,10 +699,23 @@ func (s *Service) SessionValid(realm *model.Realm, us *model.UserSession) bool {
 		}
 		return true
 	}
-	if now.After(us.LastRefresh.Add(time.Duration(realm.SSOSessionIdleTimeout) * time.Second)) {
+	idle := realm.SSOSessionIdleTimeout
+	if us.RememberMe && realm.Settings.SSOSessionIdleTimeoutRememberMe > 0 {
+		idle = realm.Settings.SSOSessionIdleTimeoutRememberMe
+	}
+	if now.After(us.LastRefresh.Add(time.Duration(idle) * time.Second)) {
 		return false
 	}
-	return !now.After(us.Started.Add(time.Duration(realm.SSOSessionMaxLifespan) * time.Second))
+	return !now.After(us.Started.Add(time.Duration(s.SessionMaxLifespan(realm, us)) * time.Second))
+}
+
+// SessionMaxLifespan is the max lifespan of an SSO session in seconds,
+// which "remember me" sessions may extend.
+func (s *Service) SessionMaxLifespan(realm *model.Realm, us *model.UserSession) int {
+	if us.RememberMe && realm.Settings.SSOSessionMaxLifespanRememberMe > 0 {
+		return realm.Settings.SSOSessionMaxLifespanRememberMe
+	}
+	return realm.SSOSessionMaxLifespan
 }
 
 // ---------------------------------------------------------------- bootstrap

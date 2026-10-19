@@ -247,9 +247,8 @@ func errInvalidCredentials() *oauthError {
 }
 
 func (h *Handler) grantPassword(r *http.Request, realm *model.Realm, client *model.Client) (*tokenResponse, error) {
-	ctx := r.Context()
-	username, pw := r.PostFormValue("username"), r.PostFormValue("password")
-	ev := &eventInfo{client: client, details: map[string]string{"grant_type": "password", "auth_method": "openid-connect", "username": username}}
+	ev := &eventInfo{client: client, details: map[string]string{"grant_type": "password", "auth_method": "openid-connect",
+		"username": r.PostFormValue("username")}}
 	fail := func(code string, e error) (*tokenResponse, error) {
 		ev.err = code
 		h.event(r, realm, "LOGIN_ERROR", ev)
@@ -258,41 +257,21 @@ func (h *Handler) grantPassword(r *http.Request, realm *model.Realm, client *mod
 	if !client.DirectAccessGrantsEnabled {
 		return fail("not_allowed", errUnauthorizedClient("Client not allowed for direct access grants"))
 	}
-	user, err := h.Svc.FindLoginUser(ctx, realm, username)
+	// The direct grant flow authenticates the user (and records its own errors).
+	user, err := h.runDirectGrant(r, realm, client)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return fail("user_not_found", errInvalidCredentials())
-		}
 		return nil, err
 	}
 	ev.userID = user.ID
-	if !user.Enabled {
-		return fail("user_disabled", errInvalidGrant("Account disabled"))
-	}
-	locked, err := h.Svc.TemporarilyLocked(ctx, realm, user)
-	if err != nil {
-		return nil, err
-	}
-	if locked {
-		return fail("user_temporarily_disabled", errInvalidCredentials())
-	}
-	ok, err := h.Svc.CheckPassword(ctx, user, pw)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		if err := h.Svc.LoginFailed(ctx, realm, user, clientIP(r)); err != nil {
-			return nil, err
-		}
-		return fail("invalid_user_credentials", errInvalidCredentials())
-	}
-	if err := h.Svc.LoginSucceeded(ctx, realm, user); err != nil {
-		return nil, err
-	}
 	if err := h.checkPasswordExpiry(r, realm, user); err != nil {
 		return nil, err
 	}
-	if len(user.RequiredActions) > 0 {
+	pending, err := h.pendingActions(&flowContext{h: h, r: r, realm: realm, client: client, user: user,
+		as: &model.AuthSession{Params: map[string]string{}}})
+	if err != nil {
+		return nil, err
+	}
+	if len(pending) > 0 {
 		return fail("resolve_required_actions", errInvalidGrant("Account is not fully set up"))
 	}
 	session, err := h.newSession(r, realm, user, client, nil)

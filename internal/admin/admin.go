@@ -35,6 +35,14 @@ type httpError struct {
 	status int
 	msg    string
 	key    string // Keycloak message key, e.g. invalidPasswordMinLengthMessage
+	// plain renders {"error": msg} even for 400s, as some Keycloak
+	// endpoints (authentication management) do.
+	plain bool
+}
+
+// badRequestPlain is a 400 rendered as {"error": msg}.
+func badRequestPlain(msg string) error {
+	return &httpError{status: http.StatusBadRequest, msg: msg, plain: true}
 }
 
 func (e *httpError) Error() string { return e.msg }
@@ -240,9 +248,14 @@ func (h *Handler) recordAdminEvent(r *http.Request, p *principal, body []byte, l
 }
 
 func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, err error) {
+	var pe *profileErrors
+	if errors.As(err, &pe) {
+		writeProfileErrors(w, pe.errs)
+		return
+	}
 	var he *httpError
-	if pe, ok := policyError(err); ok {
-		he = pe
+	if pol, ok := policyError(err); ok {
+		he = pol
 	}
 	switch {
 	case he != nil:
@@ -265,6 +278,7 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, err error) 
 	switch {
 	case he.key != "":
 		body = map[string]string{"error": he.key, "error_description": he.msg}
+	case he.plain:
 	case he.status == http.StatusBadRequest || he.status == http.StatusConflict:
 		body = map[string]string{"errorMessage": he.msg}
 	}
@@ -480,7 +494,17 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	for _, rt := range routes {
 		mux.HandleFunc(rt.pattern, h.wrap(rt.fn))
 	}
-	h.registerScopeRoutes(R, func(pattern string, fn handlerFunc) { mux.HandleFunc(pattern, h.wrap(fn)) })
+	add := func(pattern string, fn handlerFunc) { mux.HandleFunc(pattern, h.wrap(fn)) }
+	h.registerScopeRoutes(R, add)
+	h.registerAuthenticationRoutes(R, add)
+	add("GET "+R+"/users/profile", h.getUserProfile)
+	add("PUT "+R+"/users/profile", h.putUserProfile)
+	add("GET "+R+"/users/profile/metadata", h.getUserProfileMetadata)
+	add("PUT "+R+"/users/{id}/execute-actions-email", h.executeActionsEmail)
+	add("PUT "+R+"/users/{id}/send-verify-email", h.sendVerifyEmail)
+	add("PUT "+R+"/users/{id}/credentials/{credId}/userLabel", h.setCredentialLabel)
+	add("GET "+R+"/users/{id}/configured-user-storage-credential-types", h.storageCredentialTypes)
+	add("POST "+R+"/testSMTPConnection", h.testSMTPConnection)
 }
 
 // withTx is a small helper for handlers that write several rows.

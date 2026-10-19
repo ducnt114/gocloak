@@ -1,0 +1,35 @@
+{{define "webauthn-js"}}
+<script>
+const b64u = {
+  dec: s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), c => c.charCodeAt(0)),
+  enc: b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+};
+const opts = {{js .WebAuthn.Options}};
+opts.challenge = b64u.dec(opts.challenge);
+if (opts.user) opts.user.id = b64u.dec(opts.user.id);
+for (const list of [opts.excludeCredentials, opts.allowCredentials]) (list || []).forEach(c => c.id = b64u.dec(c.id));
+function submitCredential(cred) {
+  const r = cred.response, out = {id: cred.id, rawId: b64u.enc(cred.rawId), type: cred.type, response: {clientDataJSON: b64u.enc(r.clientDataJSON)}};
+  if (r.attestationObject) { out.response.attestationObject = b64u.enc(r.attestationObject); out.response.transports = r.getTransports ? r.getTransports() : []; }
+  if (r.authenticatorData) { out.response.authenticatorData = b64u.enc(r.authenticatorData); out.response.signature = b64u.enc(r.signature); if (r.userHandle) out.response.userHandle = b64u.enc(r.userHandle); }
+  document.getElementById('credential').value = JSON.stringify(out);
+  document.getElementById('webauthn-form').submit();
+}
+</script>
+{{end}}
+
+{{define "webauthn-authenticate.html"}}{{template "header" .}}
+<form id="webauthn-form" method="post" action="{{.Action}}"><input type="hidden" id="credential" name="credential"></form>
+<button type="button" id="authenticateWebAuthnButton" onclick="navigator.credentials.get({publicKey: opts}).then(submitCredential).catch(e => alert(e))">Sign in with Passkey</button>
+{{template "webauthn-js" .}}
+{{template "footer" .}}{{end}}
+
+{{define "webauthn-register.html"}}{{template "header" .}}
+<form id="webauthn-form" method="post" action="{{.Action}}">
+  <input type="hidden" id="credential" name="credential">
+  <label for="authenticatorLabel">Device name</label>
+  <input id="authenticatorLabel" name="authenticatorLabel" type="text" autocomplete="off">
+</form>
+<button type="button" id="registerWebAuthn" onclick="navigator.credentials.create({publicKey: opts}).then(submitCredential).catch(e => alert(e))">Register</button>
+{{template "webauthn-js" .}}
+{{template "footer" .}}{{end}}

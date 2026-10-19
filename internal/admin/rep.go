@@ -40,6 +40,20 @@ type RealmRep struct {
 	DefaultOptionalClientScopes []string                     `json:"defaultOptionalClientScopes,omitempty"`
 	ScopeMappings               []ScopeMappingRep            `json:"scopeMappings,omitempty"`
 	ClientScopeMappings         map[string][]ScopeMappingRep `json:"clientScopeMappings,omitempty"`
+	AuthenticationFlows         []flowRep                    `json:"authenticationFlows,omitempty"`
+	AuthenticatorConfig         []authConfigRep              `json:"authenticatorConfig,omitempty"`
+	RequiredActions             []requiredActionRep          `json:"requiredActions,omitempty"`
+	Components                  map[string][]componentExport `json:"components,omitempty"`
+}
+
+// componentExport is a component in a realm export (with its secrets).
+type componentExport struct {
+	ID            string                       `json:"id,omitempty"`
+	Name          string                       `json:"name"`
+	ProviderID    string                       `json:"providerId"`
+	SubType       string                       `json:"subType,omitempty"`
+	SubComponents map[string][]componentExport `json:"subComponents"`
+	Config        map[string][]string          `json:"config"`
 }
 
 type RolesRep struct {
@@ -48,31 +62,32 @@ type RolesRep struct {
 }
 
 type ClientRep struct {
-	ID                        *string             `json:"id,omitempty"`
-	ClientID                  *string             `json:"clientId,omitempty"`
-	Name                      *string             `json:"name,omitempty"`
-	Description               *string             `json:"description,omitempty"`
-	Enabled                   *bool               `json:"enabled,omitempty"`
-	PublicClient              *bool               `json:"publicClient,omitempty"`
-	BearerOnly                *bool               `json:"bearerOnly,omitempty"`
-	ClientAuthenticatorType   *string             `json:"clientAuthenticatorType,omitempty"`
-	NotBefore                 *int64              `json:"notBefore,omitempty"`
-	Secret                    *string             `json:"secret,omitempty"`
-	RootURL                   *string             `json:"rootUrl,omitempty"`
-	BaseURL                   *string             `json:"baseUrl,omitempty"`
-	RedirectURIs              []string            `json:"redirectUris"`
-	WebOrigins                []string            `json:"webOrigins"`
-	StandardFlowEnabled       *bool               `json:"standardFlowEnabled,omitempty"`
-	ImplicitFlowEnabled       *bool               `json:"implicitFlowEnabled,omitempty"`
-	DirectAccessGrantsEnabled *bool               `json:"directAccessGrantsEnabled,omitempty"`
-	ServiceAccountsEnabled    *bool               `json:"serviceAccountsEnabled,omitempty"`
-	ConsentRequired           *bool               `json:"consentRequired,omitempty"`
-	FullScopeAllowed          *bool               `json:"fullScopeAllowed,omitempty"`
-	Protocol                  *string             `json:"protocol,omitempty"`
-	Attributes                map[string]string   `json:"attributes,omitempty"`
-	ProtocolMappers           []ProtocolMapperRep `json:"protocolMappers,omitempty"`
-	DefaultClientScopes       []string            `json:"defaultClientScopes,omitempty"`
-	OptionalClientScopes      []string            `json:"optionalClientScopes,omitempty"`
+	ID                                 *string             `json:"id,omitempty"`
+	ClientID                           *string             `json:"clientId,omitempty"`
+	Name                               *string             `json:"name,omitempty"`
+	Description                        *string             `json:"description,omitempty"`
+	Enabled                            *bool               `json:"enabled,omitempty"`
+	PublicClient                       *bool               `json:"publicClient,omitempty"`
+	BearerOnly                         *bool               `json:"bearerOnly,omitempty"`
+	ClientAuthenticatorType            *string             `json:"clientAuthenticatorType,omitempty"`
+	NotBefore                          *int64              `json:"notBefore,omitempty"`
+	Secret                             *string             `json:"secret,omitempty"`
+	RootURL                            *string             `json:"rootUrl,omitempty"`
+	BaseURL                            *string             `json:"baseUrl,omitempty"`
+	RedirectURIs                       []string            `json:"redirectUris"`
+	WebOrigins                         []string            `json:"webOrigins"`
+	StandardFlowEnabled                *bool               `json:"standardFlowEnabled,omitempty"`
+	ImplicitFlowEnabled                *bool               `json:"implicitFlowEnabled,omitempty"`
+	DirectAccessGrantsEnabled          *bool               `json:"directAccessGrantsEnabled,omitempty"`
+	ServiceAccountsEnabled             *bool               `json:"serviceAccountsEnabled,omitempty"`
+	ConsentRequired                    *bool               `json:"consentRequired,omitempty"`
+	FullScopeAllowed                   *bool               `json:"fullScopeAllowed,omitempty"`
+	Protocol                           *string             `json:"protocol,omitempty"`
+	Attributes                         map[string]string   `json:"attributes,omitempty"`
+	ProtocolMappers                    []ProtocolMapperRep `json:"protocolMappers,omitempty"`
+	DefaultClientScopes                []string            `json:"defaultClientScopes,omitempty"`
+	AuthenticationFlowBindingOverrides map[string]string   `json:"authenticationFlowBindingOverrides,omitempty"`
+	OptionalClientScopes               []string            `json:"optionalClientScopes,omitempty"`
 }
 
 type CredentialRep struct {
@@ -102,6 +117,8 @@ type UserRep struct {
 	NotBefore              *int64              `json:"notBefore,omitempty"`
 	Access                 map[string]bool     `json:"access,omitempty"`
 	ServiceAccountClientID *string             `json:"serviceAccountClientId,omitempty"`
+
+	UserProfileMetadata *profileMetadata `json:"userProfileMetadata,omitempty"`
 
 	// Only used for create/import.
 	Credentials []CredentialRep     `json:"credentials,omitempty"`
@@ -215,7 +232,8 @@ func clientToRep(c *model.Client) ClientRep {
 		ID: ptr(c.ID), ClientID: ptr(c.ClientID), Name: ptr(c.Name), Description: ptr(c.Description),
 		Enabled: ptr(c.Enabled), PublicClient: ptr(c.PublicClient), BearerOnly: ptr(c.BearerOnly),
 		ClientAuthenticatorType: ptr(authenticatorType(c)), NotBefore: ptr(c.NotBefore),
-		RootURL: ptr(c.RootURL), BaseURL: ptr(c.BaseURL), RedirectURIs: nonNil(c.RedirectURIs), WebOrigins: nonNil(c.WebOrigins),
+		AuthenticationFlowBindingOverrides: nonNilMap(c.FlowOverrides),
+		RootURL:                            ptr(c.RootURL), BaseURL: ptr(c.BaseURL), RedirectURIs: nonNil(c.RedirectURIs), WebOrigins: nonNil(c.WebOrigins),
 		StandardFlowEnabled: ptr(c.StandardFlowEnabled), ImplicitFlowEnabled: ptr(false),
 		DirectAccessGrantsEnabled: ptr(c.DirectAccessGrantsEnabled), ServiceAccountsEnabled: ptr(c.ServiceAccountsEnabled),
 		ConsentRequired: ptr(false), FullScopeAllowed: ptr(c.FullScopeAllowed), Protocol: ptr(c.Protocol),
@@ -280,6 +298,9 @@ func applyClientRep(c *model.Client, rep *ClientRep) {
 	set(&c.Protocol, rep.Protocol)
 	set(&c.ClientAuthenticatorType, rep.ClientAuthenticatorType)
 	set(&c.NotBefore, rep.NotBefore)
+	if rep.AuthenticationFlowBindingOverrides != nil {
+		c.FlowOverrides = rep.AuthenticationFlowBindingOverrides
+	}
 	if rep.Attributes != nil {
 		c.Attributes = rep.Attributes
 	}
@@ -422,4 +443,11 @@ func authenticatorType(c *model.Client) string {
 		return "client-secret"
 	}
 	return c.ClientAuthenticatorType
+}
+
+func nonNilMap(m map[string]string) map[string]string {
+	if m == nil {
+		return map[string]string{}
+	}
+	return m
 }

@@ -1,0 +1,10 @@
+{{template "header" .}}
+<form id="kc-update-profile-form" method="post" action="{{.Action}}">
+  {{range .Profile}}
+  <label for="{{.Name}}">{{.Label}}{{if .Required}} *{{end}}</label>
+  <input id="{{.Name}}" name="{{.Name}}" type="{{.Type}}" value="{{.Value}}"{{if .ReadOnly}} readonly{{end}}>
+  {{if .Error}}<div class="field-error" id="input-error-{{.Name}}">{{.Error}}</div>{{end}}
+  {{end}}
+  <button type="submit">Submit</button>
+</form>
+{{template "footer" .}}

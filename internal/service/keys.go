@@ -127,7 +127,15 @@ func PrepareKeyComponent(c *model.Component, realmName string, previous *model.C
 		}
 	}
 	keep := func(keys ...string) bool {
-		if previous == nil || previous.ProviderID != c.ProviderID {
+		if previous == nil {
+			// imported key material (realm import) is kept as is
+			if c.ProviderID == KeyHMACGenerated {
+				return c.Get("secret") != ""
+			}
+			_, err := jwt.ParsePrivateKey(c.Get("privateKey"))
+			return err == nil
+		}
+		if previous.ProviderID != c.ProviderID {
 			return false
 		}
 		for _, k := range keys {

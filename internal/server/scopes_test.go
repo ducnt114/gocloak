@@ -82,6 +82,17 @@ func TestClientScopesAndMappers(t *testing.T) {
 
 	// Mappers on the client: multivalued attribute, groups with full path,
 	// a renamed realm role and a hardcoded client role.
+	// Like Keycloak 26, free-form attributes need unmanaged attributes enabled.
+	var profile map[string]any
+	e.expect(e.do(nil, "GET", R+"/users/profile", admin, nil, nil), 200).json(&profile)
+	e.expect(e.do(nil, "PUT", R+"/users/"+aliceID, admin, map[string]any{"attributes": map[string][]string{"dept": {"eng"}}}, nil), 204)
+	var alice map[string]any
+	e.expect(e.do(nil, "GET", R+"/users/"+aliceID, admin, nil, nil), 200).json(&alice)
+	if alice["attributes"] != nil {
+		t.Fatalf("unmanaged attribute stored while disabled: %v", alice["attributes"])
+	}
+	profile["unmanagedAttributePolicy"] = "ENABLED"
+	e.expect(e.do(nil, "PUT", R+"/users/profile", admin, profile, nil), 200)
 	e.expect(e.do(nil, "PUT", R+"/users/"+aliceID, admin, map[string]any{"attributes": map[string][]string{"dept": {"eng", "ops"}}}, nil), 204)
 	e.expect(e.do(nil, "POST", R+"/clients/"+web+"/protocol-mappers/add-models", admin, []any{
 		map[string]any{"name": "dept", "protocolMapper": "oidc-usermodel-attribute-mapper", "config": with(flags(), "user.attribute", "dept", "claim.name", "org.dept", "multivalued", "true", "jsonType.label", "String")},
@@ -196,7 +207,7 @@ func TestImportClientScopes(t *testing.T) {
 		"clients": []any{map[string]any{"clientId": "app", "publicClient": true, "directAccessGrantsEnabled": true, "fullScopeAllowed": false,
 			"defaultClientScopes": []string{"profile", "orders", "roles"}, "optionalClientScopes": []string{}}},
 		"scopeMappings": []any{map[string]any{"clientScope": "orders", "roles": []string{"reader"}}},
-		"users": []any{map[string]any{"username": "bob", "enabled": true, "realmRoles": []string{"reader", "writer"},
+		"users": []any{map[string]any{"username": "bob", "email": "bob@example.com", "firstName": "Bob", "lastName": "B", "enabled": true, "realmRoles": []string{"reader", "writer"},
 			"credentials": []any{map[string]any{"type": "password", "value": "pw"}}}},
 	}, nil), 201)
 	tok, r := e.passwordGrant("scoped", "app", "", "bob", "pw")

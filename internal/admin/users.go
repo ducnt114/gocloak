@@ -8,6 +8,7 @@ import (
 
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/store"
+	"github.com/ducnt114/gocloak/internal/userprofile"
 )
 
 func (h *Handler) loadUser(r *http.Request, realm *model.Realm) (*model.User, error) {
@@ -84,6 +85,9 @@ func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request, p *principal
 	if err != nil {
 		return err
 	}
+	if err := h.visibleAttributes(r, realm, reps); err != nil {
+		return err
+	}
 	if r.URL.Query().Get("briefRepresentation") == "true" {
 		return ok(w, briefUsers(reps))
 	}
@@ -118,6 +122,12 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request, p *principa
 		}
 		rep.Username = rep.Email
 	}
+	candidate := &model.User{RealmID: realm.ID}
+	applyUserRep(candidate, &rep)
+	if err := h.applyProfilePolicy(r, realm, candidate, nil); err != nil {
+		return err
+	}
+	rep.Attributes = candidate.Attributes
 	granted, err := h.repRoles(r.Context(), realm, rep.RealmRoles, rep.ClientRoles, rep.Groups)
 	if err != nil {
 		return err
@@ -150,6 +160,17 @@ func (h *Handler) getUser(w http.ResponseWriter, r *http.Request, p *principal) 
 	if err != nil {
 		return err
 	}
+	if err := h.visibleAttributes(r, realm, reps); err != nil {
+		return err
+	}
+	if r.URL.Query().Get("userProfileMetadata") == "true" {
+		cfg, err := h.Svc.UserProfile(r.Context(), h.Svc.Store, realm)
+		if err != nil {
+			return err
+		}
+		md := metadataFor(cfg, userprofile.ContextAdmin)
+		reps[0].UserProfileMetadata = &md
+	}
 	return ok(w, reps[0])
 }
 
@@ -166,7 +187,11 @@ func (h *Handler) updateUser(w http.ResponseWriter, r *http.Request, p *principa
 	if err := decode(r, &rep); err != nil {
 		return err
 	}
+	prev := *u
 	applyUserRep(u, &rep)
+	if err := h.applyProfilePolicy(r, realm, u, &prev); err != nil {
+		return err
+	}
 	err = h.withTx(r.Context(), func(tx *store.Store) error {
 		if err := h.Svc.UpdateUser(r.Context(), tx, u); err != nil {
 			return err

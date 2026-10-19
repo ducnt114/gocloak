@@ -1,0 +1,54 @@
+[
+  {
+    "authenticationFlow": null,
+    "displayName": "Client Id and Secret",
+    "index": 0,
+    "level": 0,
+    "providerId": "client-secret",
+    "requirement": "ALTERNATIVE",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "Signed Jwt",
+    "index": 1,
+    "level": 0,
+    "providerId": "client-jwt",
+    "requirement": "ALTERNATIVE",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "Signed Jwt with Client Secret",
+    "index": 2,
+    "level": 0,
+    "providerId": "client-secret-jwt",
+    "requirement": "ALTERNATIVE",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "X509 Certificate",
+    "index": 3,
+    "level": 0,
+    "providerId": "client-x509",
+    "requirement": "ALTERNATIVE",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED"
+    ]
+  }
+]

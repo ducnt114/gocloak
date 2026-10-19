@@ -244,8 +244,8 @@ func (s *Service) LinkDefaultScopes(ctx context.Context, st *store.Store, c *mod
 	return nil
 }
 
-// UpgradeRealms provisions client scopes in realms created before they
-// existed (databases from gocloak v0).
+// UpgradeRealms provisions client scopes and authentication flows in
+// realms created before they existed.
 func (s *Service) UpgradeRealms(ctx context.Context) error {
 	realms, err := s.Store.ListRealms(ctx)
 	if err != nil {
@@ -256,11 +256,18 @@ func (s *Service) UpgradeRealms(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if n > 0 {
-			continue
+		if n == 0 {
+			if err := s.Store.WithTx(ctx, func(tx *store.Store) error { return s.ProvisionClientScopes(ctx, tx, r) }); err != nil {
+				return err
+			}
 		}
-		if err := s.Store.WithTx(ctx, func(tx *store.Store) error { return s.ProvisionClientScopes(ctx, tx, r) }); err != nil {
+		if n, err = s.Store.CountFlows(ctx, r.ID); err != nil {
 			return err
+		}
+		if n == 0 {
+			if err := s.Store.WithTx(ctx, func(tx *store.Store) error { return s.ProvisionAuthentication(ctx, tx, r) }); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -1,0 +1,90 @@
+[
+  {
+    "alias": "CONFIGURE_TOTP",
+    "defaultAction": false,
+    "enabled": true,
+    "name": "Configure OTP",
+    "priority": 10,
+    "providerId": "CONFIGURE_TOTP"
+  },
+  {
+    "alias": "TERMS_AND_CONDITIONS",
+    "defaultAction": false,
+    "enabled": false,
+    "name": "Terms and Conditions",
+    "priority": 20,
+    "providerId": "TERMS_AND_CONDITIONS"
+  },
+  {
+    "alias": "UPDATE_PASSWORD",
+    "defaultAction": false,
+    "enabled": true,
+    "name": "Update Password",
+    "priority": 30,
+    "providerId": "UPDATE_PASSWORD"
+  },
+  {
+    "alias": "UPDATE_PROFILE",
+    "defaultAction": false,
+    "enabled": true,
+    "name": "Update Profile",
+    "priority": 40,
+    "providerId": "UPDATE_PROFILE"
+  },
+  {
+    "alias": "VERIFY_EMAIL",
+    "defaultAction": false,
+    "enabled": true,
+    "name": "Verify Email",
+    "priority": 50,
+    "providerId": "VERIFY_EMAIL"
+  },
+  {
+    "alias": "delete_account",
+    "defaultAction": false,
+    "enabled": false,
+    "name": "Delete Account",
+    "priority": 60,
+    "providerId": "delete_account"
+  },
+  {
+    "alias": "webauthn-register",
+    "defaultAction": false,
+    "enabled": true,
+    "name": "Webauthn Register",
+    "priority": 70,
+    "providerId": "webauthn-register"
+  },
+  {
+    "alias": "webauthn-register-passwordless",
+    "defaultAction": false,
+    "enabled": true,
+    "name": "Webauthn Register Passwordless",
+    "priority": 80,
+    "providerId": "webauthn-register-passwordless"
+  },
+  {
+    "alias": "VERIFY_PROFILE",
+    "defaultAction": false,
+    "enabled": true,
+    "name": "Verify Profile",
+    "priority": 90,
+    "providerId": "VERIFY_PROFILE"
+  },
+  {
+    "alias": "delete_credential",
+    "defaultAction": false,
+    "enabled": true,
+    "name": "Delete Credential",
+    "priority": 100,
+    "providerId": "delete_credential"
+  },
+  {
+    "alias": "update_user_locale",
+    "defaultAction": false,
+    "enabled": true,
+    "name": "Update User Locale",
+    "priority": 1000,
+    "providerId": "update_user_locale"
+  }
+]

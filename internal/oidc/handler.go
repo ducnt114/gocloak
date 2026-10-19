@@ -78,8 +78,15 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET "+p+"/logout", h.logout)
 	mux.HandleFunc("POST "+p+"/logout", h.cors(h.logout))
 	mux.HandleFunc("OPTIONS "+p+"/{endpoint...}", h.preflight)
-	mux.HandleFunc("POST /realms/{realm}/login-actions/authenticate", h.loginAction)
-	mux.HandleFunc("POST /realms/{realm}/login-actions/required-action", h.requiredAction)
+	mux.HandleFunc("GET "+p+"/registrations", h.registrations)
+	mux.HandleFunc("GET /realms/{realm}/login-actions/authenticate", h.authenticateEndpoint)
+	mux.HandleFunc("POST /realms/{realm}/login-actions/authenticate", h.authenticateEndpoint)
+	mux.HandleFunc("GET /realms/{realm}/login-actions/required-action", h.requiredActionEndpoint)
+	mux.HandleFunc("POST /realms/{realm}/login-actions/required-action", h.requiredActionEndpoint)
+	mux.HandleFunc("GET /realms/{realm}/login-actions/registration", h.registrationEndpoint)
+	mux.HandleFunc("GET /realms/{realm}/login-actions/reset-credentials", h.resetCredentialsEndpoint)
+	mux.HandleFunc("GET /realms/{realm}/login-actions/restart", h.restartEndpoint)
+	mux.HandleFunc("GET /realms/{realm}/login-actions/action-token", h.actionToken)
 }
 
 // ---------------------------------------------------------------- helpers
@@ -289,4 +296,9 @@ func postLogoutRedirectAllowed(base string, c *model.Client, uri string) bool {
 		}
 	}
 	return matchRedirectURI(base, &pc, uri)
+}
+
+// RedirectAllowed reports whether uri is a valid redirect URI of client.
+func RedirectAllowed(base string, c *model.Client, uri string) bool {
+	return matchRedirectURI(base, c, uri)
 }

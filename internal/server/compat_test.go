@@ -106,6 +106,9 @@ func TestKeycloakCompatibility(t *testing.T) {
 	for k, v := range securityScenarios(e, admin) {
 		got[k] = v
 	}
+	for k, v := range authenticationScenarios(e, admin) {
+		got[k] = v
+	}
 
 	files, err := filepath.Glob("testdata/keycloak/*.json")
 	if err != nil || len(files) == 0 {
@@ -263,5 +266,49 @@ func securityScenarios(e *env, admin string) map[string]any {
 	e.expect(e.do(nil, "DELETE", R+"/attack-detection/brute-force/users/"+mallory, admin, nil, nil), 204)
 	out["bruteforce.after-clear"] = map[string]any{"status": float64(password("mallory", "pass1234").status)}
 	realm(map[string]any{"bruteForceProtected": false})
+	return out
+}
+
+// authenticationScenarios mirrors authentication() in scripts/compat/tokens.py.
+func authenticationScenarios(e *env, admin string) map[string]any {
+	const R = "/admin/realms/compat"
+	out := map[string]any{}
+	statusBody := func(r *response) map[string]any {
+		var body any
+		json.Unmarshal(r.body, &body)
+		return map[string]any{"status": float64(r.status), "body": body}
+	}
+	out["profile.single-error"] = statusBody(e.do(nil, "POST", R+"/users", admin, map[string]any{"username": "x", "email": "nope", "enabled": true}, nil))
+	out["profile.multiple-errors"] = statusBody(e.do(nil, "POST", R+"/users", admin, map[string]any{"username": "ab", "email": "nope"}, nil))
+	id := idFromLocation(e.t, e.expect(e.do(nil, "POST", R+"/users", admin, map[string]any{"username": "noprofile", "enabled": true,
+		"credentials": []any{map[string]any{"type": "password", "value": "pw", "temporary": false}}}, nil), 201))
+	out["profile.incomplete-login"] = statusBody(e.do(nil, "POST", "/realms/compat/protocol/openid-connect/token", "", nil, url.Values{
+		"grant_type": {"password"}, "client_id": {"web"}, "client_secret": {"web-secret"}, "username": {"noprofile"}, "password": {"pw"}}))
+	out["email.missing"] = statusBody(e.do(nil, "PUT", R+"/users/"+id+"/execute-actions-email", admin, []string{"UPDATE_PASSWORD"}, nil))
+	var profile any
+	e.expect(e.do(nil, "GET", R+"/users/profile", admin, nil, nil), 200).json(&profile)
+	out["profile.default"] = profile
+	var actions []map[string]any
+	e.expect(e.do(nil, "GET", R+"/authentication/required-actions", admin, nil, nil), 200).json(&actions)
+	var ra []any
+	for _, a := range actions {
+		ra = append(ra, map[string]any{"alias": a["alias"], "name": a["name"], "providerId": a["providerId"], "enabled": a["enabled"],
+			"defaultAction": a["defaultAction"], "priority": a["priority"]})
+	}
+	out["required-actions"] = ra
+	for _, alias := range []string{"browser", "direct grant", "registration", "reset credentials", "clients"} {
+		var execs []map[string]any
+		e.expect(e.do(nil, "GET", R+"/authentication/flows/"+url.PathEscape(alias)+"/executions", admin, nil, nil), 200).json(&execs)
+		var list []any
+		for _, ex := range execs {
+			m := map[string]any{}
+			for _, k := range []string{"level", "index", "displayName", "requirement", "providerId", "requirementChoices", "authenticationFlow"} {
+				m[k] = ex[k]
+			}
+			list = append(list, m)
+		}
+		out["flow."+strings.ReplaceAll(alias, " ", "-")] = list
+	}
+	out["flow.builtin-edit"] = statusBody(e.do(nil, "POST", R+"/authentication/flows/browser/executions/execution", admin, map[string]string{"provider": "auth-otp-form"}, nil))
 	return out
 }

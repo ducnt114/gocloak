@@ -67,6 +67,55 @@ type RealmSettings struct {
 	// Credentials.
 	PasswordPolicy string `json:"passwordPolicy,omitempty"`
 
+	// Authentication.
+	BrowserFlow                     string `json:"browserFlow,omitempty"`
+	RegistrationFlow                string `json:"registrationFlow,omitempty"`
+	DirectGrantFlow                 string `json:"directGrantFlow,omitempty"`
+	ResetCredentialsFlow            string `json:"resetCredentialsFlow,omitempty"`
+	ClientAuthenticationFlow        string `json:"clientAuthenticationFlow,omitempty"`
+	FirstBrokerLoginFlow            string `json:"firstBrokerLoginFlow,omitempty"`
+	DockerAuthenticationFlow        string `json:"dockerAuthenticationFlow,omitempty"`
+	SSOSessionIdleTimeoutRememberMe int    `json:"ssoSessionIdleTimeoutRememberMe"`
+	SSOSessionMaxLifespanRememberMe int    `json:"ssoSessionMaxLifespanRememberMe"`
+	ActionTokenGeneratedByAdmin     int    `json:"actionTokenGeneratedByAdminLifespan"`
+	ActionTokenGeneratedByUser      int    `json:"actionTokenGeneratedByUserLifespan"`
+	// SMTPServer holds Keycloak's smtpServer settings (host, port, from, auth, user, password, ssl, starttls...).
+	SMTPServer map[string]string `json:"smtpServer,omitempty"`
+
+	// OTP policy.
+	OTPPolicyType            string   `json:"otpPolicyType,omitempty"`
+	OTPPolicyAlgorithm       string   `json:"otpPolicyAlgorithm,omitempty"`
+	OTPPolicyInitialCounter  int      `json:"otpPolicyInitialCounter"`
+	OTPPolicyDigits          int      `json:"otpPolicyDigits"`
+	OTPPolicyLookAheadWindow int      `json:"otpPolicyLookAheadWindow"`
+	OTPPolicyPeriod          int      `json:"otpPolicyPeriod"`
+	OTPPolicyCodeReusable    bool     `json:"otpPolicyCodeReusable"`
+	OTPSupportedApplications []string `json:"otpSupportedApplications,omitempty"`
+
+	// WebAuthn policies (two-factor and passwordless), flat as in Keycloak.
+	WebAuthnPolicyRpEntityName                                string   `json:"webAuthnPolicyRpEntityName"`
+	WebAuthnPolicySignatureAlgorithms                         []string `json:"webAuthnPolicySignatureAlgorithms"`
+	WebAuthnPolicyRpId                                        string   `json:"webAuthnPolicyRpId"`
+	WebAuthnPolicyAttestationConveyancePreference             string   `json:"webAuthnPolicyAttestationConveyancePreference"`
+	WebAuthnPolicyAuthenticatorAttachment                     string   `json:"webAuthnPolicyAuthenticatorAttachment"`
+	WebAuthnPolicyRequireResidentKey                          string   `json:"webAuthnPolicyRequireResidentKey"`
+	WebAuthnPolicyUserVerificationRequirement                 string   `json:"webAuthnPolicyUserVerificationRequirement"`
+	WebAuthnPolicyCreateTimeout                               int      `json:"webAuthnPolicyCreateTimeout"`
+	WebAuthnPolicyAvoidSameAuthenticatorRegister              bool     `json:"webAuthnPolicyAvoidSameAuthenticatorRegister"`
+	WebAuthnPolicyAcceptableAaguids                           []string `json:"webAuthnPolicyAcceptableAaguids"`
+	WebAuthnPolicyExtraOrigins                                []string `json:"webAuthnPolicyExtraOrigins"`
+	WebAuthnPolicyPasswordlessRpEntityName                    string   `json:"webAuthnPolicyPasswordlessRpEntityName"`
+	WebAuthnPolicyPasswordlessSignatureAlgorithms             []string `json:"webAuthnPolicyPasswordlessSignatureAlgorithms"`
+	WebAuthnPolicyPasswordlessRpId                            string   `json:"webAuthnPolicyPasswordlessRpId"`
+	WebAuthnPolicyPasswordlessAttestationConveyancePreference string   `json:"webAuthnPolicyPasswordlessAttestationConveyancePreference"`
+	WebAuthnPolicyPasswordlessAuthenticatorAttachment         string   `json:"webAuthnPolicyPasswordlessAuthenticatorAttachment"`
+	WebAuthnPolicyPasswordlessRequireResidentKey              string   `json:"webAuthnPolicyPasswordlessRequireResidentKey"`
+	WebAuthnPolicyPasswordlessUserVerificationRequirement     string   `json:"webAuthnPolicyPasswordlessUserVerificationRequirement"`
+	WebAuthnPolicyPasswordlessCreateTimeout                   int      `json:"webAuthnPolicyPasswordlessCreateTimeout"`
+	WebAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister  bool     `json:"webAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister"`
+	WebAuthnPolicyPasswordlessAcceptableAaguids               []string `json:"webAuthnPolicyPasswordlessAcceptableAaguids"`
+	WebAuthnPolicyPasswordlessExtraOrigins                    []string `json:"webAuthnPolicyPasswordlessExtraOrigins"`
+
 	// Events.
 	EventsEnabled             bool     `json:"eventsEnabled"`
 	EventsExpiration          int64    `json:"eventsExpiration,omitempty"`
@@ -76,9 +125,40 @@ type RealmSettings struct {
 	AdminEventsDetailsEnabled bool     `json:"adminEventsDetailsEnabled"`
 }
 
+// WebAuthnPolicy is one of the two WebAuthn policies of a realm.
+type WebAuthnPolicy struct {
+	RpEntityName                    string
+	SignatureAlgorithms             []string
+	RpID                            string
+	AttestationConveyancePreference string
+	AuthenticatorAttachment         string
+	RequireResidentKey              string
+	UserVerificationRequirement     string
+	CreateTimeout                   int
+	AvoidSameAuthenticatorRegister  bool
+	AcceptableAaguids               []string
+	ExtraOrigins                    []string
+}
+
+// WebAuthn returns the two-factor or the passwordless WebAuthn policy.
+func (s *RealmSettings) WebAuthn(passwordless bool) WebAuthnPolicy {
+	if passwordless {
+		return WebAuthnPolicy{s.WebAuthnPolicyPasswordlessRpEntityName, s.WebAuthnPolicyPasswordlessSignatureAlgorithms,
+			s.WebAuthnPolicyPasswordlessRpId, s.WebAuthnPolicyPasswordlessAttestationConveyancePreference,
+			s.WebAuthnPolicyPasswordlessAuthenticatorAttachment, s.WebAuthnPolicyPasswordlessRequireResidentKey,
+			s.WebAuthnPolicyPasswordlessUserVerificationRequirement, s.WebAuthnPolicyPasswordlessCreateTimeout,
+			s.WebAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister, s.WebAuthnPolicyPasswordlessAcceptableAaguids,
+			s.WebAuthnPolicyPasswordlessExtraOrigins}
+	}
+	return WebAuthnPolicy{s.WebAuthnPolicyRpEntityName, s.WebAuthnPolicySignatureAlgorithms, s.WebAuthnPolicyRpId,
+		s.WebAuthnPolicyAttestationConveyancePreference, s.WebAuthnPolicyAuthenticatorAttachment,
+		s.WebAuthnPolicyRequireResidentKey, s.WebAuthnPolicyUserVerificationRequirement, s.WebAuthnPolicyCreateTimeout,
+		s.WebAuthnPolicyAvoidSameAuthenticatorRegister, s.WebAuthnPolicyAcceptableAaguids, s.WebAuthnPolicyExtraOrigins}
+}
+
 // DefaultRealmSettings returns Keycloak's defaults for a new realm.
 func DefaultRealmSettings() RealmSettings {
-	return RealmSettings{
+	d := RealmSettings{
 		SSLRequired:                  "external",
 		OfflineSessionIdleTimeout:    2592000,
 		OfflineSessionMaxLifespan:    5184000,
@@ -91,7 +171,38 @@ func DefaultRealmSettings() RealmSettings {
 		MaxFailureWaitSeconds:        900,
 		MaxDeltaTimeSeconds:          43200,
 		EventsListeners:              []string{"jboss-logging"},
+		BrowserFlow:                  "browser",
+		RegistrationFlow:             "registration",
+		DirectGrantFlow:              "direct grant",
+		ResetCredentialsFlow:         "reset credentials",
+		ClientAuthenticationFlow:     "clients",
+		FirstBrokerLoginFlow:         "first broker login",
+		DockerAuthenticationFlow:     "docker auth",
+		ActionTokenGeneratedByAdmin:  43200,
+		ActionTokenGeneratedByUser:   300,
+		OTPPolicyType:                "totp",
+		OTPPolicyAlgorithm:           "HmacSHA1",
+		OTPPolicyDigits:              6,
+		OTPPolicyLookAheadWindow:     1,
+		OTPPolicyPeriod:              30,
+		OTPSupportedApplications:     []string{"totpAppFreeOTPName", "totpAppGoogleName", "totpAppMicrosoftAuthenticatorName"},
 	}
+	for _, p := range []struct {
+		name                                            *string
+		algs, aaguids, origins                          *[]string
+		attestation, attachment, resident, verification *string
+	}{
+		{&d.WebAuthnPolicyRpEntityName, &d.WebAuthnPolicySignatureAlgorithms, &d.WebAuthnPolicyAcceptableAaguids, &d.WebAuthnPolicyExtraOrigins,
+			&d.WebAuthnPolicyAttestationConveyancePreference, &d.WebAuthnPolicyAuthenticatorAttachment, &d.WebAuthnPolicyRequireResidentKey, &d.WebAuthnPolicyUserVerificationRequirement},
+		{&d.WebAuthnPolicyPasswordlessRpEntityName, &d.WebAuthnPolicyPasswordlessSignatureAlgorithms, &d.WebAuthnPolicyPasswordlessAcceptableAaguids, &d.WebAuthnPolicyPasswordlessExtraOrigins,
+			&d.WebAuthnPolicyPasswordlessAttestationConveyancePreference, &d.WebAuthnPolicyPasswordlessAuthenticatorAttachment, &d.WebAuthnPolicyPasswordlessRequireResidentKey, &d.WebAuthnPolicyPasswordlessUserVerificationRequirement},
+	} {
+		*p.name = "keycloak"
+		*p.algs = []string{"ES256", "RS256"}
+		*p.aaguids, *p.origins = []string{}, []string{}
+		*p.attestation, *p.attachment, *p.resident, *p.verification = "not specified", "not specified", "not specified", "not specified"
+	}
+	return d
 }
 
 // Client is an application that can request authentication.
@@ -118,6 +229,8 @@ type Client struct {
 	// ClientAuthenticatorType is client-secret, client-secret-jwt or client-jwt.
 	ClientAuthenticatorType string
 	NotBefore               int64
+	// FlowOverrides binds flows by id for this client ("browser", "direct_grant").
+	FlowOverrides map[string]string
 }
 
 // User is a realm user. Service account users are linked to a client.
@@ -334,4 +447,57 @@ func (c *Component) Set(key, value string) {
 		c.Config = map[string][]string{}
 	}
 	c.Config[key] = []string{value}
+}
+
+// Required action providers, authentication flows and their executions.
+
+// RequiredActionProvider configures a required action in a realm.
+type RequiredActionProvider struct {
+	RealmID       string
+	Alias         string
+	Name          string
+	ProviderID    string
+	Enabled       bool
+	DefaultAction bool
+	Priority      int
+	Config        map[string]string
+}
+
+// AuthFlow is an authentication flow (top level or sub flow).
+type AuthFlow struct {
+	ID          string
+	RealmID     string
+	Alias       string
+	Description string
+	ProviderID  string // basic-flow, form-flow or client-flow
+	TopLevel    bool
+	BuiltIn     bool
+}
+
+// Execution requirements.
+const (
+	Required    = "REQUIRED"
+	Alternative = "ALTERNATIVE"
+	Conditional = "CONDITIONAL"
+	Disabled    = "DISABLED"
+)
+
+// AuthExecution is a step of a flow: an authenticator, or a sub flow.
+type AuthExecution struct {
+	ID            string
+	RealmID       string
+	FlowID        string
+	Authenticator string
+	SubFlowID     string
+	Requirement   string
+	Priority      int
+	ConfigID      string
+}
+
+// AuthenticatorConfig holds the settings of an execution.
+type AuthenticatorConfig struct {
+	ID      string
+	RealmID string
+	Alias   string
+	Config  map[string]string
 }

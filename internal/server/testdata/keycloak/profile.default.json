@@ -1,0 +1,112 @@
+{
+  "attributes": [
+    {
+      "displayName": "${username}",
+      "multivalued": false,
+      "name": "username",
+      "permissions": {
+        "edit": [
+          "admin",
+          "user"
+        ],
+        "view": [
+          "admin",
+          "user"
+        ]
+      },
+      "validations": {
+        "length": {
+          "max": 255,
+          "min": 3
+        },
+        "up-username-not-idn-homograph": {},
+        "username-prohibited-characters": {}
+      }
+    },
+    {
+      "displayName": "${email}",
+      "multivalued": false,
+      "name": "email",
+      "permissions": {
+        "edit": [
+          "admin",
+          "user"
+        ],
+        "view": [
+          "admin",
+          "user"
+        ]
+      },
+      "required": {
+        "roles": [
+          "user"
+        ]
+      },
+      "validations": {
+        "email": {},
+        "length": {
+          "max": 255
+        }
+      }
+    },
+    {
+      "displayName": "${firstName}",
+      "multivalued": false,
+      "name": "firstName",
+      "permissions": {
+        "edit": [
+          "admin",
+          "user"
+        ],
+        "view": [
+          "admin",
+          "user"
+        ]
+      },
+      "required": {
+        "roles": [
+          "user"
+        ]
+      },
+      "validations": {
+        "length": {
+          "max": 255
+        },
+        "person-name-prohibited-characters": {}
+      }
+    },
+    {
+      "displayName": "${lastName}",
+      "multivalued": false,
+      "name": "lastName",
+      "permissions": {
+        "edit": [
+          "admin",
+          "user"
+        ],
+        "view": [
+          "admin",
+          "user"
+        ]
+      },
+      "required": {
+        "roles": [
+          "user"
+        ]
+      },
+      "validations": {
+        "length": {
+          "max": 255
+        },
+        "person-name-prohibited-characters": {}
+      }
+    }
+  ],
+  "groups": [
+    {
+      "displayDescription": "Attributes, which refer to user metadata",
+      "displayHeader": "User metadata",
+      "name": "user-metadata"
+    }
+  ]
+}

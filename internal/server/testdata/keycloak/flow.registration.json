@@ -1,0 +1,62 @@
+[
+  {
+    "authenticationFlow": true,
+    "displayName": "registration form",
+    "index": 0,
+    "level": 0,
+    "providerId": "registration-page-form",
+    "requirement": "REQUIRED",
+    "requirementChoices": [
+      "REQUIRED",
+      "DISABLED"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "Registration User Profile Creation",
+    "index": 0,
+    "level": 1,
+    "providerId": "registration-user-creation",
+    "requirement": "REQUIRED",
+    "requirementChoices": [
+      "REQUIRED",
+      "DISABLED"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "Password Validation",
+    "index": 1,
+    "level": 1,
+    "providerId": "registration-password-action",
+    "requirement": "REQUIRED",
+    "requirementChoices": [
+      "REQUIRED",
+      "DISABLED"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "reCAPTCHA",
+    "index": 2,
+    "level": 1,
+    "providerId": "registration-recaptcha-action",
+    "requirement": "DISABLED",
+    "requirementChoices": [
+      "REQUIRED",
+      "DISABLED"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "Terms and conditions",
+    "index": 3,
+    "level": 1,
+    "providerId": "registration-terms-and-conditions",
+    "requirement": "DISABLED",
+    "requirementChoices": [
+      "REQUIRED",
+      "DISABLED"
+    ]
+  }
+]

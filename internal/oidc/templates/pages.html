@@ -1,6 +1,8 @@
 {{define "error.html"}}{{template "header" .}}{{template "footer" .}}{{end}}
 
-{{define "info.html"}}{{template "header" .}}{{template "footer" .}}{{end}}
+{{define "info.html"}}{{template "header" .}}
+{{if .LinkURL}}<p class="center"><a id="kc-info-link" href="{{.LinkURL}}">{{.LinkText}}</a></p>{{end}}
+{{template "footer" .}}{{end}}
 
 {{define "logout-confirm.html"}}{{template "header" .}}
 <p>Do you want to log out?</p>

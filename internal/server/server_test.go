@@ -486,7 +486,7 @@ func TestAdminAPI(t *testing.T) {
 
 	// A realm admin of demo: grant view-users only.
 	e.expect(e.do(nil, "POST", "/admin/realms/demo/users", admin, map[string]any{
-		"username": "helpdesk", "enabled": true, "credentials": []any{map[string]any{"value": "pw", "temporary": false}},
+		"username": "helpdesk", "email": "helpdesk@example.com", "firstName": "Help", "lastName": "Desk", "enabled": true, "credentials": []any{map[string]any{"value": "pw", "temporary": false}},
 		"clientRoles": map[string][]string{"realm-management": {"view-users"}},
 	}, nil), 201)
 	e.expect(e.do(nil, "PUT", "/admin/realms/demo/clients/"+clientUUID(e, admin, "admin-cli"), admin, map[string]any{"directAccessGrantsEnabled": true}, nil), 204)
@@ -501,7 +501,7 @@ func TestAdminAPI(t *testing.T) {
 
 	// A user manager may map ordinary roles but not admin roles it lacks.
 	mgrID := idFromLocation(t, e.expect(e.do(nil, "POST", "/admin/realms/demo/users", admin, map[string]any{
-		"username": "usermgr", "enabled": true, "credentials": []any{map[string]any{"value": "pw", "temporary": false}},
+		"username": "usermgr", "email": "usermgr@example.com", "firstName": "User", "lastName": "Manager", "enabled": true, "credentials": []any{map[string]any{"value": "pw", "temporary": false}},
 		"clientRoles": map[string][]string{"realm-management": {"manage-users"}},
 	}, nil), 201))
 	mgr, r := e.passwordGrant("demo", "admin-cli", "", "usermgr", "pw")
@@ -571,7 +571,7 @@ func TestRealmImport(t *testing.T) {
 	  "clients": [{"clientId": "shop", "publicClient": true, "directAccessGrantsEnabled": true, "redirectUris": ["/*"], "rootUrl": "http://shop.test"}],
 	  "groups": [{"name": "eu", "subGroups": [{"name": "fr", "realmRoles": ["manager"]}]}],
 	  "users": [
-	    {"id": "11111111-2222-3333-4444-555555555555", "username": "carol", "enabled": true, "groups": ["/eu/fr"],
+	    {"id": "11111111-2222-3333-4444-555555555555", "username": "carol", "email": "carol@example.com", "firstName": "Carol", "lastName": "C", "enabled": true, "groups": ["/eu/fr"],
 	     "clientRoles": {"shop": ["buyer"]},
 	     "credentials": [{"type": "password",
 	        "secretData": "{\"value\":\"` + pbkdf2Hash("secret") + `\",\"salt\":\"c2FsdDAxMjM0NTY3ODlhYg==\",\"additionalParameters\":{}}",

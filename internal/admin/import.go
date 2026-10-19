@@ -8,6 +8,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/service"
 	"github.com/ducnt114/gocloak/internal/store"
+	"github.com/ducnt114/gocloak/internal/userprofile"
 )
 
 // Import creates a realm from a Keycloak RealmRepresentation, including the
@@ -66,6 +67,13 @@ func importContent(ctx context.Context, svc *service.Service, tx *store.Store, r
 			composites = append(composites, pending{role, rr.Composites})
 		}
 		return nil
+	}
+
+	if err := importComponents(ctx, svc, tx, realm, rep); err != nil {
+		return err
+	}
+	if err := importAuthentication(ctx, tx, realm, rep); err != nil {
+		return err
 	}
 
 	// Client scopes before clients, which reference them by name.
@@ -222,11 +230,11 @@ func importUser(ctx context.Context, svc *service.Service, tx *store.Store, real
 	}
 
 	for _, cr := range ur.Credentials {
-		if cr.Type != "" && cr.Type != model.CredentialPassword {
-			continue // only passwords are supported
+		if cr.Type == "" {
+			cr.Type = model.CredentialPassword
 		}
 		switch {
-		case cr.Value != "":
+		case cr.Value != "" && cr.Type == model.CredentialPassword:
 			if err := svc.SetPassword(ctx, tx, u, cr.Value, cr.Temporary != nil && *cr.Temporary); err != nil {
 				return nil, err
 			}
@@ -236,8 +244,9 @@ func importUser(ctx context.Context, svc *service.Service, tx *store.Store, real
 			if created == 0 {
 				created = svc.Now().UnixMilli()
 			}
-			if err := tx.CreateCredential(ctx, &model.Credential{ID: service.NewID(), UserID: u.ID, Type: model.CredentialPassword,
-				UserLabel: cr.UserLabel, SecretData: cr.SecretData, CredentialData: cr.CredentialData, CreatedDate: created, Priority: 10}); err != nil {
+			// Pre-hashed password, or an OTP / WebAuthn credential of an export.
+			if err := tx.CreateCredential(ctx, &model.Credential{ID: service.NewID(), UserID: u.ID, Type: cr.Type,
+				UserLabel: cr.UserLabel, SecretData: cr.SecretData, CredentialData: cr.CredentialData, CreatedDate: created, Priority: cr.Priority}); err != nil {
 				return nil, err
 			}
 		}
@@ -384,6 +393,145 @@ func importScopeMappings(ctx context.Context, tx *store.Store, realm *model.Real
 			if err := add(c.ID, sm); err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+// importAuthentication replaces the built-in flows and required actions
+// when the export carries its own. Executions of unknown authenticators are
+// refused unless DISABLED, so that a flow is never silently weakened.
+func importAuthentication(ctx context.Context, tx *store.Store, realm *model.Realm, rep *RealmRep) error {
+	if len(rep.AuthenticationFlows) > 0 {
+		flows, err := tx.ListFlows(ctx, realm.ID)
+		if err != nil {
+			return err
+		}
+		for _, f := range flows {
+			if f.TopLevel {
+				if err := tx.DeleteFlow(ctx, f.ID); err != nil {
+					return err
+				}
+			}
+		}
+		configs, err := tx.ListAuthConfigs(ctx, realm.ID)
+		if err != nil {
+			return err
+		}
+		for _, c := range configs {
+			if err := tx.DeleteAuthConfig(ctx, c.ID); err != nil {
+				return err
+			}
+		}
+		configByAlias := map[string]string{}
+		for _, c := range rep.AuthenticatorConfig {
+			nc := &model.AuthenticatorConfig{ID: service.NewID(), RealmID: realm.ID, Alias: c.Alias, Config: c.Config}
+			if err := tx.CreateAuthConfig(ctx, nc); err != nil {
+				return err
+			}
+			configByAlias[c.Alias] = nc.ID
+		}
+		ids := map[string]string{}
+		for _, f := range rep.AuthenticationFlows {
+			nf := &model.AuthFlow{ID: service.NewID(), RealmID: realm.ID, Alias: f.Alias, Description: f.Description,
+				ProviderID: f.ProviderID, TopLevel: f.TopLevel, BuiltIn: f.BuiltIn}
+			if nf.ProviderID == "" {
+				nf.ProviderID = "basic-flow"
+			}
+			if err := tx.CreateFlow(ctx, nf); err != nil {
+				return err
+			}
+			ids[f.Alias] = nf.ID
+		}
+		for _, f := range rep.AuthenticationFlows {
+			for i, e := range f.AuthenticationExecutions {
+				ex := &model.AuthExecution{ID: service.NewID(), RealmID: realm.ID, FlowID: ids[f.Alias], Authenticator: e.Authenticator,
+					Requirement: e.Requirement, Priority: e.Priority, ConfigID: configByAlias[e.AuthenticatorConfig]}
+				if ex.Priority == 0 && i > 0 {
+					ex.Priority = i * 10
+				}
+				if e.AuthenticatorFlow || e.AutheticatorFlow {
+					if ex.SubFlowID = ids[e.FlowAlias]; ex.SubFlowID == "" {
+						return badRequest("Flow " + e.FlowAlias + " referenced by " + f.Alias + " does not exist")
+					}
+				} else if _, known := lookupProvider(e.Authenticator); !known && e.Requirement != model.Disabled {
+					return badRequest("Authenticator " + e.Authenticator + " of flow " + f.Alias + " is not supported by gocloak")
+				}
+				if err := tx.CreateExecution(ctx, ex); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if len(rep.RequiredActions) > 0 {
+		existing, err := tx.ListRequiredActions(ctx, realm.ID)
+		if err != nil {
+			return err
+		}
+		for _, a := range existing {
+			if err := tx.DeleteRequiredAction(ctx, realm.ID, a.Alias); err != nil {
+				return err
+			}
+		}
+		for _, a := range rep.RequiredActions {
+			if a.ProviderID == "" {
+				a.ProviderID = a.Alias
+			}
+			if err := tx.CreateRequiredAction(ctx, &model.RequiredActionProvider{RealmID: realm.ID, Alias: a.Alias, Name: a.Name,
+				ProviderID: a.ProviderID, Enabled: a.Enabled, DefaultAction: a.DefaultAction, Priority: a.Priority, Config: a.Config}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// importComponents imports key providers (keeping the exported keys, so
+// tokens issued before a migration stay valid) and the user profile.
+func importComponents(ctx context.Context, svc *service.Service, tx *store.Store, realm *model.Realm, rep *RealmRep) error {
+	if keys := rep.Components[service.KeyProviderType]; len(keys) > 0 {
+		existing, err := tx.ListComponents(ctx, realm.ID, service.KeyProviderType)
+		if err != nil {
+			return err
+		}
+		imported := 0
+		for _, k := range keys {
+			if !service.KeyProviders[k.ProviderID] {
+				continue // AES, RSA-OAEP...: not used by gocloak
+			}
+			c := &model.Component{ID: service.NewID(), RealmID: realm.ID, Name: k.Name, ProviderID: k.ProviderID,
+				ProviderType: service.KeyProviderType, ParentID: realm.ID, SubType: k.SubType, Config: k.Config}
+			if err := service.PrepareKeyComponent(c, realm.Name, nil); err != nil {
+				return err
+			}
+			if err := tx.CreateComponent(ctx, c); err != nil {
+				return err
+			}
+			imported++
+		}
+		if imported > 0 {
+			for _, c := range existing {
+				if err := tx.DeleteComponent(ctx, realm.ID, c.ID); err != nil {
+					return err
+				}
+			}
+		}
+		svc.InvalidateKeys(realm.ID)
+	}
+	for _, c := range rep.Components[service.UserProfileProviderType] {
+		raw := ""
+		if v := c.Config[service.UserProfileConfigKey]; len(v) > 0 {
+			raw = v[0]
+		}
+		if raw == "" {
+			continue
+		}
+		cfg, err := userprofile.Parse([]byte(raw))
+		if err != nil {
+			return badRequest(err.Error())
+		}
+		if err := svc.SetUserProfile(ctx, tx, realm, cfg); err != nil {
+			return err
 		}
 	}
 	return nil

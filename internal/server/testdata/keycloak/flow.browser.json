@@ -1,0 +1,158 @@
+[
+  {
+    "authenticationFlow": null,
+    "displayName": "Cookie",
+    "index": 0,
+    "level": 0,
+    "providerId": "auth-cookie",
+    "requirement": "ALTERNATIVE",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "Kerberos",
+    "index": 1,
+    "level": 0,
+    "providerId": "auth-spnego",
+    "requirement": "DISABLED",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "Identity Provider Redirector",
+    "index": 2,
+    "level": 0,
+    "providerId": "identity-provider-redirector",
+    "requirement": "ALTERNATIVE",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED"
+    ]
+  },
+  {
+    "authenticationFlow": true,
+    "displayName": "Organization",
+    "index": 3,
+    "level": 0,
+    "providerId": null,
+    "requirement": "ALTERNATIVE",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED",
+      "CONDITIONAL"
+    ]
+  },
+  {
+    "authenticationFlow": true,
+    "displayName": "Browser - Conditional Organization",
+    "index": 0,
+    "level": 1,
+    "providerId": null,
+    "requirement": "CONDITIONAL",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED",
+      "CONDITIONAL"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "Condition - user configured",
+    "index": 0,
+    "level": 2,
+    "providerId": "conditional-user-configured",
+    "requirement": "REQUIRED",
+    "requirementChoices": [
+      "REQUIRED",
+      "DISABLED"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "Organization Identity-First Login",
+    "index": 1,
+    "level": 2,
+    "providerId": "organization",
+    "requirement": "ALTERNATIVE",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED"
+    ]
+  },
+  {
+    "authenticationFlow": true,
+    "displayName": "forms",
+    "index": 4,
+    "level": 0,
+    "providerId": null,
+    "requirement": "ALTERNATIVE",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED",
+      "CONDITIONAL"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "Username Password Form",
+    "index": 0,
+    "level": 1,
+    "providerId": "auth-username-password-form",
+    "requirement": "REQUIRED",
+    "requirementChoices": [
+      "REQUIRED"
+    ]
+  },
+  {
+    "authenticationFlow": true,
+    "displayName": "Browser - Conditional OTP",
+    "index": 1,
+    "level": 1,
+    "providerId": null,
+    "requirement": "CONDITIONAL",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED",
+      "CONDITIONAL"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "Condition - user configured",
+    "index": 0,
+    "level": 2,
+    "providerId": "conditional-user-configured",
+    "requirement": "REQUIRED",
+    "requirementChoices": [
+      "REQUIRED",
+      "DISABLED"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "OTP Form",
+    "index": 1,
+    "level": 2,
+    "providerId": "auth-otp-form",
+    "requirement": "REQUIRED",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED"
+    ]
+  }
+]

@@ -1,0 +1,65 @@
+[
+  {
+    "authenticationFlow": null,
+    "displayName": "Username Validation",
+    "index": 0,
+    "level": 0,
+    "providerId": "direct-grant-validate-username",
+    "requirement": "REQUIRED",
+    "requirementChoices": [
+      "REQUIRED"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "Password",
+    "index": 1,
+    "level": 0,
+    "providerId": "direct-grant-validate-password",
+    "requirement": "REQUIRED",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED"
+    ]
+  },
+  {
+    "authenticationFlow": true,
+    "displayName": "Direct Grant - Conditional OTP",
+    "index": 2,
+    "level": 0,
+    "providerId": null,
+    "requirement": "CONDITIONAL",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED",
+      "CONDITIONAL"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "Condition - user configured",
+    "index": 0,
+    "level": 1,
+    "providerId": "conditional-user-configured",
+    "requirement": "REQUIRED",
+    "requirementChoices": [
+      "REQUIRED",
+      "DISABLED"
+    ]
+  },
+  {
+    "authenticationFlow": null,
+    "displayName": "OTP",
+    "index": 1,
+    "level": 1,
+    "providerId": "direct-grant-validate-otp",
+    "requirement": "REQUIRED",
+    "requirementChoices": [
+      "REQUIRED",
+      "ALTERNATIVE",
+      "DISABLED"
+    ]
+  }
+]

@@ -173,6 +173,10 @@ func (s *Store) UpdateCredentialSecret(ctx context.Context, id, secretData, cred
 	return s.execOne(ctx, `UPDATE credentials SET secret_data=?, credential_data=? WHERE id=?`, secretData, credentialData, id)
 }
 
+func (s *Store) UpdateCredentialLabel(ctx context.Context, userID, id, label string) error {
+	return s.execOne(ctx, `UPDATE credentials SET user_label=? WHERE user_id=? AND id=?`, label, userID, id)
+}
+
 func (s *Store) DeleteCredential(ctx context.Context, userID, id string) error {
 	return s.execOne(ctx, `DELETE FROM credentials WHERE user_id=? AND id=?`, userID, id)
 }

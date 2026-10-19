@@ -177,6 +177,38 @@ def scenarios(base):
                                         "username": "alice", "password": "wonderland", "scope": "openid nope"})
     out["invalid-scope"] = {"status": st, "error": body.get("error") if isinstance(body, dict) else body}
     out.update(security(base))
+    out.update(authentication(base))
+    return out
+
+
+def authentication(base):
+    """User profile, required actions and authentication flows."""
+    out = {}
+    tok = admin_token(base)
+    r = base + "/admin/realms/" + REALM
+    t = base + f"/realms/{REALM}/protocol/openid-connect/token"
+    st, body, _ = call("POST", r + "/users", tok, {"username": "x", "email": "nope", "enabled": True})
+    out["profile.single-error"] = {"status": st, "body": body}
+    st, body, _ = call("POST", r + "/users", tok, {"username": "ab", "email": "nope"})
+    out["profile.multiple-errors"] = {"status": st, "body": body}
+    st, body, h = call("POST", r + "/users", tok, {"username": "noprofile", "enabled": True,
+                                                  "credentials": [{"type": "password", "value": "pw", "temporary": False}]})
+    must(st, 201, "create noprofile", body)
+    st, body, _ = call("POST", t, form={"grant_type": "password", "client_id": "web", "client_secret": "web-secret",
+                                        "username": "noprofile", "password": "pw"})
+    out["profile.incomplete-login"] = {"status": st, "body": body}
+    st, body, _ = call("PUT", r + "/users/" + h["Location"].rsplit("/", 1)[1] + "/execute-actions-email", tok, ["UPDATE_PASSWORD"])
+    out["email.missing"] = {"status": st, "body": body}
+    st, body, _ = call("GET", r + "/users/profile", tok)
+    out["profile.default"] = body
+    st, body, _ = call("GET", r + "/authentication/required-actions", tok)
+    out["required-actions"] = [{k: a[k] for k in ("alias", "name", "providerId", "enabled", "defaultAction", "priority")} for a in body]
+    for alias in ["browser", "direct grant", "registration", "reset credentials", "clients"]:
+        st, body, _ = call("GET", r + "/authentication/flows/" + urllib.parse.quote(alias) + "/executions", tok)
+        out["flow." + alias.replace(" ", "-")] = [{k: e.get(k) for k in ("level", "index", "displayName", "requirement", "providerId",
+                                                                         "requirementChoices", "authenticationFlow")} for e in body]
+    st, body, _ = call("POST", r + "/authentication/flows/browser/executions/execution", tok, {"provider": "auth-otp-form"})
+    out["flow.builtin-edit"] = {"status": st, "body": body}
     return out
 
 

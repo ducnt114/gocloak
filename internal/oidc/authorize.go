@@ -13,7 +13,6 @@ import (
 
 	"github.com/ducnt114/gocloak/internal/jwt"
 	"github.com/ducnt114/gocloak/internal/model"
-	"github.com/ducnt114/gocloak/internal/policy"
 	"github.com/ducnt114/gocloak/internal/service"
 	"github.com/ducnt114/gocloak/internal/store"
 )
@@ -26,10 +25,24 @@ const (
 
 // authorize handles /protocol/openid-connect/auth.
 func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
+	h.authorizeWith(w, r, "browser")
+}
+
+// registrations handles /protocol/openid-connect/registrations, which
+// starts a login on the registration form.
+func (h *Handler) registrations(w http.ResponseWriter, r *http.Request) {
+	h.authorizeWith(w, r, "registration")
+}
+
+func (h *Handler) authorizeWith(w http.ResponseWriter, r *http.Request, binding string) {
 	ctx := r.Context()
 	realm, err := h.realm(r)
 	if err != nil {
 		h.errorPage(w, r, http.StatusNotFound, "Realm does not exist.")
+		return
+	}
+	if binding == "registration" && !realm.RegistrationAllowed {
+		h.errorPage(w, r, http.StatusBadRequest, "Registration not allowed")
 		return
 	}
 	q := func(k string) string { return r.FormValue(k) }
@@ -112,35 +125,32 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request) {
 		"code_challenge":        q("code_challenge"),
 		"code_challenge_method": method,
 		"login_hint":            q("login_hint"),
+		"prompt":                q("prompt"),
+		"max_age":               q("max_age"),
+		"kc_action":             q("kc_action"),
 	}
-	prompt := q("prompt")
 
-	// Reuse an existing SSO session unless a fresh login is required.
-	if us, user := h.ssoSession(r, realm); us != nil && !strings.Contains(prompt, "login") {
-		fresh := true
-		if ma := q("max_age"); ma != "" {
-			if n, err := strconv.Atoi(ma); err == nil && h.Svc.Now().Sub(us.Started) > time.Duration(n)*time.Second {
-				fresh = false
-			}
-		}
-		if fresh && len(user.RequiredActions) == 0 {
-			h.finishLogin(w, r, realm, client, user, us, params)
+	if strings.Contains(q("prompt"), "none") {
+		// Only an existing SSO session can answer without user interaction.
+		us, user := h.ssoSession(r, realm)
+		if us == nil {
+			fail("login_required", "Login required")
 			return
 		}
-	}
-	if strings.Contains(prompt, "none") {
-		fail("login_required", "Login required")
+		if len(user.RequiredActions) > 0 {
+			fail("interaction_required", "Interaction required")
+			return
+		}
+		h.finishLogin(w, r, realm, client, user, us, params)
 		return
 	}
 
-	as := &model.AuthSession{ID: service.RandomToken(24), RealmID: realm.ID, ClientID: client.ID,
-		Params: params, ExpiresAt: h.Svc.Now().Add(authSessionTTL)}
-	if err := h.Svc.Store.CreateAuthSession(ctx, as); err != nil {
+	as, err := h.newAuthSession(w, r, realm, client, params)
+	if err != nil {
 		h.serverErrorPage(w, r, err)
 		return
 	}
-	h.setCookie(w, r, realm, authSessionCookie, as.ID, 0)
-	h.renderLogin(w, r, realm, as, params["login_hint"], "", http.StatusOK)
+	h.startFlow(w, r, realm, client, as, binding)
 }
 
 func soleRedirectURI(base string, c *model.Client) string {
@@ -172,147 +182,71 @@ func (h *Handler) loadAuthSession(r *http.Request, realm *model.Realm) (*model.A
 	return as, client, nil
 }
 
-// loginAction handles the username/password form.
-func (h *Handler) loginAction(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	realm, err := h.realm(r)
-	if err != nil {
-		h.errorPage(w, r, http.StatusNotFound, "Realm does not exist.")
-		return
-	}
-	as, client, err := h.loadAuthSession(r, realm)
-	if err != nil {
-		h.errorPage(w, r, http.StatusBadRequest, "Your login attempt timed out. Login will start from the beginning.")
-		return
-	}
-	username, pw := strings.TrimSpace(r.PostFormValue("username")), r.PostFormValue("password")
-	ev := &eventInfo{client: client, details: map[string]string{"auth_method": "openid-connect", "auth_type": "code",
-		"redirect_uri": as.Params["redirect_uri"], "username": username}}
-	fail := func(code, msg string) {
-		ev.err = code
-		h.event(r, realm, "LOGIN_ERROR", ev)
-		h.renderLogin(w, r, realm, as, username, msg, http.StatusUnauthorized)
-	}
-	user, err := h.Svc.FindLoginUser(ctx, realm, username)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
-		h.serverErrorPage(w, r, err)
-		return
-	}
-	if user == nil {
-		fail("user_not_found", "Invalid username or password.")
-		return
-	}
-	ev.userID = user.ID
-	if !user.Enabled {
-		fail("user_disabled", "Account is disabled, contact your administrator.")
-		return
-	}
-	locked, err := h.Svc.TemporarilyLocked(ctx, realm, user)
-	if err != nil {
-		h.serverErrorPage(w, r, err)
-		return
-	}
-	if locked {
-		fail("user_temporarily_disabled", "Invalid username or password.")
-		return
-	}
-	ok, err := h.Svc.CheckPassword(ctx, user, pw)
-	if err != nil {
-		h.serverErrorPage(w, r, err)
-		return
-	}
+// authenticateEndpoint serves /login-actions/authenticate: the forms of
+// the flow's executions post here (?execution=<id>).
+func (h *Handler) authenticateEndpoint(w http.ResponseWriter, r *http.Request) {
+	realm, as, client, ok := h.authSessionOf(w, r)
 	if !ok {
-		if err := h.Svc.LoginFailed(ctx, realm, user, clientIP(r)); err != nil {
-			h.serverErrorPage(w, r, err)
-			return
-		}
-		fail("invalid_user_credentials", "Invalid username or password.")
 		return
 	}
-	if err := h.Svc.LoginSucceeded(ctx, realm, user); err != nil {
-		h.serverErrorPage(w, r, err)
-		return
+	posted := ""
+	if r.Method == http.MethodPost {
+		posted = r.URL.Query().Get("execution")
 	}
-	if err := h.checkPasswordExpiry(r, realm, user); err != nil {
-		h.serverErrorPage(w, r, err)
-		return
-	}
-	as.UserID = user.ID
-	if err := h.Svc.Store.UpdateAuthSession(ctx, as); err != nil {
-		h.serverErrorPage(w, r, err)
-		return
-	}
-	h.continueLogin(w, r, realm, client, user, as)
+	h.continueFlow(w, r, realm, client, as, posted)
 }
 
-// continueLogin runs pending required actions, then completes the login.
-func (h *Handler) continueLogin(w http.ResponseWriter, r *http.Request, realm *model.Realm, client *model.Client, user *model.User, as *model.AuthSession) {
-	for _, a := range user.RequiredActions {
-		if a == service.ActionUpdatePassword {
-			h.render(w, http.StatusOK, "update-password", pageData{
-				Realm: realmTitle(realm), Title: "Update password",
-				Action:  h.loginActionURL(r, realm, "required-action", as.ID),
-				Message: "You need to change your password to activate your account.",
-			})
-			return
-		}
-	}
-	if err := h.Svc.Store.DeleteAuthSession(r.Context(), as.ID); err != nil {
-		h.serverErrorPage(w, r, err)
-		return
-	}
-	h.clearCookie(w, r, realm, authSessionCookie)
-	h.finishLogin(w, r, realm, client, user, nil, as.Params)
-}
-
-// requiredAction handles the update password form.
-func (h *Handler) requiredAction(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+// authSessionOf loads the realm and auth session of a login-actions request.
+func (h *Handler) authSessionOf(w http.ResponseWriter, r *http.Request) (*model.Realm, *model.AuthSession, *model.Client, bool) {
 	realm, err := h.realm(r)
 	if err != nil {
 		h.errorPage(w, r, http.StatusNotFound, "Realm does not exist.")
-		return
+		return nil, nil, nil, false
 	}
 	as, client, err := h.loadAuthSession(r, realm)
-	if err != nil || as.UserID == "" {
-		h.errorPage(w, r, http.StatusBadRequest, "Your login attempt timed out. Login will start from the beginning.")
-		return
-	}
-	user, err := h.Svc.Store.GetUser(ctx, realm.ID, as.UserID)
 	if err != nil {
-		h.errorPage(w, r, http.StatusBadRequest, "User not found.")
+		h.errorPage(w, r, http.StatusBadRequest, "Your login attempt timed out. Login will start from the beginning.")
+		return nil, nil, nil, false
+	}
+	return realm, as, client, true
+}
+
+// registrationEndpoint switches the login to the registration flow.
+func (h *Handler) registrationEndpoint(w http.ResponseWriter, r *http.Request) {
+	realm, as, client, ok := h.authSessionOf(w, r)
+	if !ok {
 		return
 	}
-	pw, confirm := r.PostFormValue("password-new"), r.PostFormValue("password-confirm")
-	errMsg := ""
-	switch {
-	case pw == "":
-		errMsg = "Please specify password."
-	case pw != confirm:
-		errMsg = "Passwords don't match."
-	}
-	if errMsg != "" {
-		h.render(w, http.StatusBadRequest, "update-password", pageData{
-			Realm: realmTitle(realm), Title: "Update password", Error: errMsg,
-			Action: h.loginActionURL(r, realm, "required-action", as.ID),
-		})
+	if !realm.RegistrationAllowed {
+		h.errorPage(w, r, http.StatusBadRequest, "Registration not allowed")
 		return
 	}
-	if err := h.Svc.SetPassword(ctx, h.Svc.Store, user, pw, false); err != nil {
-		var pe *policy.Error
-		if errors.As(err, &pe) {
-			h.event(r, realm, "UPDATE_PASSWORD_ERROR", &eventInfo{client: client, userID: user.ID, err: "password_rejected"})
-			h.render(w, http.StatusBadRequest, "update-password", pageData{
-				Realm: realmTitle(realm), Title: "Update password", Error: pe.Message,
-				Action: h.loginActionURL(r, realm, "required-action", as.ID),
-			})
-			return
-		}
-		h.serverErrorPage(w, r, err)
+	as.UserID = ""
+	h.startFlow(w, r, realm, client, as, "registration")
+}
+
+// resetCredentialsEndpoint switches the login to the reset credentials flow.
+func (h *Handler) resetCredentialsEndpoint(w http.ResponseWriter, r *http.Request) {
+	realm, as, client, ok := h.authSessionOf(w, r)
+	if !ok {
 		return
 	}
-	h.event(r, realm, "UPDATE_PASSWORD", &eventInfo{client: client, userID: user.ID})
-	h.continueLogin(w, r, realm, client, user, as)
+	if !realm.Settings.ResetPasswordAllowed {
+		h.errorPage(w, r, http.StatusBadRequest, "Reset password not allowed")
+		return
+	}
+	as.UserID = ""
+	h.startFlow(w, r, realm, client, as, "reset_credentials")
+}
+
+// restartEndpoint starts the login over ("Back to login", "Try another way").
+func (h *Handler) restartEndpoint(w http.ResponseWriter, r *http.Request) {
+	realm, as, client, ok := h.authSessionOf(w, r)
+	if !ok {
+		return
+	}
+	as.UserID = ""
+	h.startFlow(w, r, realm, client, as, "browser")
 }
 
 // finishLogin attaches the client to an SSO session (creating one if
@@ -326,6 +260,13 @@ func (h *Handler) finishLogin(w http.ResponseWriter, r *http.Request, realm *mod
 		}); err != nil {
 			h.serverErrorPage(w, r, err)
 			return
+		}
+		if params[keyRemember] == "true" {
+			us.RememberMe = true
+			if err := h.Svc.Store.SetSessionRememberMe(ctx, us.ID); err != nil {
+				h.serverErrorPage(w, r, err)
+				return
+			}
 		}
 	} else if !us.Clients[client.ID] {
 		us.Clients[client.ID] = true
@@ -400,7 +341,7 @@ func (h *Handler) setIdentityCookie(w http.ResponseWriter, r *http.Request, real
 	if err != nil {
 		return err
 	}
-	exp := us.Started.Add(time.Duration(realm.SSOSessionMaxLifespan) * time.Second)
+	exp := us.Started.Add(time.Duration(h.Svc.SessionMaxLifespan(realm, us)) * time.Second)
 	tok, err := jwt.Sign(jwt.Claims{
 		"typ": service.TokenCookie, "iss": h.URLs.Issuer(r, realm.Name), "sub": user.ID, "sid": us.ID,
 		"exp": exp.Unix(), "iat": h.Svc.Now().Unix(), "jti": service.NewID(),
@@ -408,7 +349,11 @@ func (h *Handler) setIdentityCookie(w http.ResponseWriter, r *http.Request, real
 	if err != nil {
 		return err
 	}
-	h.setCookie(w, r, realm, identityCookie, tok, 0)
+	maxAge := 0 // a session cookie, unless "remember me" was checked
+	if us.RememberMe {
+		maxAge = int(time.Until(exp).Seconds())
+	}
+	h.setCookie(w, r, realm, identityCookie, tok, maxAge)
 	return nil
 }
 
@@ -550,17 +495,6 @@ func (h *Handler) backchannelLogout(w http.ResponseWriter, r *http.Request, real
 
 func (h *Handler) loginActionURL(r *http.Request, realm *model.Realm, action, sessionCode string) string {
 	return h.URLs.Issuer(r, realm.Name) + "/login-actions/" + action + "?session_code=" + url.QueryEscape(sessionCode)
-}
-
-func (h *Handler) renderLogin(w http.ResponseWriter, r *http.Request, realm *model.Realm, as *model.AuthSession, username, errMsg string, status int) {
-	label := "Username"
-	if realm.LoginWithEmailAllowed {
-		label = "Username or email"
-	}
-	h.render(w, status, "login", pageData{
-		Realm: realmTitle(realm), Title: "Sign in to your account", Error: errMsg, Username: username,
-		UsernameLabel: label, Action: h.loginActionURL(r, realm, "authenticate", as.ID),
-	})
 }
 
 func realmTitle(r *model.Realm) string {
