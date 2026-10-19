@@ -75,6 +75,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST "+p+"/token", h.cors(h.token))
 	mux.HandleFunc("POST "+p+"/ext/par/request", h.cors(h.par))
 	mux.HandleFunc("POST "+p+"/auth/device", h.cors(h.deviceAuthorization))
+	mux.HandleFunc("POST "+p+"/ext/ciba/auth", h.cibaAuth)
+	mux.HandleFunc("POST "+p+"/ext/ciba/auth/callback", h.cibaCallback)
 	mux.HandleFunc("GET /realms/{realm}/device", h.deviceVerification)
 	mux.HandleFunc("POST /realms/{realm}/device", h.deviceVerification)
 	mux.HandleFunc("GET "+p+"/userinfo", h.cors(h.userinfo))

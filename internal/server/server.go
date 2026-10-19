@@ -49,6 +49,8 @@ type Config struct {
 	AdminConsoleDir string
 	// Version is the gocloak version.
 	Version string
+	// CIBAChannelURI is the authentication channel of CIBA requests.
+	CIBAChannelURI string
 }
 
 // Server is a running gocloak instance.
@@ -77,6 +79,7 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 	}
 	svc := service.New(st)
 	svc.Log = cfg.Log
+	svc.CIBAChannelURI = cfg.CIBAChannelURI
 	themes := &theme.Manager{Dir: cfg.ThemesDir, Cache: !cfg.NoThemeCache, Funcs: oidc.TemplateFuncs}
 	svc.Themes = themes
 	fed := &federation.Manager{Svc: svc, Log: cfg.Log}

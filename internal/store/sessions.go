@@ -178,6 +178,7 @@ func (s *Store) PurgeExpired(ctx context.Context, now time.Time) error {
 		`DELETE FROM auth_codes WHERE expires_at < ?`,
 		`DELETE FROM revoked_tokens WHERE expires_at < ?`,
 		`DELETE FROM device_codes WHERE expires_at < ?`,
+		`DELETE FROM ciba_requests WHERE expires_at < ?`,
 	} {
 		if err := s.exec(ctx, q, n); err != nil {
 			return err

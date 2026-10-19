@@ -78,6 +78,10 @@ type Service struct {
 	Themes *theme.Manager
 	// Federation is the user storage (LDAP) behind the local users.
 	Federation UserFederation
+	// CIBAChannelURI is where backchannel authentication requests are sent
+	// for users to authenticate on their device (Keycloak's
+	// ciba-http-auth-channel).
+	CIBAChannelURI string
 	// LogoutHandler sends back-channel logouts to the clients of ended
 	// sessions (set by the protocol handlers).
 	LogoutHandler BackchannelLogoutFunc

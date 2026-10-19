@@ -179,6 +179,8 @@ func start(args []string, dev bool) error {
 	consoleDir := fs.String("admin-console-dir", env("GOCLOAK_ADMIN_CONSOLE_DIR"), "directory of the admin console jars, see 'gocloak download-admin-console' (env GOCLOAK_ADMIN_CONSOLE_DIR)")
 	themeCache := fs.Bool("theme-cache", !dev, "cache themes (disable while developing a theme)")
 	rateLimit := fs.Float64("rate-limit", atof(envDefault("100", "GOCLOAK_RATE_LIMIT")), "requests per second allowed per client IP on /realms and /admin, 0 to disable (env GOCLOAK_RATE_LIMIT)")
+	cibaURI := fs.String("ciba-auth-channel-uri", envDefault(env("KC_SPI_CIBA_AUTH_CHANNEL_CIBA_HTTP_AUTH_CHANNEL_HTTP_AUTHENTICATION_CHANNEL_URI"), "GOCLOAK_CIBA_AUTH_CHANNEL_URI"),
+		"URL the CIBA authentication requests are posted to (env GOCLOAK_CIBA_AUTH_CHANNEL_URI or Keycloak's KC_SPI_CIBA_AUTH_CHANNEL_CIBA_HTTP_AUTH_CHANNEL_HTTP_AUTHENTICATION_CHANNEL_URI)")
 	rateBurst := fs.Int("rate-burst", atoi(envDefault("200", "GOCLOAK_RATE_BURST")), "burst size of the per IP rate limit (env GOCLOAK_RATE_BURST)")
 	fs.Parse(args)
 
@@ -197,7 +199,7 @@ func start(args []string, dev bool) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	srv, err := server.New(ctx, server.Config{
-		DB: dbCfg, Hostname: *hostname, ProxyHeaders: *proxy != "", ImportDir: *importDir, Log: log,
+		DB: dbCfg, Hostname: *hostname, ProxyHeaders: *proxy != "", ImportDir: *importDir, Log: log, CIBAChannelURI: *cibaURI,
 		RateLimit: *rateLimit, RateBurst: *rateBurst, ThemesDir: *themesDir, NoThemeCache: !*themeCache,
 		AdminConsoleDir: *consoleDir, Version: version,
 		AdminUser:     env("KC_BOOTSTRAP_ADMIN_USERNAME", "KEYCLOAK_ADMIN"),

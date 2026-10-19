@@ -5322,7 +5322,7 @@
   },
   {
    "dependencies": [],
-   "enabled": false,
+   "enabled": true,
    "label": "OpenID Connect Client Initiated Backchannel Authentication (CIBA)",
    "name": "CIBA",
    "type": "DEFAULT"
@@ -5668,7 +5668,6 @@
   "disabledFeatures": [
    "ADMIN_FINE_GRAINED_AUTHZ",
    "CACHE_EMBEDDED_REMOTE_STORE",
-   "CIBA",
    "CLIENT_POLICIES",
    "CLIENT_SECRET_ROTATION",
    "CLIENT_TYPES",

@@ -34,7 +34,7 @@ LDAP_MAPPERS = {"user-attribute-ldap-mapper", "full-name-ldap-mapper", "group-ld
 POLICIES = {"length", "maxLength", "digits", "lowerCase", "upperCase", "specialChars", "notUsername", "notEmail",
     "notContainsUsername", "regexPattern", "passwordHistory", "forceExpiredPasswordChange", "hashAlgorithm", "hashIterations"}
 # features of the console gocloak does not implement (yet)
-DISABLED = {"ORGANIZATION", "IMPERSONATION", "CIBA", "KERBEROS", "STEP_UP_AUTHENTICATION",
+DISABLED = {"ORGANIZATION", "IMPERSONATION", "KERBEROS", "STEP_UP_AUTHENTICATION",
     "CLIENT_POLICIES", "ADMIN_FINE_GRAINED_AUTHZ", "TOKEN_EXCHANGE", "PASSKEYS", "RECOVERY_CODES", "DOCKER", "SCRIPTS"}
 
 # preview features of Keycloak that gocloak implements

@@ -241,6 +241,22 @@ type Client struct {
 	ConsentRequired bool
 }
 
+// CIBARequest is a pending backchannel authentication (OIDC CIBA).
+type CIBARequest struct {
+	ID                string // auth_req_id
+	RealmID           string
+	ClientID          string // client UUID
+	UserID            string
+	Scope             string
+	CallbackID        string // jti of the token the authentication device calls back with
+	NotificationToken string // client_notification_token (ping mode)
+	Status            string // pending, approved or denied
+	SessionID         string
+	Interval          int
+	LastPoll          int64
+	ExpiresAt         time.Time
+}
+
 // InitialAccessToken lets clients register themselves (dynamic client
 // registration) a limited number of times.
 type InitialAccessToken struct {
