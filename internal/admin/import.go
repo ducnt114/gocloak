@@ -119,6 +119,9 @@ func importContent(ctx context.Context, svc *service.Service, tx *store.Store, r
 		if err := applyClientScopes(ctx, tx, c, cr, true); err != nil {
 			return err
 		}
+		if err := (&Handler{Svc: svc}).applyAuthorization(ctx, tx, realm, c, cr); err != nil {
+			return err
+		}
 	}
 
 	if rep.Roles != nil {

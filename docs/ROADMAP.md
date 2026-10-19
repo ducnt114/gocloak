@@ -266,7 +266,7 @@ policies...) are disabled so the console hides them. Not done: realm
 localization texts (empty), partial import / export from the console, client
 installation formats, impersonation.
 
-## M8 — Authorization services (XL)
+## M8 — Authorization services (XL) ✅ done
 
 Keycloak's fine-grained authorization (UMA 2.0):
 
@@ -281,6 +281,17 @@ Keycloak's fine-grained authorization (UMA 2.0):
 - Admin fine-grained permissions (users/clients/groups) after the above.
 
 Acceptance: Keycloak's authorization quickstarts (photoz-style) pass against gocloak.
+
+Done notes: representations, error responses, evaluation results and RPTs
+were compared with Keycloak 26.0.7 on the same resource server; a photoz-like
+scenario (protection API registration, owner managed albums, typed and scope
+permissions, tickets with submitted and approved requests, RPT upgrades) runs
+in the tests. JavaScript policies other than Keycloak's default "grant" policy
+are rejected, as gocloak runs no scripts. Not done: admin fine-grained
+permissions (users / clients / groups), the user-managed access policy API
+(`/authz/protection/uma-policy`) and the account console "My resources" page,
+pushed claims (`claim_token`). The order of evaluation results differs from
+Keycloak's, which does not guarantee one.
 
 ## M9 — SAML 2.0 (XL)
 

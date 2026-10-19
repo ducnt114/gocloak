@@ -30,7 +30,7 @@ LDAP_MAPPERS = {"user-attribute-ldap-mapper", "full-name-ldap-mapper", "group-ld
 POLICIES = {"length", "maxLength", "digits", "lowerCase", "upperCase", "specialChars", "notUsername", "notEmail",
     "notContainsUsername", "regexPattern", "passwordHistory", "forceExpiredPasswordChange", "hashAlgorithm", "hashIterations"}
 # features of the console gocloak does not implement (yet)
-DISABLED = {"ORGANIZATION", "AUTHORIZATION", "IMPERSONATION", "DEVICE_FLOW", "CIBA", "PAR", "KERBEROS", "STEP_UP_AUTHENTICATION",
+DISABLED = {"ORGANIZATION", "IMPERSONATION", "DEVICE_FLOW", "CIBA", "PAR", "KERBEROS", "STEP_UP_AUTHENTICATION",
     "CLIENT_POLICIES", "ADMIN_FINE_GRAINED_AUTHZ", "TOKEN_EXCHANGE", "DPOP", "PASSKEYS", "RECOVERY_CODES", "DOCKER", "SCRIPTS"}
 
 out = {k: v for k, v in info.items() if k not in ("systemInfo", "memoryInfo", "themes")}

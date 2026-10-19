@@ -169,6 +169,23 @@ Main options (flag / environment variable):
   account controls, and group and role mappers (DN or UID memberships, group inheritance,
   READ_ONLY / LDAP_ONLY / IMPORT modes, synchronization in both directions)
 
+**Authorization services (UMA 2.0)**
+
+- Resource servers on confidential clients (`authorizationServicesEnabled`), with Keycloak's
+  default resource, policy and permission; resources (types, URIs, owners, owner managed access,
+  attributes), scopes, policies (role, user, group, client, client scope, time, regex, aggregated,
+  and the default JavaScript policy), resource and scope based permissions, decision strategies,
+  positive / negative logic and the ENFORCING / PERMISSIVE / DISABLED enforcement modes
+- The `urn:ietf:params:oauth:grant-type:uma-ticket` grant: RPTs with an `authorization` claim,
+  `response_mode=decision|permissions`, permission tickets, `submit_request`, RPT upgrades,
+  `response_include_resource_name` and `response_permissions_limit`
+- The protection API for resource servers (`/authz/protection/resource_set`, `/permission`,
+  `/permission/ticket`, with the `uma_protection` role) and `/.well-known/uma2-configuration`
+- Admin API `/clients/{id}/authz/resource-server/...`: resources, scopes, policies and
+  permissions (generic and typed), providers, associated / dependent policies, policy evaluation,
+  settings export and import; authorization settings in realm exports; the admin console's
+  Authorization tabs
+
 **Themes, languages and account console**
 
 - Login, email and account themes: built-in theme embedded in the binary, custom themes from
@@ -252,8 +269,7 @@ Main options (flag / environment variable):
 
 ## Not implemented yet
 
-SAML, Kerberos, script mappers,
-fine-grained authorization services (UMA), consent screens, reCAPTCHA, organizations,
+SAML, Kerberos, script mappers, admin fine-grained permissions, consent screens, reCAPTCHA, organizations,
 FreeMarker themes (gocloak themes use Go templates; Keycloak message bundles work as is),
 clustering, token exchange, device flow, CIBA, PAR.
 

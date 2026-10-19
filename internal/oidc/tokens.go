@@ -59,6 +59,7 @@ type issueRequest struct {
 	strict  bool               // reject unknown scopes (invalid_scope)
 	nonce   string
 	refresh bool
+	extra   jwt.Claims // claims added to the access token (RPT permissions)
 }
 
 // atHash is the left half of the access token's hash, using the hash of
@@ -148,6 +149,9 @@ func (h *Handler) issue(r *http.Request, ir *issueRequest) (*tokenResponse, erro
 	}
 	if err := tc.apply(ctx, at, kindAccess); err != nil {
 		return nil, err
+	}
+	for k, v := range ir.extra {
+		at[k] = v
 	}
 	access, err := jwt.Sign(at, accessKey)
 	if err != nil {

@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"sort"
 
@@ -64,6 +65,12 @@ func Export(ctx context.Context, svc *service.Service, realm *model.Realm, opts 
 					cr.Secret = ptr(c.Secret)
 				} else {
 					cr.Secret = ptr(maskedSecret)
+				}
+			}
+			if cr.AuthorizationServicesEnabled != nil {
+				if d, err := svc.LoadAuthz(ctx, st, c.ID); err == nil {
+					settings := (&Handler{Svc: svc}).exportSettings(ctx, &authzCtx{realm: realm, client: c, data: d})
+					cr.AuthorizationSettings, _ = json.Marshal(settings)
 				}
 			}
 			rep.Clients = append(rep.Clients, cr)

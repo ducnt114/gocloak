@@ -4890,7 +4890,7 @@
   },
   {
    "dependencies": [],
-   "enabled": false,
+   "enabled": true,
    "label": "Authorization Service",
    "name": "AUTHORIZATION",
    "type": "DEFAULT"
@@ -5193,7 +5193,6 @@
  "profileInfo": {
   "disabledFeatures": [
    "ADMIN_FINE_GRAINED_AUTHZ",
-   "AUTHORIZATION",
    "CACHE_EMBEDDED_REMOTE_STORE",
    "CIBA",
    "CLIENT_POLICIES",

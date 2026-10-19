@@ -531,6 +531,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	add("DELETE "+R+"/roles-by-id/{roleId}/composites", h.removeRoleByIDComposites)
 	add("GET "+R+"/users/{id}/unmanagedAttributes", h.unmanagedAttributes)
 	h.registerCertificateRoutes(R, add)
+	h.registerAuthzRoutes(R, add)
 	add("GET "+R+"/clients/{id}/offline-sessions", h.clientSessions)
 	add("GET "+R+"/clients/{id}/session-count", h.clientSessions)
 	add("GET "+R+"/clients/{id}/offline-session-count", h.clientSessions)

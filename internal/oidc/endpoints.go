@@ -111,6 +111,22 @@ func (h *Handler) certs(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------- token
 
 func (h *Handler) token(w http.ResponseWriter, r *http.Request) {
+	if r.PostFormValue("grant_type") == grantUMATicket {
+		realm, err := h.realm(r)
+		if err != nil {
+			h.writeError(w, err)
+			return
+		}
+		// the client may authenticate, but the bearer token is what counts
+		if bearerToken(r) == "" || r.PostFormValue("client_id") != "" {
+			if _, err := h.authenticateClient(r, realm); err != nil {
+				h.writeError(w, err)
+				return
+			}
+		}
+		h.grantUMA(w, r, realm)
+		return
+	}
 	resp, err := h.tokenGrant(r)
 	if err != nil {
 		h.writeError(w, err)

@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"encoding/json"
 	"net/url"
 	"strings"
 
@@ -91,6 +92,8 @@ type ClientRep struct {
 	DefaultClientScopes                []string            `json:"defaultClientScopes,omitempty"`
 	AuthenticationFlowBindingOverrides map[string]string   `json:"authenticationFlowBindingOverrides,omitempty"`
 	OptionalClientScopes               []string            `json:"optionalClientScopes,omitempty"`
+	AuthorizationServicesEnabled       *bool               `json:"authorizationServicesEnabled,omitempty"`
+	AuthorizationSettings              json.RawMessage     `json:"authorizationSettings,omitempty"`
 }
 
 type CredentialRep struct {

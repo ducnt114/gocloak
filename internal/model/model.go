@@ -544,3 +544,46 @@ type FederatedIdentity struct {
 	FederatedUsername string
 	Token             string // stored token response, when the provider stores tokens
 }
+
+// ResourceServer is a client with authorization services enabled.
+type ResourceServer struct {
+	ClientID                      string // client UUID
+	RealmID                       string
+	PolicyEnforcementMode         string // ENFORCING, PERMISSIVE, DISABLED
+	DecisionStrategy              string // UNANIMOUS, AFFIRMATIVE, CONSENSUS
+	AllowRemoteResourceManagement bool
+}
+
+// AuthzScope is a scope of a resource server.
+type AuthzScope struct {
+	ID, ResourceServerID, Name, DisplayName, IconURI string
+}
+
+// AuthzResource is a protected resource.
+type AuthzResource struct {
+	ID, ResourceServerID, Name, DisplayName, Type string
+	Owner                                         string // client UUID (the resource server) or user id
+	OwnerManagedAccess                            bool
+	IconURI                                       string
+	URIs                                          []string
+	Attributes                                    map[string][]string
+	ScopeIDs                                      []string
+}
+
+// AuthzPolicy is a policy or a permission (types resource and scope).
+type AuthzPolicy struct {
+	ID, ResourceServerID, Name, Description string
+	Type                                    string
+	Logic                                   string // POSITIVE, NEGATIVE
+	DecisionStrategy                        string
+	Owner                                   string
+	Config                                  map[string]string
+	ResourceIDs, ScopeIDs, AssociatedIDs    []string
+}
+
+// PermissionTicket is a UMA permission request on a user's resource.
+type PermissionTicket struct {
+	ID, ResourceServerID, ResourceID, ScopeID string
+	Owner, Requester                          string
+	CreatedTimestamp, GrantedTimestamp        int64 // millis; granted when > 0
+}

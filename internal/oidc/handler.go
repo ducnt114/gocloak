@@ -92,6 +92,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /resources/{theme}/{type}/{path...}", h.resources)
 	h.registerBroker(mux)
 	h.registerIframes(mux)
+	h.registerUMA(mux)
 }
 
 // ---------------------------------------------------------------- helpers

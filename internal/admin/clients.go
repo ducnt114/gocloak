@@ -35,6 +35,9 @@ func (h *Handler) clientRep(ctx context.Context, p *principal, realm *model.Real
 // protocol mappers to the representation.
 func clientRepWithScopes(ctx context.Context, st *store.Store, c *model.Client) (ClientRep, error) {
 	rep := clientToRep(c)
+	if _, err := st.GetResourceServer(ctx, c.ID); err == nil {
+		rep.AuthorizationServicesEnabled = ptr(true)
+	}
 	links, err := st.ListClientScopeLinks(ctx, c.ID)
 	if err != nil {
 		return rep, err
@@ -179,7 +182,10 @@ func (h *Handler) createClient(w http.ResponseWriter, r *http.Request, p *princi
 		if err := h.Svc.CreateClient(r.Context(), tx, c); err != nil {
 			return err
 		}
-		return applyClientScopes(r.Context(), tx, c, &rep, true)
+		if err := applyClientScopes(r.Context(), tx, c, &rep, true); err != nil {
+			return err
+		}
+		return h.applyAuthorization(r.Context(), tx, realm, c, &rep)
 	})
 	if errors.Is(err, store.ErrConflict) {
 		return conflict("Client " + c.ClientID + " already exists")
@@ -233,7 +239,10 @@ func (h *Handler) updateClient(w http.ResponseWriter, r *http.Request, p *princi
 		if err := applyClientScopes(r.Context(), tx, c, &rep, false); err != nil {
 			return err
 		}
-		return h.Svc.SyncServiceAccount(r.Context(), tx, c)
+		if err := h.Svc.SyncServiceAccount(r.Context(), tx, c); err != nil {
+			return err
+		}
+		return h.applyAuthorization(r.Context(), tx, realm, c, &rep)
 	})
 	if errors.Is(err, store.ErrConflict) {
 		return conflict("Client " + c.ClientID + " already exists")
