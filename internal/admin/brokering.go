@@ -27,8 +27,6 @@ func init() {
 	implied[permViewIdPs] = []string{permManageIdPs}
 }
 
-const secretMask = "**********"
-
 // IdentityProviderRep is Keycloak's IdentityProviderRepresentation.
 type IdentityProviderRep struct {
 	Alias                       *string           `json:"alias,omitempty"`
@@ -68,7 +66,7 @@ func idpToRep(p *model.IdentityProvider, withSecrets bool) IdentityProviderRep {
 	cfg := map[string]string{}
 	for k, v := range p.Config {
 		if !withSecrets && (k == "clientSecret" || k == "p8Key") && v != "" && !strings.HasPrefix(v, "${vault.") {
-			v = secretMask
+			v = maskedSecret
 		}
 		cfg[k] = v
 	}
@@ -119,7 +117,7 @@ func applyIdPRep(p *model.IdentityProvider, rep *IdentityProviderRep) {
 		old := p.Config
 		p.Config = map[string]string{}
 		for k, v := range rep.Config {
-			if v == secretMask {
+			if v == maskedSecret {
 				v = old[k]
 			}
 			p.Config[k] = v

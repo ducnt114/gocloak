@@ -48,3 +48,14 @@ func (s *Store) ListComponents(ctx context.Context, realmID, providerType string
 	return queryList(ctx, s, scanComponent, `SELECT `+componentCols+` FROM components WHERE realm_id=? AND provider_type=? ORDER BY name, id`,
 		realmID, providerType)
 }
+
+// DeleteComponentTree deletes a component with its sub components (e.g. an
+// LDAP provider and its mappers).
+func (s *Store) DeleteComponentTree(ctx context.Context, realmID, id string) error {
+	return s.WithTx(ctx, func(tx *Store) error {
+		if err := tx.exec(ctx, `DELETE FROM components WHERE realm_id=? AND parent_id=?`, realmID, id); err != nil {
+			return err
+		}
+		return tx.execOne(ctx, `DELETE FROM components WHERE realm_id=? AND id=?`, realmID, id)
+	})
+}

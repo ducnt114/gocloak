@@ -76,6 +76,8 @@ type Service struct {
 	ExtraListeners map[string]EventListener
 	// Themes renders emails.
 	Themes *theme.Manager
+	// Federation is the user storage (LDAP) behind the local users.
+	Federation UserFederation
 
 	mu   sync.RWMutex
 	keys map[string]*keySet // realm id -> keys
@@ -335,7 +337,12 @@ func (s *Service) CreateUser(ctx context.Context, st *store.Store, u *model.User
 		return err
 	}
 	if realm.DefaultRoleID != "" {
-		return st.GrantUserRole(ctx, u.ID, realm.DefaultRoleID)
+		if err := st.GrantUserRole(ctx, u.ID, realm.DefaultRoleID); err != nil {
+			return err
+		}
+	}
+	if s.Federation != nil && u.FederationLink == "" && u.ServiceAccountClientID == "" && !federationDisabled(ctx) {
+		return s.Federation.UserCreated(ctx, st, realm, u)
 	}
 	return nil
 }
@@ -353,6 +360,15 @@ func (s *Service) UpdateUser(ctx context.Context, st *store.Store, u *model.User
 	}
 	if err := s.checkEmail(ctx, st, realm, u); err != nil {
 		return err
+	}
+	if s.Federation != nil && u.FederationLink != "" {
+		old, err := st.GetUser(ctx, realm.ID, u.ID)
+		if err != nil {
+			return err
+		}
+		if err := s.Federation.UserUpdated(ctx, realm, old, u); err != nil {
+			return err
+		}
 	}
 	if err := st.UpdateUser(ctx, u); err != nil {
 		if errors.Is(err, store.ErrConflict) {
@@ -416,8 +432,23 @@ func (s *Service) SetPassword(ctx context.Context, st *store.Store, u *model.Use
 	if err != nil {
 		return err
 	}
-	if perr := pol.Validate(pw, policy.Subject{Username: u.Username, Email: u.Email}); perr != nil {
-		return perr
+	mode, err := s.federatedPasswordMode(ctx, realm, u)
+	if err != nil {
+		return err
+	}
+	if mode.ReadOnly {
+		return ErrReadOnlyUser
+	}
+	if mode.ValidatePolicy {
+		if perr := pol.Validate(pw, policy.Subject{Username: u.Username, Email: u.Email}); perr != nil {
+			return perr
+		}
+	}
+	if mode.Remote {
+		if err := s.Federation.UpdatePassword(ctx, realm, u, pw); err != nil {
+			return err
+		}
+		return s.setTemporary(ctx, st, u, temporary)
 	}
 	creds, err := st.ListCredentials(ctx, u.ID)
 	if err != nil {
@@ -479,6 +510,11 @@ func (s *Service) SetPassword(ctx context.Context, st *store.Store, u *model.Use
 		SecretData: sd, CredentialData: cd, CreatedDate: s.nowMillis(), Priority: 10}); err != nil {
 		return err
 	}
+	return s.setTemporary(ctx, st, u, temporary)
+}
+
+// setTemporary adds (temporary password) or removes UPDATE_PASSWORD.
+func (s *Service) setTemporary(ctx context.Context, st *store.Store, u *model.User, temporary bool) error {
 	changed := false
 	if temporary {
 		u.RequiredActions, changed = addAction(u.RequiredActions, ActionUpdatePassword)
@@ -498,6 +534,20 @@ func (s *Service) CheckPassword(ctx context.Context, u *model.User, pw string) (
 	creds, err := s.Store.ListCredentials(ctx, u.ID)
 	if err != nil {
 		return false, err
+	}
+	if u.FederationLink != "" && s.Federation != nil {
+		// a password stored locally (UNSYNCED mode) wins, as in Keycloak
+		local := false
+		for _, c := range creds {
+			local = local || c.Type == model.CredentialPassword
+		}
+		if !local {
+			realm, err := s.Store.GetRealm(ctx, u.RealmID)
+			if err != nil {
+				return false, err
+			}
+			return s.Federation.CheckPassword(ctx, realm, u, pw)
+		}
 	}
 	for _, c := range creds {
 		if c.Type != model.CredentialPassword {
@@ -561,9 +611,19 @@ func (s *Service) PasswordExpired(ctx context.Context, realm *model.Realm, u *mo
 // FindLoginUser resolves the identifier typed in a login form, which may be
 // a username or (when the realm allows it) an email.
 func (s *Service) FindLoginUser(ctx context.Context, realm *model.Realm, ident string) (*model.User, error) {
-	u, err := s.Store.GetUserByUsername(ctx, realm.ID, ident)
+	u, err := s.Store.GetUserByUsername(ctx, realm.ID, strings.ToLower(ident))
 	if errors.Is(err, store.ErrNotFound) && realm.LoginWithEmailAllowed && strings.Contains(ident, "@") {
-		u, err = s.Store.GetUserByEmail(ctx, realm.ID, ident)
+		u, err = s.Store.GetUserByEmail(ctx, realm.ID, strings.ToLower(ident))
+	}
+	switch {
+	case errors.Is(err, store.ErrNotFound) && s.Federation != nil:
+		if u, err = s.Federation.LookupUser(ctx, realm, ident); err == nil && u == nil {
+			err = store.ErrNotFound
+		}
+	case err == nil && u.FederationLink != "" && s.Federation != nil:
+		if u, err = s.Federation.ValidateUser(ctx, realm, u); err == nil && u == nil {
+			err = store.ErrNotFound // removed from the directory
+		}
 	}
 	if err != nil {
 		return nil, err

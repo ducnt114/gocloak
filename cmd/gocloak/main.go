@@ -201,6 +201,7 @@ func start(args []string, dev bool) error {
 	}
 	defer srv.Close()
 	go srv.RunJanitor(ctx, time.Minute)
+	go srv.RunFederationSync(ctx)
 
 	tls := *certFile != "" && *keyFile != ""
 	p := *port

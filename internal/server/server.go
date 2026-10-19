@@ -16,6 +16,7 @@ import (
 
 	"github.com/ducnt114/gocloak/internal/account"
 	"github.com/ducnt114/gocloak/internal/admin"
+	"github.com/ducnt114/gocloak/internal/federation"
 	"github.com/ducnt114/gocloak/internal/oidc"
 	"github.com/ducnt114/gocloak/internal/service"
 	"github.com/ducnt114/gocloak/internal/store"
@@ -44,6 +45,7 @@ type Config struct {
 // Server is a running gocloak instance.
 type Server struct {
 	Svc     *service.Service
+	Fed     *federation.Manager
 	Log     *slog.Logger
 	handler http.Handler
 }
@@ -68,7 +70,9 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 	svc.Log = cfg.Log
 	themes := &theme.Manager{Dir: cfg.ThemesDir, Cache: !cfg.NoThemeCache, Funcs: oidc.TemplateFuncs}
 	svc.Themes = themes
-	s := &Server{Svc: svc, Log: cfg.Log}
+	fed := &federation.Manager{Svc: svc, Log: cfg.Log}
+	svc.Federation = fed
+	s := &Server{Svc: svc, Fed: fed, Log: cfg.Log}
 
 	createdMaster, err := svc.Bootstrap(ctx, cfg.AdminUser, cfg.AdminPassword)
 	if err != nil {
@@ -98,7 +102,7 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 	oh := &oidc.Handler{Svc: svc, URLs: urls, Log: cfg.Log, Themes: themes}
 	oh.Register(mux)
 	(&account.Handler{Svc: svc, URLs: urls, Log: cfg.Log, Themes: themes, OIDC: oh}).Register(mux)
-	(&admin.Handler{Svc: svc, URLs: urls, Log: cfg.Log}).Register(mux)
+	(&admin.Handler{Svc: svc, URLs: urls, Log: cfg.Log, Fed: fed}).Register(mux)
 	mux.HandleFunc("GET /health", s.health)
 	mux.HandleFunc("GET /health/live", s.health)
 	mux.HandleFunc("GET /health/ready", s.health)
@@ -204,6 +208,10 @@ func (s *Server) RealmNames(ctx context.Context) ([]string, error) {
 func (s *Server) BootstrapAdmin(ctx context.Context, username, password string) error {
 	return s.Svc.EnsureAdmin(ctx, username, password)
 }
+
+// RunFederationSync runs the periodic synchronization of LDAP providers
+// (fullSyncPeriod / changedSyncPeriod).
+func (s *Server) RunFederationSync(ctx context.Context) { s.Fed.RunPeriodicSync(ctx, 15*time.Second) }
 
 // RunJanitor periodically removes expired sessions, codes and revocations.
 func (s *Server) RunJanitor(ctx context.Context, every time.Duration) {

@@ -227,7 +227,7 @@ func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request, p *principa
 	if u.ServiceAccountClientID != "" {
 		return badRequest("Service account user cannot be deleted")
 	}
-	if err := h.Svc.Store.DeleteUser(r.Context(), realm.ID, u.ID); err != nil {
+	if err := h.Svc.DeleteUser(r.Context(), realm, u); err != nil {
 		return err
 	}
 	return noContent(w)
@@ -437,9 +437,9 @@ func (h *Handler) membership(w http.ResponseWriter, r *http.Request, p *principa
 		if err := h.checkGrantable(r.Context(), p, realm, roles); err != nil {
 			return err
 		}
-		err = h.Svc.Store.AddUserToGroup(r.Context(), u.ID, g.ID)
+		err = h.Svc.JoinGroup(r.Context(), realm, u, g)
 	} else {
-		err = h.Svc.Store.RemoveUserFromGroup(r.Context(), u.ID, g.ID)
+		err = h.Svc.LeaveGroup(r.Context(), realm, u, g)
 	}
 	if err != nil {
 		return err

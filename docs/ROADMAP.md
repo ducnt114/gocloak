@@ -207,7 +207,7 @@ are tested only through the generic code paths, not against the real services.
 Not done: SAML providers (M9), token exchange with external tokens (M10), the
 organization authenticators.
 
-## M6 — LDAP user federation (L)
+## M6 — LDAP user federation (L) ✅ done
 
 - **LDAP provider** (go-ldap) as a Keycloak component: connection settings,
   bind credentials, `editMode` READ_ONLY / WRITABLE / UNSYNCED, import vs
@@ -221,6 +221,18 @@ organization authenticators.
 
 Acceptance: against an OpenLDAP container in CI, users and groups sync, log in
 with their LDAP password, and changes flow back in WRITABLE mode.
+
+Done notes: the provider and mapper components (defaults per vendor, rdn and
+edit mode, validation messages), the connection test, sync results and the
+imported users match Keycloak 26.0.7 run against the same directory. The LDAP
+tests run on an in-memory directory (`internal/ldaptest`) and, in CI, on
+OpenLDAP. Differences: Keycloak reads always-read attributes and READ_ONLY /
+LDAP_ONLY group and role memberships from LDAP on every access, gocloak
+refreshes them at login and at synchronization; with `importEnabled=false`
+users are still stored locally (with Keycloak's `f:<provider>:<id>` ids).
+Active Directory specifics (objectGUID, unicodePwd, userAccountControl) are
+implemented but only tested against Keycloak's behaviour on paper. Not done:
+Kerberos, `ldap-server-capabilities`, the MSAD LDS mapper beyond enabled state.
 
 ## M7 — Admin console (L)
 
@@ -274,7 +286,9 @@ Device authorization grant, token exchange (RFC 8693, internal-to-internal
 first), Pushed Authorization Requests, request objects (`request`,
 `request_uri`), consent screen and stored consents, DPoP, CIBA, front-channel
 and back-channel logout to clients (`frontchannelLogout`,
-`backchannel.logout.url`), dynamic client registration.
+`backchannel.logout.url`), dynamic client registration, lightweight access
+tokens (`client.use.lightweight.access.token.enabled`, which Keycloak 26 sets on
+`admin-cli`).
 
 Acceptance: the OpenID Foundation conformance suite passes the "Basic OP",
 "Config OP" and "Form Post OP" profiles.

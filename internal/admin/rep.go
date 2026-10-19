@@ -119,6 +119,9 @@ type UserRep struct {
 	NotBefore              *int64              `json:"notBefore,omitempty"`
 	Access                 map[string]bool     `json:"access,omitempty"`
 	ServiceAccountClientID *string             `json:"serviceAccountClientId,omitempty"`
+	DisableableCredTypes   *[]string           `json:"disableableCredentialTypes,omitempty"`
+	FederationLink         *string             `json:"federationLink,omitempty"`
+	Origin                 *string             `json:"origin,omitempty"`
 
 	UserProfileMetadata *profileMetadata `json:"userProfileMetadata,omitempty"`
 
@@ -319,7 +322,8 @@ func userToRep(u *model.User) UserRep {
 		ID: ptr(u.ID), Username: ptr(u.Username), EmailVerified: ptr(u.EmailVerified),
 		Enabled: ptr(u.Enabled), CreatedTimestamp: ptr(u.CreatedTimestamp), Totp: ptr(false),
 		RequiredActions: nonNil(u.RequiredActions), NotBefore: ptr(u.NotBefore),
-		Access: map[string]bool{"manageGroupMembership": true, "view": true, "mapRoles": true, "impersonate": false, "manage": true},
+		Access:               map[string]bool{"manageGroupMembership": true, "view": true, "mapRoles": true, "impersonate": false, "manage": true},
+		DisableableCredTypes: &[]string{},
 	}
 	if u.Email != "" {
 		rep.Email = ptr(u.Email)
@@ -332,6 +336,9 @@ func userToRep(u *model.User) UserRep {
 	}
 	if len(u.Attributes) > 0 {
 		rep.Attributes = u.Attributes
+	}
+	if u.FederationLink != "" {
+		rep.FederationLink, rep.Origin = ptr(u.FederationLink), ptr(u.FederationLink)
 	}
 	return rep
 }

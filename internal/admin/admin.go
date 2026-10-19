@@ -16,11 +16,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ducnt114/gocloak/internal/federation"
 	"github.com/ducnt114/gocloak/internal/jwt"
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/oidc"
 	"github.com/ducnt114/gocloak/internal/service"
 	"github.com/ducnt114/gocloak/internal/store"
+	"github.com/ducnt114/gocloak/internal/userprofile"
 )
 
 // Handler serves the admin API.
@@ -28,6 +30,7 @@ type Handler struct {
 	Svc  *service.Service
 	URLs oidc.URLs
 	Log  *slog.Logger
+	Fed  *federation.Manager
 }
 
 // httpError is an error with an HTTP status, rendered as Keycloak does.
@@ -252,6 +255,14 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, err error) 
 	if errors.As(err, &pe) {
 		writeProfileErrors(w, pe.errs)
 		return
+	}
+	var ue userprofile.Errors
+	if errors.As(err, &ue) {
+		writeProfileErrors(w, ue)
+		return
+	}
+	if errors.Is(err, service.ErrReadOnlyUser) {
+		err = &httpError{status: http.StatusBadRequest, msg: "error-user-attribute-read-only", plain: false}
 	}
 	var he *httpError
 	if pol, ok := policyError(err); ok {
@@ -498,6 +509,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	h.registerScopeRoutes(R, add)
 	h.registerAuthenticationRoutes(R, add)
 	h.registerBrokeringRoutes(R, add)
+	h.registerFederationRoutes(R, add)
 	add("GET "+R+"/users/profile", h.getUserProfile)
 	add("PUT "+R+"/users/profile", h.putUserProfile)
 	add("GET "+R+"/users/profile/metadata", h.getUserProfileMetadata)

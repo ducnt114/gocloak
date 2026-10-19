@@ -8,13 +8,13 @@ import (
 )
 
 const userCols = `id, realm_id, username, email, email_verified, first_name, last_name, enabled,
-	created_timestamp, attributes, required_actions, service_account_client_id, not_before`
+	created_timestamp, attributes, required_actions, service_account_client_id, not_before, federation_link`
 
 func scanUser(sc scanner) (*model.User, error) {
 	u := &model.User{Attributes: map[string][]string{}}
 	err := sc.Scan(&u.ID, &u.RealmID, &u.Username, &u.Email, &u.EmailVerified, &u.FirstName, &u.LastName,
 		&u.Enabled, &u.CreatedTimestamp, jsonCol{&u.Attributes}, jsonCol{&u.RequiredActions},
-		&u.ServiceAccountClientID, &u.NotBefore)
+		&u.ServiceAccountClientID, &u.NotBefore, &u.FederationLink)
 	if err != nil {
 		return nil, mapErr(err)
 	}
@@ -29,13 +29,13 @@ func userArgs(u *model.User) []any {
 		u.RequiredActions = []string{}
 	}
 	return []any{u.Username, u.Email, u.EmailVerified, u.FirstName, u.LastName, u.Enabled,
-		u.CreatedTimestamp, toJSON(u.Attributes), toJSON(u.RequiredActions), u.ServiceAccountClientID, u.NotBefore}
+		u.CreatedTimestamp, toJSON(u.Attributes), toJSON(u.RequiredActions), u.ServiceAccountClientID, u.NotBefore, u.FederationLink}
 }
 
 func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
 	args := append([]any{u.ID, u.RealmID}, userArgs(u)...)
 	return s.WithTx(ctx, func(tx *Store) error {
-		if err := tx.exec(ctx, `INSERT INTO users (`+userCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, args...); err != nil {
+		if err := tx.exec(ctx, `INSERT INTO users (`+userCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, args...); err != nil {
 			return err
 		}
 		return tx.indexUserAttributes(ctx, u)
@@ -46,8 +46,8 @@ func (s *Store) UpdateUser(ctx context.Context, u *model.User) error {
 	args := append(userArgs(u), u.ID)
 	return s.WithTx(ctx, func(tx *Store) error {
 		if err := tx.execOne(ctx, `UPDATE users SET username=?, email=?, email_verified=?, first_name=?, last_name=?,
-			enabled=?, created_timestamp=?, attributes=?, required_actions=?, service_account_client_id=?, not_before=?
-			WHERE id=?`, args...); err != nil {
+			enabled=?, created_timestamp=?, attributes=?, required_actions=?, service_account_client_id=?, not_before=?,
+			federation_link=? WHERE id=?`, args...); err != nil {
 			return err
 		}
 		return tx.indexUserAttributes(ctx, u)
@@ -197,4 +197,15 @@ func (s *Store) DeleteCredential(ctx context.Context, userID, id string) error {
 
 func (s *Store) DeleteCredentialsOfType(ctx context.Context, userID, typ string) error {
 	return s.exec(ctx, `DELETE FROM credentials WHERE user_id=? AND type=?`, userID, typ)
+}
+
+// ListFederatedUsers lists the users imported from a user storage component.
+func (s *Store) ListFederatedUsers(ctx context.Context, realmID, componentID string) ([]*model.User, error) {
+	return queryList(ctx, s, scanUser, `SELECT `+userCols+` FROM users WHERE realm_id=? AND federation_link=? ORDER BY username`, realmID, componentID)
+}
+
+// FindUserByAttribute returns the user with an attribute value (e.g. LDAP_ID).
+func (s *Store) FindUserByAttribute(ctx context.Context, realmID, name, value string) (*model.User, error) {
+	return scanUser(s.q.QueryRowContext(ctx, `SELECT `+prefixed("users", userCols)+` FROM users
+		JOIN user_attributes ua ON ua.user_id=users.id WHERE users.realm_id=? AND ua.name=? AND ua.value=? LIMIT 1`, realmID, name, value))
 }

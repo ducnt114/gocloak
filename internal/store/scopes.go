@@ -194,7 +194,11 @@ func (s *Store) indexUserAttributes(ctx context.Context, u *model.User) error {
 
 // backfillUserAttributes indexes users created before the index existed.
 func backfillUserAttributes(ctx context.Context, tx *Store) error {
-	users, err := queryList(ctx, tx, scanUser, `SELECT `+userCols+` FROM users`)
+	// only the columns of version 4: later migrations add others
+	users, err := queryList(ctx, tx, func(sc scanner) (*model.User, error) {
+		u := &model.User{Attributes: map[string][]string{}}
+		return u, sc.Scan(&u.ID, jsonCol{&u.Attributes})
+	}, `SELECT id, attributes FROM users`)
 	if err != nil {
 		return err
 	}

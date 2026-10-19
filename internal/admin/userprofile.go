@@ -114,6 +114,10 @@ func (h *Handler) applyProfilePolicy(r *http.Request, realm *model.Realm, u *mod
 	if err != nil {
 		return err
 	}
+	if prev != nil && !strings.EqualFold(strings.TrimSpace(u.Username), prev.Username) && !realm.Settings.EditUsernameAllowed {
+		// as in Keycloak, admins too may only rename users when the realm allows it
+		return &profileErrors{userprofile.Errors{{Field: "username", ErrorMessage: "error-user-attribute-read-only", Params: []any{"username"}}}}
+	}
 	attrs := map[string][]string{}
 	for k, v := range u.Attributes {
 		if cfg.CanEdit(k, userprofile.ContextAdmin) {
@@ -145,7 +149,11 @@ func (h *Handler) visibleAttributes(r *http.Request, realm *model.Realm, reps []
 		return err
 	}
 	for i := range reps {
+		federated := reps[i].FederationLink != nil
 		for k := range reps[i].Attributes {
+			if federated && federatedAttributes[k] {
+				continue // shown for users of a user storage provider, as in Keycloak
+			}
 			if !cfg.CanView(k, userprofile.ContextAdmin) {
 				delete(reps[i].Attributes, k)
 			}
@@ -302,8 +310,20 @@ func (h *Handler) setCredentialLabel(w http.ResponseWriter, r *http.Request, p *
 }
 
 func (h *Handler) storageCredentialTypes(w http.ResponseWriter, r *http.Request, p *principal) error {
-	if _, err := h.realmFor(r, p, permViewUsers); err != nil {
+	realm, err := h.realmFor(r, p, permViewUsers)
+	if err != nil {
 		return err
+	}
+	u, err := h.loadUser(r, realm)
+	if err != nil {
+		return err
+	}
+	if u.FederationLink != "" {
+		return ok(w, []string{model.CredentialPassword})
 	}
 	return ok(w, []string{})
 }
+
+// federatedAttributes are the attributes user storage providers add.
+var federatedAttributes = map[string]bool{"LDAP_ID": true, "LDAP_ENTRY_DN": true, "createTimestamp": true, "modifyTimestamp": true,
+	"KERBEROS_PRINCIPAL": true}

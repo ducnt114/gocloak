@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/ducnt114/gocloak/internal/federation"
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/service"
 	"github.com/ducnt114/gocloak/internal/store"
@@ -181,8 +182,20 @@ func Export(ctx context.Context, svc *service.Service, realm *model.Realm, opts 
 		if err := exportComponents(ctx, st, realm, &rep); err != nil {
 			return nil, err
 		}
-	} else if err := exportUserProfile(ctx, st, realm, &rep); err != nil {
-		return nil, err
+	} else {
+		if err := exportUserProfile(ctx, st, realm, &rep); err != nil {
+			return nil, err
+		}
+		// user storage providers, with masked credentials
+		storage, err := st.ListComponents(ctx, realm.ID, federation.ProviderType)
+		if err != nil {
+			return nil, err
+		}
+		mappers, err := st.ListComponents(ctx, realm.ID, federation.MapperType)
+		if err != nil {
+			return nil, err
+		}
+		addComponentTree(&rep, append(storage, mappers...), true)
 	}
 
 	idps, err := st.ListIdentityProviders(ctx, realm.ID)
@@ -404,13 +417,50 @@ func exportComponents(ctx context.Context, st *store.Store, realm *model.Realm, 
 	if err != nil {
 		return err
 	}
+	addComponentTree(rep, comps, false)
+	return nil
+}
+
+// addComponentTree adds components to an export, sub components (LDAP
+// mappers) nested under their parent as Keycloak does.
+func addComponentTree(rep *RealmRep, comps []*model.Component, mask bool) {
+	byParent := map[string][]*model.Component{}
+	ids := map[string]bool{}
 	for _, c := range comps {
+		ids[c.ID] = true
+	}
+	for _, c := range comps {
+		if ids[c.ParentID] {
+			byParent[c.ParentID] = append(byParent[c.ParentID], c)
+		}
+	}
+	var build func(c *model.Component) componentExport
+	build = func(c *model.Component) componentExport {
+		ce := componentToExport(c)
+		if mask {
+			cfg := map[string][]string{}
+			for k, v := range c.Config {
+				if maskedComponentConfig[k] && len(v) > 0 && v[0] != "" {
+					v = []string{maskedSecret}
+				}
+				cfg[k] = v
+			}
+			ce.Config = cfg
+		}
+		for _, sub := range byParent[c.ID] {
+			ce.SubComponents[sub.ProviderType] = append(ce.SubComponents[sub.ProviderType], build(sub))
+		}
+		return ce
+	}
+	for _, c := range comps {
+		if ids[c.ParentID] {
+			continue
+		}
 		if rep.Components == nil {
 			rep.Components = map[string][]componentExport{}
 		}
-		rep.Components[c.ProviderType] = append(rep.Components[c.ProviderType], componentToExport(c))
+		rep.Components[c.ProviderType] = append(rep.Components[c.ProviderType], build(c))
 	}
-	return nil
 }
 
 func exportUserProfile(ctx context.Context, st *store.Store, realm *model.Realm, rep *RealmRep) error {

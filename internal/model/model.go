@@ -247,7 +247,10 @@ type User struct {
 	Attributes             map[string][]string
 	RequiredActions        []string
 	ServiceAccountClientID string // client UUID
-	NotBefore              int64
+	// FederationLink is the id of the user storage component (LDAP) the
+	// user was imported from.
+	FederationLink string
+	NotBefore      int64
 }
 
 // Credential types.

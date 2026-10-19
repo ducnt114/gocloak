@@ -143,6 +143,21 @@ Main options (flag / environment variable):
   (`/broker/{alias}/link`), unlinking, stored provider tokens at `/broker/{alias}/token`
   (`broker/read-token` role), front-channel and back-channel logout at the provider
 
+**User federation (LDAP)**
+
+- LDAP user storage providers as Keycloak components: vendors (other, AD, RHDS...), simple
+  bind or anonymous, StartTLS and `ldaps://`, users DN with one level or subtree search, custom
+  user filters, pagination, and the default mappers Keycloak creates
+- Users found and imported at login (username or email), passwords checked with an LDAP bind;
+  `editMode` READ_ONLY (mapped attributes read-only), WRITABLE (profile, password, enabled
+  state and deletions written to LDAP, `syncRegistrations` for new users) and UNSYNCED
+- Full and changed-users synchronization (`/user-storage/{id}/sync`), periodic sync
+  (`fullSyncPeriod`, `changedSyncPeriod`), removal of users deleted in LDAP, remove / unlink
+  imported users, `testLDAPConnection`
+- Mappers: user attribute, full name, certificate, hardcoded attribute / role / group, MSAD
+  account controls, and group and role mappers (DN or UID memberships, group inheritance,
+  READ_ONLY / LDAP_ONLY / IMPORT modes, synchronization in both directions)
+
 **Themes, languages and account console**
 
 - Login, email and account themes: built-in theme embedded in the binary, custom themes from
@@ -208,7 +223,7 @@ Main options (flag / environment variable):
 
 ## Not implemented yet
 
-SAML, LDAP/Kerberos user federation, script mappers,
+SAML, Kerberos, script mappers,
 fine-grained authorization services (UMA), consent screens, reCAPTCHA, organizations, the admin
 console, FreeMarker themes (gocloak themes use Go templates; Keycloak message bundles work as is),
 clustering, token exchange, device flow, CIBA, PAR.

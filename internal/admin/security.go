@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ducnt114/gocloak/internal/federation"
 	"github.com/ducnt114/gocloak/internal/jwt"
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/policy"
@@ -37,6 +38,9 @@ func componentToRep(c *model.Component) ComponentRep {
 	for k, v := range c.Config {
 		if service.SecretKeyConfig[k] {
 			continue // private keys and secrets never leave the server
+		}
+		if maskedComponentConfig[k] && len(v) > 0 && v[0] != "" {
+			v = []string{maskedSecret}
 		}
 		cfg[k] = v
 	}
@@ -93,7 +97,9 @@ func (h *Handler) createComponent(w http.ResponseWriter, r *http.Request, p *pri
 	if err := decode(r, &rep); err != nil {
 		return err
 	}
-	if rep.ProviderType != service.KeyProviderType {
+	switch rep.ProviderType {
+	case service.KeyProviderType, federation.ProviderType, federation.MapperType:
+	default:
 		return badRequest("Unsupported component type: " + rep.ProviderType)
 	}
 	c := &model.Component{ID: rep.ID, RealmID: realm.ID, Name: rep.Name, ProviderID: rep.ProviderID,
@@ -106,6 +112,18 @@ func (h *Handler) createComponent(w http.ResponseWriter, r *http.Request, p *pri
 	}
 	if c.Name == "" {
 		c.Name = c.ProviderID
+	}
+	if c.Config == nil {
+		c.Config = map[string][]string{}
+	}
+	if c.ProviderType != service.KeyProviderType {
+		if err := h.prepareFederationComponent(r.Context(), realm, c, nil); err != nil {
+			return err
+		}
+		if err := h.createFederationComponent(r.Context(), c); err != nil {
+			return err
+		}
+		return created(w, r, c.ID)
 	}
 	if err := service.PrepareKeyComponent(c, realm.Name, nil); err != nil {
 		return err
@@ -141,6 +159,19 @@ func (h *Handler) updateComponent(w http.ResponseWriter, r *http.Request, p *pri
 	for k, v := range rep.Config {
 		c.Config[k] = v
 	}
+	if c.ProviderType != service.KeyProviderType {
+		if rep.Config != nil && c.ProviderType == federation.ProviderType {
+			// a provider update replaces its config, as in Keycloak
+			c.Config = rep.Config
+		}
+		if err := h.prepareFederationComponent(r.Context(), realm, &c, prev); err != nil {
+			return err
+		}
+		if err := h.Svc.Store.UpdateComponent(r.Context(), &c); err != nil {
+			return err
+		}
+		return noContent(w)
+	}
 	if err := service.PrepareKeyComponent(&c, realm.Name, prev); err != nil {
 		return err
 	}
@@ -159,6 +190,12 @@ func (h *Handler) deleteComponent(w http.ResponseWriter, r *http.Request, p *pri
 	c, err := h.loadComponent(r, realm)
 	if err != nil {
 		return err
+	}
+	if c.ProviderType == federation.ProviderType {
+		if err := h.deleteFederationComponent(r.Context(), realm, c); err != nil {
+			return err
+		}
+		return noContent(w)
 	}
 	if err := h.Svc.Store.DeleteComponent(r.Context(), realm.ID, c.ID); err != nil {
 		return err

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ducnt114/gocloak/internal/federation"
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/service"
 	"github.com/ducnt114/gocloak/internal/store"
@@ -25,6 +26,8 @@ func Import(ctx context.Context, svc *service.Service, rep *RealmRep) (*model.Re
 	}
 	applyRealmRep(realm, rep)
 	realm.Settings = rep.RealmSettings
+	// imported users are not registered in user storage providers
+	ctx = service.WithoutFederation(ctx)
 	err := svc.Store.WithTx(ctx, func(tx *store.Store) error {
 		if err := svc.CreateRealm(ctx, tx, realm); err != nil {
 			return err
@@ -204,6 +207,9 @@ func importUser(ctx context.Context, svc *service.Service, tx *store.Store, real
 		u.ID = *ur.ID
 	}
 	applyUserRep(u, ur)
+	if ur.FederationLink != nil {
+		u.FederationLink = *ur.FederationLink
+	}
 	if ur.CreatedTimestamp != nil {
 		u.CreatedTimestamp = *ur.CreatedTimestamp
 	}
@@ -530,6 +536,36 @@ func importComponents(ctx context.Context, svc *service.Service, tx *store.Store
 			}
 		}
 		svc.InvalidateKeys(realm.ID)
+	}
+	for _, sp := range rep.Components[federation.ProviderType] {
+		c := &model.Component{ID: sp.ID, RealmID: realm.ID, Name: sp.Name, ProviderID: sp.ProviderID,
+			ProviderType: federation.ProviderType, ParentID: realm.ID, SubType: sp.SubType, Config: sp.Config}
+		if c.ID == "" {
+			c.ID = service.NewID()
+		}
+		if c.Config == nil {
+			c.Config = map[string][]string{}
+		}
+		if c.ProviderID != federation.ProviderLDAP {
+			return badRequest("Unsupported user storage provider: " + c.ProviderID)
+		}
+		federation.PrepareProvider(c)
+		if err := tx.CreateComponent(ctx, c); err != nil {
+			return err
+		}
+		for _, m := range sp.SubComponents[federation.MapperType] {
+			mc := &model.Component{ID: m.ID, RealmID: realm.ID, Name: m.Name, ProviderID: m.ProviderID,
+				ProviderType: federation.MapperType, ParentID: c.ID, Config: m.Config}
+			if mc.ID == "" {
+				mc.ID = service.NewID()
+			}
+			if mc.Config == nil {
+				mc.Config = map[string][]string{}
+			}
+			if err := tx.CreateComponent(ctx, mc); err != nil {
+				return err
+			}
+		}
 	}
 	for _, c := range rep.Components[service.UserProfileProviderType] {
 		raw := ""
