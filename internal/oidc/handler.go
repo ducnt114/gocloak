@@ -73,6 +73,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET "+p+"/auth", h.authorize)
 	mux.HandleFunc("POST "+p+"/auth", h.authorize)
 	mux.HandleFunc("POST "+p+"/token", h.cors(h.token))
+	mux.HandleFunc("POST "+p+"/ext/par/request", h.cors(h.par))
 	mux.HandleFunc("GET "+p+"/userinfo", h.cors(h.userinfo))
 	mux.HandleFunc("POST "+p+"/userinfo", h.cors(h.userinfo))
 	mux.HandleFunc("POST "+p+"/token/introspect", h.cors(h.introspect))

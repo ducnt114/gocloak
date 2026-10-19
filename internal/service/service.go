@@ -132,6 +132,14 @@ func NewRealm(name string) *model.Realm {
 
 // CreateRealm stores r and provisions everything Keycloak creates with a new
 // realm: signing key, default roles and the built-in clients.
+// RealmAttributeDefaults are the attributes Keycloak 26 gives new realms
+// (device flow, CIBA and PAR settings).
+var RealmAttributeDefaults = map[string]string{
+	"cibaBackchannelTokenDeliveryMode": "poll", "cibaExpiresIn": "120", "cibaAuthRequestedUserHint": "login_hint",
+	"cibaInterval": "5", "oauth2DeviceCodeLifespan": "600", "oauth2DevicePollingInterval": "5",
+	"parRequestUriLifespan": "60", "realmReusableOtpCode": "false",
+}
+
 func (s *Service) CreateRealm(ctx context.Context, st *store.Store, r *model.Realm) error {
 	if r.Name == "" || strings.ContainsAny(r.Name, "/ ") {
 		return validationf("invalid realm name %q", r.Name)
@@ -140,6 +148,14 @@ func (s *Service) CreateRealm(ctx context.Context, st *store.Store, r *model.Rea
 		r.ID = NewID()
 	}
 	r.CreatedAt = s.Now()
+	if r.Attributes == nil {
+		r.Attributes = map[string]string{}
+	}
+	for k, v := range RealmAttributeDefaults {
+		if _, ok := r.Attributes[k]; !ok {
+			r.Attributes[k] = v
+		}
+	}
 	defaultRole := &model.Role{ID: NewID(), RealmID: r.ID, Name: "default-roles-" + strings.ToLower(r.Name),
 		Description: "${role_default-roles}", Composite: true}
 	r.DefaultRoleID = defaultRole.ID

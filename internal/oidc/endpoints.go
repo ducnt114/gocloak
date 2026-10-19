@@ -79,9 +79,14 @@ func (h *Handler) discovery(w http.ResponseWriter, r *http.Request) {
 		"revocation_endpoint_auth_signing_alg_values_supported":    authAlgs,
 		"scopes_supported":                                         []string{"openid", "profile", "email", "roles", "web-origins", "acr", "basic", "address", "phone", "offline_access", "microprofile-jwt"},
 		"claims_supported":                                         []string{"aud", "sub", "iss", "auth_time", "name", "given_name", "family_name", "preferred_username", "email", "email_verified", "acr", "sid"},
-		"claims_parameter_supported":                               false,
-		"request_parameter_supported":                              false,
-		"request_uri_parameter_supported":                          false,
+		"claims_parameter_supported":                               true,
+		"request_parameter_supported":                              true,
+		"request_uri_parameter_supported":                          true,
+		"require_request_uri_registration":                         true,
+		"request_object_signing_alg_values_supported":              append(append([]string{}, authAlgs...), "none"),
+		"pushed_authorization_request_endpoint":                    p + "/ext/par/request",
+		"require_pushed_authorization_requests":                    false,
+		"authorization_response_iss_parameter_supported":           true,
 		"tls_client_certificate_bound_access_tokens":               false,
 	})
 }

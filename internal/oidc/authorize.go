@@ -46,7 +46,15 @@ func (h *Handler) authorizeWith(w http.ResponseWriter, r *http.Request, binding 
 		h.errorPage(w, r, http.StatusBadRequest, "registrationNotAllowedMessage")
 		return
 	}
-	q := func(k string) string { return r.FormValue(k) }
+	if err := r.ParseForm(); err != nil {
+		h.errorPage(w, r, http.StatusBadRequest, "invalidRequestMessage")
+		return
+	}
+	form := url.Values{}
+	for k, v := range r.Form {
+		form[k] = v
+	}
+	q := func(k string) string { return form.Get(k) }
 
 	client, err := h.Svc.Store.GetClientByClientID(ctx, realm.ID, q("client_id"))
 	if err != nil {
@@ -59,6 +67,22 @@ func (h *Handler) authorizeWith(w http.ResponseWriter, r *http.Request, binding 
 	}
 	if client.BearerOnly {
 		h.errorPage(w, r, http.StatusBadRequest, "bearerOnlyMessage")
+		return
+	}
+	// pushed requests and request objects replace or complete the parameters
+	pushed := false
+	if ru := q("request_uri"); strings.HasPrefix(ru, parURNPrefix) {
+		if form, err = h.pushedRequest(ctx, realm, client, ru); err == nil {
+			pushed = true
+		}
+	} else if q("request") != "" || q("request_uri") != "" {
+		err = h.applyRequestObject(ctx, realm, client, form)
+	}
+	if errors.Is(err, errInvalidRequestObject) {
+		h.errorPage(w, r, http.StatusBadRequest, "invalidRequestMessage")
+		return
+	} else if err != nil {
+		h.serverErrorPage(w, r, err)
 		return
 	}
 	redirectURI := q("redirect_uri")
@@ -81,6 +105,27 @@ func (h *Handler) authorizeWith(w http.ResponseWriter, r *http.Request, binding 
 	fail := func(code, desc string) {
 		h.redirectResult(w, r, redirectURI, mode, url.Values{"error": {code}, "error_description": {desc}, "state": {q("state")},
 			"iss": {h.URLs.Issuer(r, realm.Name)}})
+	}
+	if client.Attributes[attrRequirePAR] == "true" && !pushed {
+		fail("invalid_request", "Pushed Authorization Request is only allowed.")
+		return
+	}
+	switch client.Attributes[attrRequestObjectReq] {
+	case "request or request_uri":
+		if r.Form.Get("request") == "" && r.Form.Get("request_uri") == "" {
+			fail("invalid_request", "Missing parameter: 'request' or 'request_uri'")
+			return
+		}
+	case "request only":
+		if r.Form.Get("request") == "" {
+			fail("invalid_request", "Missing parameter: 'request'")
+			return
+		}
+	case "request_uri only":
+		if r.Form.Get("request_uri") == "" {
+			fail("invalid_request", "Missing parameter: 'request_uri'")
+			return
+		}
 	}
 	if q("response_type") != "code" {
 		fail("unsupported_response_type", "Client is not allowed to initiate browser login with given response_type. Only the authorization code flow is supported.")
@@ -182,7 +227,7 @@ func (h *Handler) loadAuthSession(r *http.Request, realm *model.Realm) (*model.A
 	if err != nil {
 		return nil, nil, err
 	}
-	if as.RealmID != realm.ID || h.Svc.Now().After(as.ExpiresAt) {
+	if as.RealmID != realm.ID || h.Svc.Now().After(as.ExpiresAt) || as.Params[keyPAR] != "" {
 		return nil, nil, store.ErrNotFound
 	}
 	client, err := h.Svc.Store.GetClient(r.Context(), realm.ID, as.ClientID)
