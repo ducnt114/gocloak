@@ -35,12 +35,17 @@ POLICIES = {"length", "maxLength", "digits", "lowerCase", "upperCase", "specialC
     "notContainsUsername", "regexPattern", "passwordHistory", "forceExpiredPasswordChange", "hashAlgorithm", "hashIterations"}
 # features of the console gocloak does not implement (yet)
 DISABLED = {"ORGANIZATION", "IMPERSONATION", "CIBA", "KERBEROS", "STEP_UP_AUTHENTICATION",
-    "CLIENT_POLICIES", "ADMIN_FINE_GRAINED_AUTHZ", "TOKEN_EXCHANGE", "DPOP", "PASSKEYS", "RECOVERY_CODES", "DOCKER", "SCRIPTS"}
+    "CLIENT_POLICIES", "ADMIN_FINE_GRAINED_AUTHZ", "TOKEN_EXCHANGE", "PASSKEYS", "RECOVERY_CODES", "DOCKER", "SCRIPTS"}
+
+# preview features of Keycloak that gocloak implements
+ENABLED = {"DPOP"}
 
 out = {k: v for k, v in info.items() if k not in ("systemInfo", "memoryInfo", "themes")}
 for f in out["features"]:
     if f["name"] in DISABLED:
         f["enabled"] = False
+    if f["name"] in ENABLED:
+        f["enabled"] = True
 out["profileInfo"]["disabledFeatures"] = sorted({f["name"] for f in out["features"] if not f["enabled"]})
 out["protocolMapperTypes"] = {"openid-connect": [m for m in info["protocolMapperTypes"]["openid-connect"] if m["id"] in MAPPERS],
     "saml": [m for m in info["protocolMapperTypes"]["saml"] if m["id"] in SAML_MAPPERS]}

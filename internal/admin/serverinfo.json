@@ -5278,7 +5278,7 @@
   },
   {
    "dependencies": [],
-   "enabled": false,
+   "enabled": true,
    "label": "OAuth 2.0 Demonstrating Proof-of-Possession at the Application Layer",
    "name": "DPOP",
    "type": "PREVIEW"
@@ -5675,7 +5675,6 @@
    "CLUSTERLESS",
    "DECLARATIVE_UI",
    "DOCKER",
-   "DPOP",
    "DYNAMIC_SCOPES",
    "FIPS",
    "IMPERSONATION",

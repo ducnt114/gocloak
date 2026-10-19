@@ -1,6 +1,7 @@
 package oidc
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ducnt114/gocloak/internal/dpop"
 	"github.com/ducnt114/gocloak/internal/jwt"
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/service"
@@ -89,6 +91,7 @@ func (h *Handler) discovery(w http.ResponseWriter, r *http.Request) {
 		"require_pushed_authorization_requests":                    false,
 		"authorization_response_iss_parameter_supported":           true,
 		"tls_client_certificate_bound_access_tokens":               false,
+		"dpop_signing_alg_values_supported":                        asymmetricAlgs,
 	})
 }
 
@@ -164,6 +167,20 @@ func (h *Handler) tokenGrant(r *http.Request) (*tokenResponse, error) {
 				details: map[string]string{"grant_type": grant}})
 		}
 		return nil, err
+	}
+	// a DPoP proof binds the issued tokens to the client's key
+	proof, err := h.Svc.CheckDPoP(r.Context(), r, h.URLs.Issuer(r, realm.Name)+"/protocol/openid-connect/token", "")
+	if err != nil {
+		if dpop.IsError(err) {
+			return nil, &oauthError{http.StatusBadRequest, "invalid_dpop_proof", err.Error()}
+		}
+		return nil, err
+	}
+	if proof == nil && client.Attributes[attrDPoPBound] == "true" {
+		return nil, &oauthError{http.StatusBadRequest, "invalid_dpop_proof", "DPoP proof is missing"}
+	}
+	if proof != nil {
+		r = r.WithContext(context.WithValue(r.Context(), dpopProofKey{}, proof))
 	}
 	switch grant {
 	case "authorization_code":
@@ -397,6 +414,11 @@ func (h *Handler) grantRefreshToken(r *http.Request, realm *model.Realm, client 
 	if vt.Claims.String("azp") != client.ClientID {
 		return fail("invalid_token", errInvalidGrant("Invalid refresh token. Token client and authorized client don't match"))
 	}
+	if jkt := service.BoundKey(vt.Claims); jkt != "" {
+		if p := dpopProof(r); p == nil || p.JKT != jkt {
+			return fail("invalid_token", &oauthError{http.StatusBadRequest, "invalid_dpop_proof", "DPoP proof and token binding verification failed"})
+		}
+	}
 	if vt.Session == nil || vt.User == nil {
 		return fail("invalid_token", errInvalidGrant("Session not active"))
 	}
@@ -477,9 +499,9 @@ func (h *Handler) userinfo(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
-	tok := bearerToken(r)
+	tok, scheme := service.AccessToken(r)
 	if tok == "" && r.Method == http.MethodPost {
-		tok = r.PostFormValue("access_token")
+		tok, scheme = r.PostFormValue("access_token"), "Bearer"
 	}
 	unauthorized := func(desc string) {
 		h.event(r, realm, "USER_INFO_REQUEST_ERROR", &eventInfo{err: "invalid_token"})
@@ -501,6 +523,14 @@ func (h *Handler) userinfo(w http.ResponseWriter, r *http.Request) {
 	}
 	if vt.User == nil {
 		unauthorized("User not found")
+		return
+	}
+	if err := h.Svc.CheckTokenBinding(r.Context(), r, h.URLs.Base(r)+r.URL.Path, tok, scheme, vt.Claims); err != nil {
+		if dpop.IsError(err) {
+			unauthorized(err.Error())
+			return
+		}
+		h.writeError(w, err)
 		return
 	}
 	if !hasScope(vt.Claims.String("scope"), "openid") {

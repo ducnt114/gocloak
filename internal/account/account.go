@@ -79,8 +79,8 @@ func (c *caller) can(role string) bool {
 }
 
 func wantsJSON(r *http.Request) bool {
-	return strings.Contains(r.Header.Get("Accept"), "application/json") || strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") ||
-		strings.HasPrefix(r.Header.Get("Authorization"), "bearer ")
+	tok, _ := service.AccessToken(r)
+	return strings.Contains(r.Header.Get("Accept"), "application/json") || tok != ""
 }
 
 func (h *Handler) realm(r *http.Request) (*model.Realm, error) {
@@ -142,15 +142,18 @@ func (h *Handler) api(fn apiFunc) http.HandlerFunc {
 			if err != nil {
 				return &apiError{http.StatusNotFound, map[string]string{"error": "Realm does not exist"}}
 			}
-			a := r.Header.Get("Authorization")
-			if len(a) < 8 || !strings.EqualFold(a[:7], "bearer ") {
+			tok, scheme := service.AccessToken(r)
+			if tok == "" {
 				return &apiError{http.StatusUnauthorized, nil}
 			}
-			vt, err := h.Svc.VerifyToken(r.Context(), realm, strings.TrimSpace(a[7:]), h.URLs.Issuer(r, realm.Name), service.TokenBearer)
+			vt, err := h.Svc.VerifyToken(r.Context(), realm, tok, h.URLs.Issuer(r, realm.Name), service.TokenBearer)
 			if err != nil || vt.User == nil {
 				if err != nil && !errors.Is(err, service.ErrInvalidToken) {
 					return err
 				}
+				return &apiError{http.StatusUnauthorized, nil}
+			}
+			if err := h.Svc.CheckTokenBinding(r.Context(), r, h.URLs.Base(r)+r.URL.Path, tok, scheme, vt.Claims); err != nil {
 				return &apiError{http.StatusUnauthorized, nil}
 			}
 			roles, err := h.accountRoles(r.Context(), realm, vt.User)

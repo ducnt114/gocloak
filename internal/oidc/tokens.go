@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ducnt114/gocloak/internal/dpop"
 	"github.com/ducnt114/gocloak/internal/jwt"
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/service"
@@ -156,6 +157,10 @@ func (h *Handler) issue(r *http.Request, ir *issueRequest) (*tokenResponse, erro
 	if ir.session != nil {
 		at["sid"] = ir.session.ID
 	}
+	proof := dpopProof(r)
+	if proof != nil {
+		at["cnf"] = map[string]any{"jkt": proof.JKT}
+	}
 	kind := kindAccess
 	if ir.client.Attributes[service.LightweightAccessToken] == "true" && ir.session != nil {
 		// a lightweight token: the user is found through its session
@@ -182,8 +187,12 @@ func (h *Handler) issue(r *http.Request, ir *issueRequest) (*tokenResponse, erro
 	if err != nil {
 		return nil, err
 	}
+	tokenType := "Bearer"
+	if proof != nil {
+		tokenType = "DPoP"
+	}
 	resp := &tokenResponse{
-		AccessToken: access, ExpiresIn: int(exp.Sub(now).Seconds()), TokenType: "Bearer", Scope: scope,
+		AccessToken: access, ExpiresIn: int(exp.Sub(now).Seconds()), TokenType: tokenType, Scope: scope,
 		NotBeforePolicy: int(ir.realm.Settings.NotBefore), accessJTI: at.String("jti"),
 	}
 
@@ -224,6 +233,10 @@ func (h *Handler) issue(r *http.Request, ir *issueRequest) (*tokenResponse, erro
 		if ir.realm.Settings.RevokeRefreshToken {
 			rc["reuse_id"] = service.NewID()
 		}
+		if proof != nil && ir.client.PublicClient {
+			// public clients cannot authenticate: their refresh tokens are bound
+			rc["cnf"] = map[string]any{"jkt": proof.JKT}
+		}
 		if offline {
 			rc["typ"] = service.TokenOffline
 			if ir.realm.Settings.OfflineSessionMaxLifespanEnabled {
@@ -249,6 +262,17 @@ func (h *Handler) issue(r *http.Request, ir *issueRequest) (*tokenResponse, erro
 		resp.refreshJTI, resp.refreshTyp = rc.String("jti"), rc.String("typ")
 	}
 	return resp, nil
+}
+
+// attrDPoPBound requires DPoP proofs at the token endpoint.
+const attrDPoPBound = "dpop.bound.access.tokens"
+
+type dpopProofKey struct{}
+
+// dpopProof is the verified DPoP proof of a token request, if any.
+func dpopProof(r *http.Request) *dpop.Proof {
+	p, _ := r.Context().Value(dpopProofKey{}).(*dpop.Proof)
+	return p
 }
 
 // offlineSession returns the offline copy of an SSO session (same id, as

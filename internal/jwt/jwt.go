@@ -297,6 +297,27 @@ type JWK struct {
 	X5tS256 string   `json:"x5t#S256,omitempty"`
 }
 
+// Thumbprint is the RFC 7638 SHA-256 thumbprint of a public JWK.
+func (j JWK) Thumbprint() (string, error) {
+	var members string
+	switch j.Kty {
+	case "RSA":
+		if j.N == "" || j.E == "" {
+			return "", ErrInvalid
+		}
+		members = `{"e":"` + j.E + `","kty":"RSA","n":"` + j.N + `"}`
+	case "EC":
+		if j.Crv == "" || j.X == "" || j.Y == "" {
+			return "", ErrInvalid
+		}
+		members = `{"crv":"` + j.Crv + `","kty":"EC","x":"` + j.X + `","y":"` + j.Y + `"}`
+	default:
+		return "", ErrInvalid
+	}
+	sum := sha256.Sum256([]byte(members))
+	return b64.EncodeToString(sum[:]), nil
+}
+
 // JWK returns the public JWK of an asymmetric key.
 func (k *Key) JWK() (JWK, bool) {
 	pub := k.Public

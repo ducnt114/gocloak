@@ -164,11 +164,10 @@ func (h *Handler) realm(r *http.Request) (*model.Realm, error) {
 	return realm, nil
 }
 
+// bearerToken returns the access token of a request (Bearer or DPoP scheme).
 func bearerToken(r *http.Request) string {
-	if a := r.Header.Get("Authorization"); len(a) > 7 && strings.EqualFold(a[:7], "bearer ") {
-		return strings.TrimSpace(a[7:])
-	}
-	return ""
+	tok, _ := service.AccessToken(r)
+	return tok
 }
 
 // ---------------------------------------------------------------- CORS

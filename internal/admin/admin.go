@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ducnt114/gocloak/internal/dpop"
 	"github.com/ducnt114/gocloak/internal/federation"
 	"github.com/ducnt114/gocloak/internal/jwt"
 	"github.com/ducnt114/gocloak/internal/model"
@@ -162,11 +163,10 @@ type handlerFunc func(w http.ResponseWriter, r *http.Request, p *principal) erro
 // from the database (not from the token), so revoked roles apply at once.
 func (h *Handler) authenticate(r *http.Request) (*principal, error) {
 	ctx := r.Context()
-	a := r.Header.Get("Authorization")
-	if len(a) < 8 || !strings.EqualFold(a[:7], "bearer ") {
+	tok, scheme := service.AccessToken(r)
+	if tok == "" {
 		return nil, unauthorized("HTTP 401 Unauthorized")
 	}
-	tok := strings.TrimSpace(a[7:])
 	_, claims, err := jwt.Parse(tok)
 	if err != nil {
 		return nil, unauthorized("HTTP 401 Unauthorized")
@@ -186,6 +186,12 @@ func (h *Handler) authenticate(r *http.Request) (*principal, error) {
 			return nil, err
 		}
 		return nil, unauthorized("HTTP 401 Unauthorized")
+	}
+	if err := h.Svc.CheckTokenBinding(ctx, r, h.URLs.Base(r)+r.URL.Path, tok, scheme, vt.Claims); err != nil {
+		if dpop.IsError(err) {
+			return nil, unauthorized("HTTP 401 Unauthorized")
+		}
+		return nil, err
 	}
 	roles, err := h.Svc.EffectiveRoles(ctx, realm.ID, vt.User.ID)
 	if err != nil {
