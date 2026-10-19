@@ -147,7 +147,13 @@ func (h *Handler) issue(r *http.Request, ir *issueRequest) (*tokenResponse, erro
 	if ir.session != nil {
 		at["sid"] = ir.session.ID
 	}
-	if err := tc.apply(ctx, at, kindAccess); err != nil {
+	kind := kindAccess
+	if ir.client.Attributes[service.LightweightAccessToken] == "true" && ir.session != nil {
+		// a lightweight token: the user is found through its session
+		delete(at, "sub")
+		kind = kindLightweight
+	}
+	if err := tc.apply(ctx, at, kind); err != nil {
 		return nil, err
 	}
 	for k, v := range ir.extra {

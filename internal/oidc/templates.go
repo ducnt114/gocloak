@@ -51,6 +51,10 @@ type pageData struct {
 	// Items is a list of message keys (e.g. required actions).
 	Items []string
 
+	// Frames are the front-channel logout URLs of clients, loaded in
+	// hidden iframes (and allowed by the page's frame-src).
+	Frames []string
+
 	OTP      *otpSetup
 	WebAuthn *webauthnPage
 
@@ -241,7 +245,13 @@ func (h *Handler) render(w http.ResponseWriter, status int, page string, d pageD
 	w.Header().Set("Content-Language", d.Locale)
 	w.Header().Set("Cache-Control", "no-store, must-revalidate, max-age=0")
 	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
-	w.Header().Set("Content-Security-Policy", "frame-src 'self'; frame-ancestors 'self'; object-src 'none';")
+	frameSrc := "'self'"
+	for _, f := range d.Frames {
+		if u, err := url.Parse(f); err == nil && u.Host != "" {
+			frameSrc += " " + u.Host
+		}
+	}
+	w.Header().Set("Content-Security-Policy", "frame-src "+frameSrc+"; frame-ancestors 'self'; object-src 'none';")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.WriteHeader(status)
 	if err := th.Execute(w, page+".html", d); err != nil {

@@ -127,7 +127,12 @@ func ecSize(curve elliptic.Curve) int { return (curve.Params().BitSize + 7) / 8 
 
 // Sign produces a compact JWS of claims with key k (and k.Alg).
 func Sign(claims Claims, k *Key) (string, error) {
-	h, _ := json.Marshal(Header{Alg: k.Alg, Typ: "JWT", Kid: k.Kid})
+	return SignTyped(claims, k, "JWT")
+}
+
+// SignTyped is Sign with the given "typ" header (e.g. logout+jwt).
+func SignTyped(claims Claims, k *Key, typ string) (string, error) {
+	h, _ := json.Marshal(Header{Alg: k.Alg, Typ: typ, Kid: k.Kid})
 	p, err := json.Marshal(claims)
 	if err != nil {
 		return "", err

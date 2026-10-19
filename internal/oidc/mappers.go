@@ -20,6 +20,7 @@ const (
 	kindID            = "id"
 	kindUserinfo      = "userinfo"
 	kindIntrospection = "introspection"
+	kindLightweight   = "lightweight" // lightweight access tokens
 )
 
 // tokenContext is everything protocol mappers need to compute claims for
@@ -302,6 +303,8 @@ func includes(m *model.ProtocolMapper, kind string) bool {
 			return m.Config["access.token.claim"] == "true"
 		}
 		return v == "true"
+	case kindLightweight:
+		return m.Config["lightweight.claim"] == "true"
 	}
 	return false
 }

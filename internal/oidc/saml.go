@@ -545,6 +545,7 @@ const (
 	pLogoutRequestID = "_saml_request_id"  // its request id
 	pLogoutRelay     = "_saml_relay_state" // its relay state
 	pLogoutRedirect  = "_logout_redirect"  // OIDC post logout redirect (with state)
+	pLogoutFrames    = "_logout_frames"    // OIDC front-channel logout URLs, then the client names
 )
 
 // samlLogoutRequest handles a LogoutRequest from a service provider.
@@ -591,6 +592,7 @@ func (h *Handler) samlEndSession(w http.ResponseWriter, r *http.Request, realm *
 	if _, err := h.queueSAMLLogouts(r, realm, us, initiator, state); err != nil {
 		return err
 	}
+	h.logoutOIDCClients(ctx, h.URLs.Issuer(r, realm.Name), realm, us)
 	h.idpLogout(r, realm, us, false, "", "")
 	if err := h.Svc.Store.DeleteUserSession(ctx, us.ID); err != nil && !errors.Is(err, store.ErrNotFound) {
 		return err
@@ -634,6 +636,11 @@ func (h *Handler) samlContinueLogout(w http.ResponseWriter, r *http.Request, rea
 	_ = h.Svc.Store.DeleteAuthSession(ctx, state.ID)
 
 	if redirect, ok := state.Params[pLogoutRedirect]; ok {
+		if f := state.Params[pLogoutFrames]; f != "" {
+			frames, names, _ := strings.Cut(f, "\x01")
+			h.renderFrontchannelLogout(w, r, realm, strings.Split(frames, "\n"), strings.Split(names, "\n"), redirect)
+			return
+		}
 		if redirect != "" {
 			http.Redirect(w, r, redirect, http.StatusFound)
 			return
@@ -690,9 +697,12 @@ func (h *Handler) samlLogoutResponse(w http.ResponseWriter, r *http.Request, rea
 // by the OIDC logout endpoint; redirect is where the browser goes after
 // ("" shows the logged out page). It reports false when there is nothing to
 // do through the browser.
-func (h *Handler) samlBrowserLogout(w http.ResponseWriter, r *http.Request, realm *model.Realm, us *model.UserSession, redirect string) (bool, error) {
+func (h *Handler) samlBrowserLogout(w http.ResponseWriter, r *http.Request, realm *model.Realm, us *model.UserSession, redirect string, frames, names []string) (bool, error) {
 	state := &model.AuthSession{ID: service.RandomToken(24), RealmID: realm.ID, ExpiresAt: h.Svc.Now().Add(authSessionTTL),
 		Params: map[string]string{pLogoutRedirect: redirect}}
+	if len(frames) > 0 {
+		state.Params[pLogoutFrames] = strings.Join(frames, "\n") + "\x01" + strings.Join(names, "\n")
+	}
 	n, err := h.queueSAMLLogouts(r, realm, us, "", state)
 	if err != nil || n == 0 {
 		return false, err
@@ -791,15 +801,14 @@ func (h *Handler) samlBackchannel(ctx context.Context, issuer string, realm *mod
 	}
 }
 
-// BackchannelLogout notifies the SAML clients of sessions ended outside of
-// a browser logout (registered as the service's LogoutHandler).
+// BackchannelLogout notifies the SAML and OIDC clients of sessions ended
+// outside of a browser logout (registered as the service's LogoutHandler).
 func (h *Handler) BackchannelLogout(ctx context.Context, base string, realm *model.Realm, sessions []*model.UserSession) {
 	issuer := base + "/realms/" + url.PathEscape(realm.Name)
 	for _, us := range sessions {
 		targets, err := h.samlLogoutTargets(ctx, realm, us, "")
 		if err != nil {
 			h.Log.Warn("SAML back-channel logout", "err", err)
-			continue
 		}
 		for _, t := range targets {
 			// front-channel clients can only be reached through the browser
@@ -807,5 +816,6 @@ func (h *Handler) BackchannelLogout(ctx context.Context, base string, realm *mod
 				h.samlBackchannel(ctx, issuer, realm, t)
 			}
 		}
+		h.logoutOIDCClients(ctx, issuer, realm, us)
 	}
 }

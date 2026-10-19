@@ -188,7 +188,8 @@ func (s *Service) CreateRealm(ctx context.Context, st *store.Store, r *model.Rea
 	}
 
 	adminCLI := &model.Client{ID: NewID(), RealmID: r.ID, ClientID: AdminCLIClient, Name: "${client_admin-cli}",
-		Enabled: true, PublicClient: true, DirectAccessGrantsEnabled: true, FullScopeAllowed: true, Protocol: "openid-connect"}
+		Enabled: true, PublicClient: true, DirectAccessGrantsEnabled: true, FullScopeAllowed: true, Protocol: "openid-connect",
+		Attributes: map[string]string{LightweightAccessToken: "true"}}
 	if err := st.CreateClient(ctx, adminCLI); err != nil {
 		return err
 	}

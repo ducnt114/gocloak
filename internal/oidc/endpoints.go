@@ -60,8 +60,10 @@ func (h *Handler) discovery(w http.ResponseWriter, r *http.Request) {
 		"end_session_endpoint":                                     p + "/logout",
 		"revocation_endpoint":                                      p + "/revoke",
 		"jwks_uri":                                                 p + "/certs",
-		"frontchannel_logout_session_supported":                    false,
-		"backchannel_logout_supported":                             false,
+		"frontchannel_logout_supported":                            true,
+		"frontchannel_logout_session_supported":                    true,
+		"backchannel_logout_supported":                             true,
+		"backchannel_logout_session_supported":                     true,
 		"grant_types_supported":                                    []string{"authorization_code", "client_credentials", "password", "refresh_token"},
 		"response_types_supported":                                 []string{"code"},
 		"response_modes_supported":                                 []string{"query", "fragment", "form_post"},
@@ -531,7 +533,7 @@ func (h *Handler) introspect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if client.PublicClient {
-		h.writeError(w, errUnauthorizedClient("Public client is not allowed to introspect tokens"))
+		h.writeError(w, &oauthError{http.StatusForbidden, "invalid_request", "Client not allowed."})
 		return
 	}
 	tok := r.PostFormValue("token")
@@ -552,6 +554,14 @@ func (h *Handler) introspect(w http.ResponseWriter, r *http.Request) {
 	for k, v := range vt.Claims {
 		out[k] = v
 	}
+	if _, hasSub := vt.Claims["sub"]; !hasSub && vt.User != nil && vt.Session != nil && vt.Claims.String("typ") == service.TokenBearer {
+		// a lightweight access token: introspection returns the claims the
+		// mappers give to introspection
+		if err := h.lightweightClaims(r, realm, vt, out); err != nil {
+			h.writeError(w, err)
+			return
+		}
+	}
 	out["active"] = true
 	out["client_id"] = vt.Claims.String("azp")
 	out["token_type"] = vt.Claims.String("typ")
@@ -560,6 +570,21 @@ func (h *Handler) introspect(w http.ResponseWriter, r *http.Request) {
 	}
 	h.event(r, realm, "INTROSPECT_TOKEN", &eventInfo{client: client})
 	writeJSON(w, http.StatusOK, out)
+}
+
+// lightweightClaims adds the claims left out of a lightweight access token.
+func (h *Handler) lightweightClaims(r *http.Request, realm *model.Realm, vt *service.VerifiedToken, out jwt.Claims) error {
+	ctx := r.Context()
+	client, err := h.Svc.Store.GetClientByClientID(ctx, realm.ID, vt.Claims.String("azp"))
+	if err != nil {
+		return nil
+	}
+	tc, _, err := newTokenContext(ctx, h.Svc, h.URLs.Base(r), realm, client, vt.User, vt.Session, vt.Claims.String("scope"), false)
+	if err != nil {
+		return err
+	}
+	out["sub"] = vt.User.ID
+	return tc.apply(ctx, out, kindIntrospection)
 }
 
 // ---------------------------------------------------------------- revocation

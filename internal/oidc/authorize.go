@@ -473,7 +473,9 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	front := ""
+	var frames, names []string
 	if us != nil {
+		frames, names = h.logoutOIDCClients(ctx, h.URLs.Issuer(r, realm.Name), realm, us)
 		front = h.idpLogout(r, realm, us, true, redirect, r.FormValue("state"))
 		if err := h.Svc.Store.DeleteUserSession(ctx, us.ID); err != nil {
 			h.serverErrorPage(w, r, err)
@@ -491,12 +493,16 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	if us != nil {
 		// SAML clients logged in with the session are logged out through
 		// the browser before the final redirect
-		if done, err := h.samlBrowserLogout(w, r, realm, us, final); err != nil {
+		if done, err := h.samlBrowserLogout(w, r, realm, us, final, frames, names); err != nil {
 			h.serverErrorPage(w, r, err)
 			return
 		} else if done {
 			return
 		}
+	}
+	if len(frames) > 0 {
+		h.renderFrontchannelLogout(w, r, realm, frames, names, final)
+		return
 	}
 	if final != "" {
 		http.Redirect(w, r, final, http.StatusFound)

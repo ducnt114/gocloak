@@ -17,7 +17,8 @@ func (s *Service) createConsoleClient(ctx context.Context, st *store.Store, r *m
 	c := &model.Client{ID: NewID(), RealmID: r.ID, ClientID: AdminConsoleClient, Name: "${client_security-admin-console}",
 		Enabled: true, PublicClient: true, StandardFlowEnabled: true, FullScopeAllowed: true, Protocol: "openid-connect",
 		RootURL: "${authAdminUrl}", BaseURL: "/admin/" + r.Name + "/console/", RedirectURIs: []string{"/admin/" + r.Name + "/console/*"},
-		WebOrigins: []string{"+"}, Attributes: map[string]string{"pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "+"}}
+		WebOrigins: []string{"+"}, Attributes: map[string]string{"pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "+",
+			LightweightAccessToken: "true"}}
 	if err := st.CreateClient(ctx, c); err != nil {
 		return err
 	}

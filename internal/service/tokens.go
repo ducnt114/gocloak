@@ -18,6 +18,11 @@ const (
 	TokenCookie  = "Serialized-ID"
 )
 
+// LightweightAccessToken is the client attribute making access tokens
+// lightweight: only the core claims and the mappers marked for them
+// (lightweight.claim), the rest being available through introspection.
+const LightweightAccessToken = "client.use.lightweight.access.token.enabled"
+
 // ErrInvalidToken is returned by VerifyToken for any token that is not
 // currently acceptable.
 var ErrInvalidToken = errors.New("invalid token")
@@ -98,6 +103,20 @@ func (s *Service) VerifyToken(ctx context.Context, realm *model.Realm, token, is
 			return nil, ErrInvalidToken
 		}
 		vt.Session = us
+	}
+	if vt.User == nil && vt.Session != nil && typ != TokenCookie {
+		// lightweight access tokens have no subject: the session tells the user
+		u, err := s.Store.GetUser(ctx, realm.ID, vt.Session.UserID)
+		if err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				return nil, ErrInvalidToken
+			}
+			return nil, err
+		}
+		if !u.Enabled || (u.NotBefore > 0 && iat < u.NotBefore) {
+			return nil, ErrInvalidToken
+		}
+		vt.User = u
 	}
 	return vt, nil
 }

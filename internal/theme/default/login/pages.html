@@ -13,6 +13,18 @@
 </form>
 {{template "footer" .}}{{end}}
 
+{{define "frontchannel-logout.html"}}{{template "header" .}}
+<p>{{.T "frontchannel-logout.message"}}</p>
+{{if .Items}}<ul id="kc-logout-clients">{{range .Items}}<li>{{.}}</li>{{end}}</ul>{{end}}
+{{range .Frames}}<iframe src="{{.}}" style="display:none;"></iframe>
+{{end}}{{if .LinkURL}}<script>
+document.addEventListener('readystatechange', function () {
+  if (document.readyState == 'complete') { window.location.replace({{.LinkURL}}); }
+});
+</script>
+<p class="center"><a id="continue" href="{{.LinkURL}}">{{.T "doContinue"}}</a></p>{{end}}
+{{template "footer" .}}{{end}}
+
 {{define "form-post.html"}}<!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>Submit This Form</title></head>
