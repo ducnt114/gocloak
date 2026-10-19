@@ -37,6 +37,7 @@ type tokenResponse struct {
 	NotBeforePolicy  int    `json:"not-before-policy"`
 	SessionState     string `json:"session_state,omitempty"`
 	Scope            string `json:"scope"`
+	IssuedTokenType  string `json:"issued_token_type,omitempty"` // token exchange
 
 	accessJTI, refreshJTI, refreshTyp string // for events
 }
@@ -60,7 +61,15 @@ type issueRequest struct {
 	nonce   string
 	refresh bool
 	extra   jwt.Claims // claims added to the access token (RPT permissions)
+	// audience restricts the "aud" of the access token (token exchange);
+	// each value must be an audience the token would have anyway.
+	audience []string
 }
+
+// errAudience reports a requested audience the token cannot have.
+type errAudience struct{ aud string }
+
+func (e *errAudience) Error() string { return "Requested audience not available: " + e.aud }
 
 // atHash is the left half of the access token's hash, using the hash of
 // the ID token's signature algorithm.
@@ -155,6 +164,16 @@ func (h *Handler) issue(r *http.Request, ir *issueRequest) (*tokenResponse, erro
 	}
 	if err := tc.apply(ctx, at, kind); err != nil {
 		return nil, err
+	}
+	if len(ir.audience) > 0 {
+		have := at.Audience()
+		for _, a := range ir.audience {
+			if !slices.Contains(have, a) && a != ir.client.ClientID {
+				return nil, &errAudience{a}
+			}
+		}
+		at["aud"] = append([]string{}, ir.audience...)
+		finalizeAudience(at)
 	}
 	for k, v := range ir.extra {
 		at[k] = v
