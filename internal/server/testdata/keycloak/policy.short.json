@@ -1,0 +1,5 @@
+{
+  "error": "invalidPasswordMinLengthMessage",
+  "error_description": "Invalid password: minimum length 8.",
+  "status": 400
+}

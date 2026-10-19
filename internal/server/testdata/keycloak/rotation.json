@@ -1,0 +1,18 @@
+[
+  {
+    "error_description": null,
+    "status": 200
+  },
+  {
+    "error_description": null,
+    "status": 200
+  },
+  {
+    "error_description": "Maximum allowed refresh token reuse exceeded",
+    "status": 400
+  },
+  {
+    "error_description": "Session doesn't have required client",
+    "status": 400
+  }
+]

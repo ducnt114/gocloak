@@ -119,7 +119,8 @@ def decode(tok):
     return json.loads(base64.urlsafe_b64decode(p + "=" * (-len(p) % 4)))
 
 
-VOLATILE = {"exp", "iat", "jti", "sid", "auth_time", "sub", "at_hash", "session_state", "nonce", "clientHost", "clientAddress"}
+VOLATILE = {"exp", "iat", "jti", "sid", "auth_time", "sub", "at_hash", "session_state", "nonce", "clientHost", "clientAddress",
+            "reuse_id", "lastFailure", "failedLoginNotBefore", "lastIPFailure"}
 
 
 def normalise(claims, base):
@@ -175,6 +176,80 @@ def scenarios(base):
     st, body, _ = call("POST", t, form={"grant_type": "password", "client_id": "web", "client_secret": "web-secret",
                                         "username": "alice", "password": "wonderland", "scope": "openid nope"})
     out["invalid-scope"] = {"status": st, "error": body.get("error") if isinstance(body, dict) else body}
+    out.update(security(base))
+    return out
+
+
+def security(base):
+    """Password policy, brute force, offline and refresh token behaviour."""
+    out = {}
+    tok = admin_token(base)
+    r = base + "/admin/realms/" + REALM
+    t = base + f"/realms/{REALM}/protocol/openid-connect/token"
+
+    def realm(settings):
+        st, body, _ = call("PUT", r, tok, settings)
+        must(st, 204, "update realm", body)
+
+    def password(user, pw, **extra):
+        form = {"grant_type": "password", "client_id": "web", "client_secret": "web-secret", "username": user, "password": pw}
+        form.update(extra)
+        return call("POST", t, form=form)[:2]
+
+    def refresh(token):
+        return call("POST", t, form={"grant_type": "refresh_token", "client_id": "web", "client_secret": "web-secret",
+                                     "refresh_token": token})[:2]
+
+    def outcome(st, body):
+        if isinstance(body, dict):
+            return {"status": st, "error": body.get("error"), "error_description": body.get("error_description")}
+        return {"status": st}
+
+    st, body, h = call("POST", r + "/users", tok, {"username": "mallory", "email": "mallory@example.com", "firstName": "M",
+                                                  "lastName": "M", "enabled": True,
+                                                  "credentials": [{"type": "password", "value": "pass1234", "temporary": False}]})
+    must(st, 201, "create mallory", body)
+    mallory = h["Location"].rsplit("/", 1)[1]
+
+    realm({"passwordPolicy": "length(8) and digits(1) and passwordHistory(1)"})
+    for name, pw in [("short", "short"), ("no-digit", "abcdefgh"), ("history", "pass1234")]:
+        st, body, _ = call("PUT", f"{r}/users/{mallory}/reset-password", tok, {"type": "password", "value": pw, "temporary": False})
+        out["policy." + name] = outcome(st, body)
+    realm({"passwordPolicy": ""})
+
+    st, body = password("mallory", "pass1234")
+    out["refresh.claims"] = normalise(decode(body["refresh_token"]), base)
+    out["refresh.response"] = {"refresh_expires_in": body["refresh_expires_in"] > 0, "not-before-policy": body["not-before-policy"]}
+    st, body = password("mallory", "pass1234", scope="openid offline_access")
+    out["offline.claims"] = normalise(decode(body["refresh_token"]), base)
+    out["offline.response"] = {"refresh_expires_in": body["refresh_expires_in"], "scope": " ".join(sorted(body["scope"].split()))}
+    st, body = refresh(body["refresh_token"])
+    out["offline.refresh"] = {"status": st, "typ": decode(body["refresh_token"])["typ"] if st == 200 else None}
+
+    realm({"revokeRefreshToken": True, "refreshTokenMaxReuse": 1})
+    st, body = password("mallory", "pass1234")
+    first = body["refresh_token"]
+    st, body = refresh(first)
+    second = body["refresh_token"]
+    seq = [outcome(st, body)]
+    seq.append(outcome(*refresh(first)))
+    seq.append(outcome(*refresh(first)))
+    seq.append(outcome(*refresh(second)))
+    out["rotation"] = [{"status": x["status"], "error_description": x.get("error_description")} for x in seq]
+    realm({"revokeRefreshToken": False})
+
+    realm({"bruteForceProtected": True, "failureFactor": 2, "waitIncrementSeconds": 60, "quickLoginCheckMilliSeconds": 0})
+    attempts = [outcome(*password("mallory", "wrong")), outcome(*password("mallory", "wrong")),
+                outcome(*password("mallory", "pass1234"))]
+    out["bruteforce.attempts"] = attempts
+    st, status, _ = call("GET", f"{r}/attack-detection/brute-force/users/{mallory}", tok)
+    out["bruteforce.status"] = normalise(status, base)
+    st, user, _ = call("GET", f"{r}/users/{mallory}", tok)
+    out["bruteforce.user-enabled"] = {"enabled": user["enabled"]}
+    call("DELETE", f"{r}/attack-detection/brute-force/users/{mallory}", tok)
+    out["bruteforce.after-clear"] = outcome(*password("mallory", "pass1234"))["status"]
+    realm({"bruteForceProtected": False})
+    out["bruteforce.after-clear"] = {"status": out["bruteforce.after-clear"]}
     return out
 
 

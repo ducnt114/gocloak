@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/ducnt114/gocloak/internal/jwt"
@@ -23,7 +24,7 @@ func (h *Handler) realmInfo(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
-	_, key, err := h.Svc.SigningKey(r.Context(), realm.ID)
+	key, err := h.Svc.SigningKey(r.Context(), realm, "RS256")
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -31,12 +32,14 @@ func (h *Handler) realmInfo(w http.ResponseWriter, r *http.Request) {
 	iss := h.URLs.Issuer(r, realm.Name)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"realm":             realm.Name,
-		"public_key":        jwt.PublicKeyBase64(&key.PublicKey),
+		"public_key":        jwt.PublicKeyBase64(key.Public),
 		"token-service":     iss + "/protocol/openid-connect",
 		"account-service":   iss + "/account",
-		"tokens-not-before": 0,
+		"tokens-not-before": realm.Settings.NotBefore,
 	})
 }
+
+var asymmetricAlgs = []string{"PS384", "ES384", "RS384", "ES256", "RS256", "ES512", "PS256", "PS512", "RS512"}
 
 func (h *Handler) discovery(w http.ResponseWriter, r *http.Request) {
 	realm, err := h.realm(r)
@@ -46,33 +49,38 @@ func (h *Handler) discovery(w http.ResponseWriter, r *http.Request) {
 	}
 	iss := h.URLs.Issuer(r, realm.Name)
 	p := iss + "/protocol/openid-connect"
+	authMethods := []string{"private_key_jwt", "client_secret_basic", "client_secret_post", "client_secret_jwt"}
+	authAlgs := append(append([]string{}, asymmetricAlgs...), "HS256", "HS512", "HS384")
 	writeJSON(w, http.StatusOK, map[string]any{
-		"issuer":                                        iss,
-		"authorization_endpoint":                        p + "/auth",
-		"token_endpoint":                                p + "/token",
-		"introspection_endpoint":                        p + "/token/introspect",
-		"userinfo_endpoint":                             p + "/userinfo",
-		"end_session_endpoint":                          p + "/logout",
-		"revocation_endpoint":                           p + "/revoke",
-		"jwks_uri":                                      p + "/certs",
-		"frontchannel_logout_session_supported":         false,
-		"backchannel_logout_supported":                  false,
-		"grant_types_supported":                         []string{"authorization_code", "client_credentials", "password", "refresh_token"},
-		"response_types_supported":                      []string{"code"},
-		"response_modes_supported":                      []string{"query", "fragment", "form_post"},
-		"subject_types_supported":                       []string{"public"},
-		"id_token_signing_alg_values_supported":         []string{"RS256"},
-		"userinfo_signing_alg_values_supported":         []string{"none"},
-		"code_challenge_methods_supported":              []string{"plain", "S256"},
-		"token_endpoint_auth_methods_supported":         []string{"client_secret_basic", "client_secret_post"},
-		"introspection_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"},
-		"revocation_endpoint_auth_methods_supported":    []string{"client_secret_basic", "client_secret_post"},
-		"scopes_supported":                              []string{"openid", "profile", "email", "roles", "web-origins", "address", "phone", "offline_access", "microprofile-jwt"},
-		"claims_supported":                              []string{"aud", "sub", "iss", "auth_time", "name", "given_name", "family_name", "preferred_username", "email", "email_verified", "acr", "sid"},
-		"claims_parameter_supported":                    false,
-		"request_parameter_supported":                   false,
-		"request_uri_parameter_supported":               false,
-		"tls_client_certificate_bound_access_tokens":    false,
+		"issuer":                                                   iss,
+		"authorization_endpoint":                                   p + "/auth",
+		"token_endpoint":                                           p + "/token",
+		"introspection_endpoint":                                   p + "/token/introspect",
+		"userinfo_endpoint":                                        p + "/userinfo",
+		"end_session_endpoint":                                     p + "/logout",
+		"revocation_endpoint":                                      p + "/revoke",
+		"jwks_uri":                                                 p + "/certs",
+		"frontchannel_logout_session_supported":                    false,
+		"backchannel_logout_supported":                             false,
+		"grant_types_supported":                                    []string{"authorization_code", "client_credentials", "password", "refresh_token"},
+		"response_types_supported":                                 []string{"code"},
+		"response_modes_supported":                                 []string{"query", "fragment", "form_post"},
+		"subject_types_supported":                                  []string{"public"},
+		"id_token_signing_alg_values_supported":                    asymmetricAlgs,
+		"userinfo_signing_alg_values_supported":                    []string{"none"},
+		"code_challenge_methods_supported":                         []string{"plain", "S256"},
+		"token_endpoint_auth_methods_supported":                    authMethods,
+		"token_endpoint_auth_signing_alg_values_supported":         authAlgs,
+		"introspection_endpoint_auth_methods_supported":            authMethods,
+		"introspection_endpoint_auth_signing_alg_values_supported": authAlgs,
+		"revocation_endpoint_auth_methods_supported":               authMethods,
+		"revocation_endpoint_auth_signing_alg_values_supported":    authAlgs,
+		"scopes_supported":                                         []string{"openid", "profile", "email", "roles", "web-origins", "acr", "basic", "address", "phone", "offline_access", "microprofile-jwt"},
+		"claims_supported":                                         []string{"aud", "sub", "iss", "auth_time", "name", "given_name", "family_name", "preferred_username", "email", "email_verified", "acr", "sid"},
+		"claims_parameter_supported":                               false,
+		"request_parameter_supported":                              false,
+		"request_uri_parameter_supported":                          false,
+		"tls_client_certificate_bound_access_tokens":               false,
 	})
 }
 
@@ -82,16 +90,21 @@ func (h *Handler) certs(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
-	keys, err := h.Svc.PublicKeys(r.Context(), realm.ID)
+	keys, err := h.Svc.RealmKeys(r.Context(), realm.ID)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
-	jwks := make([]jwt.JWK, 0, len(keys))
-	for kid, k := range keys {
-		jwks = append(jwks, jwt.PublicJWK(kid, k))
+	jwks := []jwt.JWK{}
+	for _, k := range keys {
+		if !k.Enabled {
+			continue
+		}
+		if j, ok := k.JWK(); ok {
+			jwks = append(jwks, j)
+		}
 	}
-	sort.Slice(jwks, func(i, j int) bool { return jwks[i].Kid < jwks[j].Kid })
+	sort.SliceStable(jwks, func(i, j int) bool { return jwks[i].Kid < jwks[j].Kid })
 	writeJSON(w, http.StatusOK, map[string]any{"keys": jwks})
 }
 
@@ -120,6 +133,12 @@ func (h *Handler) tokenGrant(r *http.Request) (*tokenResponse, error) {
 	}
 	client, err := h.authenticateClient(r, realm)
 	if err != nil {
+		typ := map[string]string{"authorization_code": "CODE_TO_TOKEN_ERROR", "password": "LOGIN_ERROR",
+			"client_credentials": "CLIENT_LOGIN_ERROR", "refresh_token": "REFRESH_TOKEN_ERROR"}[grant]
+		if typ != "" {
+			h.event(r, realm, typ, &eventInfo{clientID: clientIDParam(r), err: "invalid_client_credentials",
+				details: map[string]string{"grant_type": grant}})
+		}
 		return nil, err
 	}
 	switch grant {
@@ -137,51 +156,65 @@ func (h *Handler) tokenGrant(r *http.Request) (*tokenResponse, error) {
 
 func (h *Handler) grantAuthorizationCode(r *http.Request, realm *model.Realm, client *model.Client) (*tokenResponse, error) {
 	ctx := r.Context()
+	ev := &eventInfo{client: client, details: map[string]string{"grant_type": "authorization_code"}}
+	fail := func(code string, e error) (*tokenResponse, error) {
+		ev.err = code
+		h.event(r, realm, "CODE_TO_TOKEN_ERROR", ev)
+		return nil, e
+	}
 	if !client.StandardFlowEnabled {
-		return nil, errUnauthorizedClient("Client not allowed to exchange code")
+		return fail("not_allowed", errUnauthorizedClient("Client not allowed to exchange code"))
 	}
 	code := r.PostFormValue("code")
 	if code == "" {
-		return nil, errInvalidRequest("Missing parameter: code")
+		return fail("invalid_code", errInvalidRequest("Missing parameter: code"))
 	}
 	ac, err := h.Svc.Store.ConsumeAuthCode(ctx, code)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			return nil, errInvalidGrant("Code not valid")
+			return fail("invalid_code", errInvalidGrant("Code not valid"))
 		}
 		return nil, err
 	}
+	ev.sessionID, ev.userID = ac.SessionID, ac.UserID
 	if ac.RealmID != realm.ID || ac.ClientID != client.ID {
-		return nil, errInvalidGrant("Code not valid")
+		return fail("invalid_code", errInvalidGrant("Code not valid"))
 	}
 	if h.Svc.Now().After(ac.ExpiresAt) {
-		return nil, errInvalidGrant("Code not valid")
+		return fail("expired_code", errInvalidGrant("Code not valid"))
 	}
 	if ac.RedirectURI != r.PostFormValue("redirect_uri") {
-		return nil, errInvalidGrant("Incorrect redirect_uri")
+		return fail("invalid_code", errInvalidGrant("Incorrect redirect_uri"))
 	}
 	if err := verifyPKCE(ac, r.PostFormValue("code_verifier")); err != nil {
-		return nil, err
+		return fail("invalid_code_verifier", err)
 	}
 	session, err := h.Svc.Store.GetUserSession(ctx, ac.SessionID)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			return nil, errInvalidGrant("Session not active")
+			return fail("user_session_not_found", errInvalidGrant("Session not active"))
 		}
 		return nil, err
 	}
 	if !h.Svc.SessionValid(realm, session) {
-		return nil, errInvalidGrant("Session not active")
+		return fail("user_session_not_found", errInvalidGrant("Session not active"))
 	}
 	user, err := h.Svc.Store.GetUser(ctx, realm.ID, ac.UserID)
 	if err != nil {
-		return nil, errInvalidGrant("User not found")
+		return fail("user_not_found", errInvalidGrant("User not found"))
 	}
 	if !user.Enabled {
-		return nil, errInvalidGrant("User disabled")
+		return fail("user_disabled", errInvalidGrant("User disabled"))
 	}
-	return h.issue(r, &issueRequest{realm: realm, client: client, user: user, session: session,
+	resp, err := h.issue(r, &issueRequest{realm: realm, client: client, user: user, session: session,
 		scope: ac.Scope, nonce: ac.Nonce, refresh: true})
+	if err != nil {
+		return fail(errorCode(err), err)
+	}
+	ev.details["code_id"] = ac.SessionID
+	resp.eventDetails(ev)
+	h.event(r, realm, "CODE_TO_TOKEN", ev)
+	return resp, nil
 }
 
 func verifyPKCE(ac *model.AuthCode, verifier string) error {
@@ -208,87 +241,204 @@ func verifyPKCE(ac *model.AuthCode, verifier string) error {
 	return nil
 }
 
+// errInvalidCredentials is Keycloak's response to a failed password grant.
+func errInvalidCredentials() *oauthError {
+	return &oauthError{http.StatusUnauthorized, "invalid_grant", "Invalid user credentials"}
+}
+
 func (h *Handler) grantPassword(r *http.Request, realm *model.Realm, client *model.Client) (*tokenResponse, error) {
 	ctx := r.Context()
-	if !client.DirectAccessGrantsEnabled {
-		return nil, errUnauthorizedClient("Client not allowed for direct access grants")
-	}
 	username, pw := r.PostFormValue("username"), r.PostFormValue("password")
+	ev := &eventInfo{client: client, details: map[string]string{"grant_type": "password", "auth_method": "openid-connect", "username": username}}
+	fail := func(code string, e error) (*tokenResponse, error) {
+		ev.err = code
+		h.event(r, realm, "LOGIN_ERROR", ev)
+		return nil, e
+	}
+	if !client.DirectAccessGrantsEnabled {
+		return fail("not_allowed", errUnauthorizedClient("Client not allowed for direct access grants"))
+	}
 	user, err := h.Svc.FindLoginUser(ctx, realm, username)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			return nil, errInvalidGrant("Invalid user credentials")
+			return fail("user_not_found", errInvalidCredentials())
 		}
 		return nil, err
+	}
+	ev.userID = user.ID
+	if !user.Enabled {
+		return fail("user_disabled", errInvalidGrant("Account disabled"))
+	}
+	locked, err := h.Svc.TemporarilyLocked(ctx, realm, user)
+	if err != nil {
+		return nil, err
+	}
+	if locked {
+		return fail("user_temporarily_disabled", errInvalidCredentials())
 	}
 	ok, err := h.Svc.CheckPassword(ctx, user, pw)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
-		h.Log.Info("login failed", "realm", realm.Name, "username", username, "client", client.ClientID)
-		return nil, errInvalidGrant("Invalid user credentials")
+		if err := h.Svc.LoginFailed(ctx, realm, user, clientIP(r)); err != nil {
+			return nil, err
+		}
+		return fail("invalid_user_credentials", errInvalidCredentials())
 	}
-	if !user.Enabled {
-		return nil, errInvalidGrant("Account disabled")
+	if err := h.Svc.LoginSucceeded(ctx, realm, user); err != nil {
+		return nil, err
+	}
+	if err := h.checkPasswordExpiry(r, realm, user); err != nil {
+		return nil, err
 	}
 	if len(user.RequiredActions) > 0 {
-		return nil, errInvalidGrant("Account is not fully set up")
+		return fail("resolve_required_actions", errInvalidGrant("Account is not fully set up"))
 	}
 	session, err := h.newSession(r, realm, user, client, nil)
 	if err != nil {
 		return nil, err
 	}
-	return h.issue(r, &issueRequest{realm: realm, client: client, user: user, session: session,
+	ev.sessionID = session.ID
+	resp, err := h.issue(r, &issueRequest{realm: realm, client: client, user: user, session: session,
 		scope: r.PostFormValue("scope"), strict: true, refresh: true})
+	if err != nil {
+		return fail(errorCode(err), err)
+	}
+	resp.eventDetails(ev)
+	h.event(r, realm, "LOGIN", ev)
+	return resp, nil
+}
+
+// checkPasswordExpiry adds UPDATE_PASSWORD when the forceExpiredPasswordChange
+// policy says the user's password is too old.
+func (h *Handler) checkPasswordExpiry(r *http.Request, realm *model.Realm, user *model.User) error {
+	expired, err := h.Svc.PasswordExpired(r.Context(), realm, user)
+	if err != nil || !expired {
+		return err
+	}
+	for _, a := range user.RequiredActions {
+		if a == service.ActionUpdatePassword {
+			return nil
+		}
+	}
+	user.RequiredActions = append(user.RequiredActions, service.ActionUpdatePassword)
+	return h.Svc.Store.UpdateUser(r.Context(), user)
 }
 
 func (h *Handler) grantClientCredentials(r *http.Request, realm *model.Realm, client *model.Client) (*tokenResponse, error) {
 	ctx := r.Context()
+	ev := &eventInfo{client: client, details: map[string]string{"grant_type": "client_credentials"}}
+	fail := func(code string, e error) (*tokenResponse, error) {
+		ev.err = code
+		h.event(r, realm, "CLIENT_LOGIN_ERROR", ev)
+		return nil, e
+	}
 	if client.PublicClient {
-		return nil, errUnauthorizedClient("Public client not allowed to retrieve service account")
+		return fail("invalid_client", errUnauthorizedClient("Public client not allowed to retrieve service account"))
 	}
 	if !client.ServiceAccountsEnabled {
-		return nil, errUnauthorizedClient("Client not enabled to retrieve service account")
+		return fail("invalid_client", errUnauthorizedClient("Client not enabled to retrieve service account"))
 	}
 	user, err := h.Svc.Store.GetServiceAccountUser(ctx, client.ID)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			return nil, errInvalidRequest("Service account user not found")
+			return fail("user_not_found", errInvalidRequest("Service account user not found"))
 		}
 		return nil, err
 	}
+	ev.userID = user.ID
+	ev.details["username"] = user.Username
 	if !user.Enabled {
-		return nil, errInvalidRequest("User disabled")
+		return fail("user_disabled", errInvalidRequest("User disabled"))
 	}
-	return h.issue(r, &issueRequest{realm: realm, client: client, user: user, scope: r.PostFormValue("scope"), strict: true})
+	resp, err := h.issue(r, &issueRequest{realm: realm, client: client, user: user, scope: r.PostFormValue("scope"), strict: true})
+	if err != nil {
+		return fail(errorCode(err), err)
+	}
+	resp.eventDetails(ev)
+	h.event(r, realm, "CLIENT_LOGIN", ev)
+	return resp, nil
 }
 
 func (h *Handler) grantRefreshToken(r *http.Request, realm *model.Realm, client *model.Client) (*tokenResponse, error) {
 	ctx := r.Context()
+	ev := &eventInfo{client: client, details: map[string]string{"grant_type": "refresh_token"}}
+	fail := func(code string, e error) (*tokenResponse, error) {
+		ev.err = code
+		h.event(r, realm, "REFRESH_TOKEN_ERROR", ev)
+		return nil, e
+	}
 	raw := r.PostFormValue("refresh_token")
 	if raw == "" {
-		return nil, errInvalidRequest("Missing parameter: refresh_token")
+		return fail("invalid_token", errInvalidRequest("Missing parameter: refresh_token"))
 	}
-	vt, err := h.Svc.VerifyToken(ctx, realm, raw, h.URLs.Issuer(r, realm.Name), service.TokenRefresh)
+	vt, err := h.Svc.VerifyToken(ctx, realm, raw, h.URLs.Issuer(r, realm.Name), service.TokenRefresh, service.TokenOffline)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidToken) {
-			return nil, errInvalidGrant("Invalid refresh token")
+			return fail("invalid_token", errInvalidGrant("Invalid refresh token"))
 		}
 		return nil, err
 	}
-	if vt.Claims.String("azp") != client.ClientID {
-		return nil, errInvalidGrant("Invalid refresh token. Token client and authorized client don't match")
+	if vt.User != nil {
+		ev.userID = vt.User.ID
 	}
-	if vt.Session == nil || vt.User == nil || !vt.Session.Clients[client.ID] {
-		return nil, errInvalidGrant("Session not active")
+	if vt.Claims.String("azp") != client.ClientID {
+		return fail("invalid_token", errInvalidGrant("Invalid refresh token. Token client and authorized client don't match"))
+	}
+	if vt.Session == nil || vt.User == nil {
+		return fail("invalid_token", errInvalidGrant("Session not active"))
+	}
+	ev.sessionID = vt.Session.ID
+	if !vt.Session.Clients[client.ID] {
+		return fail("invalid_token", errInvalidGrant("Session doesn't have required client"))
+	}
+	if realm.Settings.RevokeRefreshToken {
+		if err := h.checkRefreshReuse(r, realm, client, vt); err != nil {
+			return fail("invalid_token", err)
+		}
 	}
 	vt.Session.LastRefresh = h.Svc.Now()
 	if err := h.Svc.Store.UpdateUserSession(ctx, vt.Session); err != nil {
 		return nil, err
 	}
-	return h.issue(r, &issueRequest{realm: realm, client: client, user: vt.User, session: vt.Session,
+	resp, err := h.issue(r, &issueRequest{realm: realm, client: client, user: vt.User, session: vt.Session,
 		scope: vt.Claims.String("scope"), nonce: vt.Claims.String("nonce"), refresh: true})
+	if err != nil {
+		return fail(errorCode(err), err)
+	}
+	resp.eventDetails(ev)
+	ev.details["updated_refresh_token_id"] = resp.refreshJTI
+	ev.details["refresh_token_id"] = vt.Claims.String("jti")
+	h.event(r, realm, "REFRESH_TOKEN", ev)
+	return resp, nil
+}
+
+// checkRefreshReuse implements revokeRefreshToken: each refresh token may
+// be used refreshTokenMaxReuse+1 times; exceeding that removes the client
+// from the session, which invalidates every refresh token it holds.
+func (h *Handler) checkRefreshReuse(r *http.Request, realm *model.Realm, client *model.Client, vt *service.VerifiedToken) error {
+	us := vt.Session
+	if us.Notes == nil {
+		us.Notes = map[string]string{}
+	}
+	key, countKey := "refresh."+client.ID, "refresh_count."+client.ID
+	jti := vt.Claims.String("jti")
+	if us.Notes[key] != jti {
+		us.Notes[key], us.Notes[countKey] = jti, "0"
+	}
+	count, _ := strconv.Atoi(us.Notes[countKey])
+	if count > realm.Settings.RefreshTokenMaxReuse {
+		delete(us.Clients, client.ID)
+		delete(us.Notes, key)
+		delete(us.Notes, countKey)
+		if err := h.Svc.Store.UpdateUserSession(r.Context(), us); err != nil {
+			return err
+		}
+		return errInvalidGrant("Maximum allowed refresh token reuse exceeded")
+	}
+	us.Notes[countKey] = strconv.Itoa(count + 1)
+	return nil
 }
 
 // newSession starts an SSO session for user with client attached.
@@ -299,7 +449,6 @@ func (h *Handler) newSession(r *http.Request, realm *model.Realm, user *model.Us
 	if err := h.Svc.Store.CreateUserSession(r.Context(), us); err != nil {
 		return nil, err
 	}
-	h.Log.Info("login", "realm", realm.Name, "user", user.Username, "client", client.ClientID, "session", us.ID)
 	return us, nil
 }
 
@@ -316,6 +465,7 @@ func (h *Handler) userinfo(w http.ResponseWriter, r *http.Request) {
 		tok = r.PostFormValue("access_token")
 	}
 	unauthorized := func(desc string) {
+		h.event(r, realm, "USER_INFO_REQUEST_ERROR", &eventInfo{err: "invalid_token"})
 		w.Header().Set("WWW-Authenticate", `Bearer realm="`+realm.Name+`", error="invalid_token", error_description="`+desc+`"`)
 		writeJSON(w, http.StatusUnauthorized, &oauthError{Code: "invalid_token", Description: desc})
 	}
@@ -357,6 +507,11 @@ func (h *Handler) userinfo(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
+	ev := &eventInfo{client: client, userID: vt.User.ID, details: map[string]string{"auth_method": "validate_access_token", "username": vt.User.Username}}
+	if vt.Session != nil {
+		ev.sessionID = vt.Session.ID
+	}
+	h.event(r, realm, "USER_INFO_REQUEST", ev)
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -370,6 +525,7 @@ func (h *Handler) introspect(w http.ResponseWriter, r *http.Request) {
 	}
 	client, err := h.authenticateClient(r, realm)
 	if err != nil {
+		h.event(r, realm, "INTROSPECT_TOKEN_ERROR", &eventInfo{clientID: clientIDParam(r), err: "invalid_client_credentials"})
 		h.writeError(w, err)
 		return
 	}
@@ -382,7 +538,7 @@ func (h *Handler) introspect(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, errInvalidRequest("Token not provided"))
 		return
 	}
-	vt, err := h.Svc.VerifyToken(r.Context(), realm, tok, h.URLs.Issuer(r, realm.Name), "")
+	vt, err := h.Svc.VerifyToken(r.Context(), realm, tok, h.URLs.Issuer(r, realm.Name))
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidToken) {
 			writeJSON(w, http.StatusOK, map[string]any{"active": false})
@@ -401,6 +557,7 @@ func (h *Handler) introspect(w http.ResponseWriter, r *http.Request) {
 	if vt.User != nil {
 		out["username"] = vt.User.Username
 	}
+	h.event(r, realm, "INTROSPECT_TOKEN", &eventInfo{client: client})
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -423,7 +580,7 @@ func (h *Handler) revoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	vt, err := h.Svc.VerifyToken(ctx, realm, tok, h.URLs.Issuer(r, realm.Name), "")
+	vt, err := h.Svc.VerifyToken(ctx, realm, tok, h.URLs.Issuer(r, realm.Name))
 	if err != nil {
 		// RFC 7009: invalid tokens do not cause an error response.
 		if errors.Is(err, service.ErrInvalidToken) {
@@ -438,12 +595,12 @@ func (h *Handler) revoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch vt.Claims.String("typ") {
-	case service.TokenRefresh:
+	case service.TokenRefresh, service.TokenOffline:
 		// Revoking a refresh token ends the client's part of the session.
 		if s := vt.Session; s != nil {
 			delete(s.Clients, client.ID)
 			if len(s.Clients) == 0 {
-				err = h.Svc.Store.DeleteUserSession(ctx, s.ID)
+				err = h.Svc.Store.DeleteSession(ctx, s)
 			} else {
 				err = h.Svc.Store.UpdateUserSession(ctx, s)
 			}
@@ -455,5 +612,10 @@ func (h *Handler) revoke(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
+	ev := &eventInfo{client: client}
+	if vt.User != nil {
+		ev.userID = vt.User.ID
+	}
+	h.event(r, realm, "REVOKE_GRANT", ev)
 	w.WriteHeader(http.StatusOK)
 }

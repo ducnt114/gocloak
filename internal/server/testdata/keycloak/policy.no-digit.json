@@ -1,0 +1,5 @@
+{
+  "error": "invalidPasswordMinDigitsMessage",
+  "error_description": "Invalid password: must contain at least 1 numerical digits.",
+  "status": 400
+}

@@ -1,16 +1,20 @@
 package oidc
 
 import (
+	"context"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/ducnt114/gocloak/internal/jwt"
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/service"
+	"github.com/ducnt114/gocloak/internal/store"
 )
 
 func hasScope(scope, s string) bool {
@@ -33,6 +37,16 @@ type tokenResponse struct {
 	NotBeforePolicy  int    `json:"not-before-policy"`
 	SessionState     string `json:"session_state,omitempty"`
 	Scope            string `json:"scope"`
+
+	accessJTI, refreshJTI, refreshTyp string // for events
+}
+
+// eventDetails adds the token ids Keycloak records in login events.
+func (t *tokenResponse) eventDetails(ev *eventInfo) {
+	ev.details["token_id"] = t.accessJTI
+	ev.details["refresh_token_id"] = t.refreshJTI
+	ev.details["refresh_token_type"] = t.refreshTyp
+	ev.details["scope"] = t.Scope
 }
 
 // issueRequest gathers everything needed to mint tokens.
@@ -47,9 +61,22 @@ type issueRequest struct {
 	refresh bool
 }
 
-func atHash(token string) string {
-	sum := sha256.Sum256([]byte(token))
-	return base64.RawURLEncoding.EncodeToString(sum[:16])
+// atHash is the left half of the access token's hash, using the hash of
+// the ID token's signature algorithm.
+func atHash(token, alg string) string {
+	var sum []byte
+	switch alg[len(alg)-3:] {
+	case "384":
+		s := sha512.Sum384([]byte(token))
+		sum = s[:]
+	case "512":
+		s := sha512.Sum512([]byte(token))
+		sum = s[:]
+	default:
+		s := sha256.Sum256([]byte(token))
+		sum = s[:]
+	}
+	return base64.RawURLEncoding.EncodeToString(sum[:len(sum)/2])
 }
 
 func allowedOrigins(base string, c *model.Client) []string {
@@ -85,17 +112,30 @@ func (h *Handler) issue(r *http.Request, ir *issueRequest) (*tokenResponse, erro
 		ip := clientIP(r)
 		tc.notes["client_id"], tc.notes["clientHost"], tc.notes["clientAddress"] = ir.client.ClientID, ip, ip
 	}
-	kid, key, err := h.Svc.SigningKey(ctx, ir.realm.ID)
+	accessKey, err := h.Svc.SigningKey(ctx, ir.realm, ir.client.Attributes["access.token.signed.response.alg"])
 	if err != nil {
 		return nil, err
 	}
 	now := h.Svc.Now()
 	iss := h.URLs.Issuer(r, ir.realm.Name)
 	exp := now.Add(time.Duration(ir.realm.AccessTokenLifespan) * time.Second)
-	if ir.session != nil {
+	if ir.session != nil && !ir.session.Offline {
 		// An access token never outlives its SSO session.
 		if max := ir.session.Started.Add(time.Duration(ir.realm.SSOSessionMaxLifespan) * time.Second); exp.After(max) {
 			exp = max
+		}
+	}
+
+	// offline_access turns the refresh token into an offline token, backed
+	// by an offline session that survives logout.
+	session := ir.session
+	offline := ir.refresh && session != nil && (session.Offline || hasScope(scope, "offline_access"))
+	if offline && !session.Offline {
+		if !slices.Contains(tc.realmRoles, service.OfflineAccessRole) {
+			return nil, &oauthError{http.StatusBadRequest, "not_allowed", "Offline tokens not allowed for the user or client"}
+		}
+		if session, err = h.offlineSession(ctx, session, ir.client); err != nil {
+			return nil, err
 		}
 	}
 
@@ -109,19 +149,24 @@ func (h *Handler) issue(r *http.Request, ir *issueRequest) (*tokenResponse, erro
 	if err := tc.apply(ctx, at, kindAccess); err != nil {
 		return nil, err
 	}
-	access, err := jwt.Sign(at, kid, key)
+	access, err := jwt.Sign(at, accessKey)
 	if err != nil {
 		return nil, err
 	}
 	resp := &tokenResponse{
 		AccessToken: access, ExpiresIn: int(exp.Sub(now).Seconds()), TokenType: "Bearer", Scope: scope,
+		NotBeforePolicy: int(ir.realm.Settings.NotBefore), accessJTI: at.String("jti"),
 	}
 
 	if hasScope(scope, "openid") {
+		idKey, err := h.Svc.SigningKey(ctx, ir.realm, ir.client.Attributes["id.token.signed.response.alg"])
+		if err != nil {
+			return nil, err
+		}
 		idc := jwt.Claims{
 			"exp": exp.Unix(), "iat": now.Unix(), "jti": service.NewID(), "iss": iss,
 			"aud": ir.client.ClientID, "sub": ir.user.ID, "typ": service.TokenID, "azp": ir.client.ClientID,
-			"at_hash": atHash(access),
+			"at_hash": atHash(access, idKey.Alg),
 		}
 		if ir.nonce != "" {
 			idc["nonce"] = ir.nonce
@@ -132,31 +177,74 @@ func (h *Handler) issue(r *http.Request, ir *issueRequest) (*tokenResponse, erro
 		if err := tc.apply(ctx, idc, kindID); err != nil {
 			return nil, err
 		}
-		if resp.IDToken, err = jwt.Sign(idc, kid, key); err != nil {
+		if resp.IDToken, err = jwt.Sign(idc, idKey); err != nil {
 			return nil, err
 		}
 	}
 
-	if ir.refresh && ir.session != nil {
-		rexp := now.Add(time.Duration(ir.realm.SSOSessionIdleTimeout) * time.Second)
-		if max := ir.session.Started.Add(time.Duration(ir.realm.SSOSessionMaxLifespan) * time.Second); rexp.After(max) {
-			rexp = max
+	if ir.refresh && session != nil {
+		refreshKey, err := h.Svc.SigningKey(ctx, ir.realm, "HS512")
+		if err != nil {
+			return nil, err
 		}
 		rc := jwt.Claims{
-			"exp": rexp.Unix(), "iat": now.Unix(), "jti": service.NewID(), "iss": iss, "aud": iss,
-			"sub": ir.user.ID, "typ": service.TokenRefresh, "azp": ir.client.ClientID, "sid": ir.session.ID,
-			"scope": scope,
+			"iat": now.Unix(), "jti": service.NewID(), "iss": iss, "aud": iss,
+			"sub": ir.user.ID, "typ": service.TokenRefresh, "azp": ir.client.ClientID, "sid": session.ID,
+			"scope": tc.allScopes(hasScope(scope, "openid")),
+		}
+		if ir.realm.Settings.RevokeRefreshToken {
+			rc["reuse_id"] = service.NewID()
+		}
+		if offline {
+			rc["typ"] = service.TokenOffline
+			if ir.realm.Settings.OfflineSessionMaxLifespanEnabled {
+				rexp := session.Started.Add(time.Duration(ir.realm.Settings.OfflineSessionMaxLifespan) * time.Second)
+				rc["exp"] = rexp.Unix()
+				resp.RefreshExpiresIn = int(rexp.Sub(now).Seconds())
+			}
+		} else {
+			rexp := now.Add(time.Duration(ir.realm.SSOSessionIdleTimeout) * time.Second)
+			if max := session.Started.Add(time.Duration(ir.realm.SSOSessionMaxLifespan) * time.Second); rexp.After(max) {
+				rexp = max
+			}
+			rc["exp"] = rexp.Unix()
+			resp.RefreshExpiresIn = int(rexp.Sub(now).Seconds())
 		}
 		if ir.nonce != "" {
 			rc["nonce"] = ir.nonce
 		}
-		if resp.RefreshToken, err = jwt.Sign(rc, kid, key); err != nil {
+		if resp.RefreshToken, err = jwt.Sign(rc, refreshKey); err != nil {
 			return nil, err
 		}
-		resp.RefreshExpiresIn = int(rexp.Sub(now).Seconds())
-		resp.SessionState = ir.session.ID
+		resp.SessionState = session.ID
+		resp.refreshJTI, resp.refreshTyp = rc.String("jti"), rc.String("typ")
 	}
 	return resp, nil
+}
+
+// offlineSession returns the offline copy of an SSO session (same id, as
+// in Keycloak), creating it or attaching client to it.
+func (h *Handler) offlineSession(ctx context.Context, us *model.UserSession, client *model.Client) (*model.UserSession, error) {
+	off, err := h.Svc.Store.GetSession(ctx, us.ID, true)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		off = &model.UserSession{ID: us.ID, RealmID: us.RealmID, UserID: us.UserID, IPAddress: us.IPAddress,
+			Started: h.Svc.Now(), LastRefresh: h.Svc.Now(), Clients: map[string]bool{client.ID: true}, Notes: map[string]string{}, Offline: true}
+		for k, v := range us.Notes {
+			off.Notes[k] = v
+		}
+		return off, h.Svc.Store.CreateUserSession(ctx, off)
+	case err != nil:
+		return nil, err
+	}
+	if !off.Clients[client.ID] {
+		off.Clients[client.ID] = true
+		off.LastRefresh = h.Svc.Now()
+		if err := h.Svc.Store.UpdateUserSession(ctx, off); err != nil {
+			return nil, err
+		}
+	}
+	return off, nil
 }
 
 func clientIP(r *http.Request) string {

@@ -56,6 +56,7 @@ type ClientRep struct {
 	PublicClient              *bool               `json:"publicClient,omitempty"`
 	BearerOnly                *bool               `json:"bearerOnly,omitempty"`
 	ClientAuthenticatorType   *string             `json:"clientAuthenticatorType,omitempty"`
+	NotBefore                 *int64              `json:"notBefore,omitempty"`
 	Secret                    *string             `json:"secret,omitempty"`
 	RootURL                   *string             `json:"rootUrl,omitempty"`
 	BaseURL                   *string             `json:"baseUrl,omitempty"`
@@ -160,6 +161,12 @@ type ClientMappingsRep struct {
 	Mappings []RoleRep `json:"mappings"`
 }
 
+// NewRealmRep returns a realm representation pre-filled with Keycloak's
+// default settings; decode a realm JSON into it so absent keys keep them.
+func NewRealmRep() RealmRep {
+	return RealmRep{RealmSettings: model.DefaultRealmSettings()}
+}
+
 func ptr[T any](v T) *T { return &v }
 
 func set[T any](dst *T, src *T) {
@@ -207,8 +214,8 @@ func clientToRep(c *model.Client) ClientRep {
 	return ClientRep{
 		ID: ptr(c.ID), ClientID: ptr(c.ClientID), Name: ptr(c.Name), Description: ptr(c.Description),
 		Enabled: ptr(c.Enabled), PublicClient: ptr(c.PublicClient), BearerOnly: ptr(c.BearerOnly),
-		ClientAuthenticatorType: ptr("client-secret"),
-		RootURL:                 ptr(c.RootURL), BaseURL: ptr(c.BaseURL), RedirectURIs: nonNil(c.RedirectURIs), WebOrigins: nonNil(c.WebOrigins),
+		ClientAuthenticatorType: ptr(authenticatorType(c)), NotBefore: ptr(c.NotBefore),
+		RootURL: ptr(c.RootURL), BaseURL: ptr(c.BaseURL), RedirectURIs: nonNil(c.RedirectURIs), WebOrigins: nonNil(c.WebOrigins),
 		StandardFlowEnabled: ptr(c.StandardFlowEnabled), ImplicitFlowEnabled: ptr(false),
 		DirectAccessGrantsEnabled: ptr(c.DirectAccessGrantsEnabled), ServiceAccountsEnabled: ptr(c.ServiceAccountsEnabled),
 		ConsentRequired: ptr(false), FullScopeAllowed: ptr(c.FullScopeAllowed), Protocol: ptr(c.Protocol),
@@ -271,6 +278,8 @@ func applyClientRep(c *model.Client, rep *ClientRep) {
 	set(&c.ServiceAccountsEnabled, rep.ServiceAccountsEnabled)
 	set(&c.FullScopeAllowed, rep.FullScopeAllowed)
 	set(&c.Protocol, rep.Protocol)
+	set(&c.ClientAuthenticatorType, rep.ClientAuthenticatorType)
+	set(&c.NotBefore, rep.NotBefore)
 	if rep.Attributes != nil {
 		c.Attributes = rep.Attributes
 	}
@@ -406,4 +415,11 @@ func splitPath(p string) []string {
 		}
 	}
 	return out
+}
+
+func authenticatorType(c *model.Client) string {
+	if c.ClientAuthenticatorType == "" {
+		return "client-secret"
+	}
+	return c.ClientAuthenticatorType
 }

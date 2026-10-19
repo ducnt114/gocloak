@@ -169,6 +169,8 @@ type migration struct {
 // version sequence with the SQL files.
 var goMigrations = []migration{
 	{version: 4, name: "0004_backfill_user_attributes", fn: backfillUserAttributes},
+	{version: 7, name: "0007_realm_settings_defaults", fn: migrateRealmSettingsDefaults},
+	{version: 8, name: "0008_key_components", fn: migrateRealmKeys},
 }
 
 func loadMigrations() ([]migration, error) {

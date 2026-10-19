@@ -3,7 +3,6 @@
 package oidc
 
 import (
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -59,6 +58,8 @@ type Handler struct {
 	Svc  *service.Service
 	URLs URLs
 	Log  *slog.Logger
+
+	jwks jwksCache
 }
 
 // Register adds the OIDC routes to mux.
@@ -139,46 +140,6 @@ func (h *Handler) realm(r *http.Request) (*model.Realm, error) {
 		return nil, &oauthError{http.StatusNotFound, "not_found", "Realm not enabled"}
 	}
 	return realm, nil
-}
-
-// authenticateClient implements client_secret_basic and client_secret_post.
-// Public clients only need to identify themselves.
-func (h *Handler) authenticateClient(r *http.Request, realm *model.Realm) (*model.Client, error) {
-	id, secret, hasBasic := r.BasicAuth()
-	if hasBasic {
-		var err error
-		if id, err = url.QueryUnescape(id); err != nil {
-			return nil, errInvalidClient("Invalid client credentials")
-		}
-		if secret, err = url.QueryUnescape(secret); err != nil {
-			return nil, errInvalidClient("Invalid client credentials")
-		}
-	} else {
-		id, secret = r.PostFormValue("client_id"), r.PostFormValue("client_secret")
-	}
-	if id == "" {
-		return nil, errInvalidClient("Missing client_id parameter")
-	}
-	c, err := h.Svc.Store.GetClientByClientID(r.Context(), realm.ID, id)
-	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return nil, errInvalidClient("Invalid client or Invalid client credentials")
-		}
-		return nil, err
-	}
-	if !c.Enabled {
-		return nil, errInvalidClient("Invalid client or Invalid client credentials")
-	}
-	if c.BearerOnly {
-		return nil, errUnauthorizedClient("Bearer-only not allowed")
-	}
-	if c.PublicClient {
-		return c, nil
-	}
-	if secret == "" || subtle.ConstantTimeCompare([]byte(secret), []byte(c.Secret)) != 1 {
-		return nil, errInvalidClient("Invalid client or Invalid client credentials")
-	}
-	return c, nil
 }
 
 func bearerToken(r *http.Request) string {

@@ -1,0 +1,17 @@
+[
+  {
+    "error": "invalid_grant",
+    "error_description": "Invalid user credentials",
+    "status": 401
+  },
+  {
+    "error": "invalid_grant",
+    "error_description": "Invalid user credentials",
+    "status": 401
+  },
+  {
+    "error": "invalid_grant",
+    "error_description": "Invalid user credentials",
+    "status": 401
+  }
+]

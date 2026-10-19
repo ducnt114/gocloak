@@ -89,6 +89,19 @@ func newTokenContext(ctx context.Context, svc *service.Service, base string, rea
 	return tc, claim, nil
 }
 
+// allScopes is the "scope" claim of refresh tokens: every applied client
+// scope, including those not listed in access tokens (roles, acr...).
+func (tc *tokenContext) allScopes(openid bool) string {
+	var names []string
+	if openid {
+		names = append(names, "openid")
+	}
+	for _, s := range tc.scopes {
+		names = append(names, s.Name)
+	}
+	return strings.Join(names, " ")
+}
+
 // resolveScopes returns the client scopes applied for a requested scope
 // parameter (the client's default scopes plus the requested optional ones),
 // the resulting "scope" claim, and the requested names the client may not use.

@@ -29,6 +29,10 @@ type Config struct {
 	AdminPassword string
 	ImportDir     string
 	Log           *slog.Logger
+	// RateLimit is the sustained number of requests per second allowed per
+	// client IP on the protocol and admin endpoints (0 disables limiting).
+	RateLimit float64
+	RateBurst int
 }
 
 // Server is a running gocloak instance.
@@ -55,6 +59,7 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 	svc := service.New(st)
+	svc.Log = cfg.Log
 	s := &Server{Svc: svc, Log: cfg.Log}
 
 	createdMaster, err := svc.Bootstrap(ctx, cfg.AdminUser, cfg.AdminPassword)
@@ -88,7 +93,11 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /health/live", s.health)
 	mux.HandleFunc("GET /health/ready", s.health)
 	mux.HandleFunc("GET /{$}", s.welcome)
-	s.handler = s.logRequests(mux)
+	var h http.Handler = mux
+	if cfg.RateLimit > 0 {
+		h = newRateLimiter(cfg.RateLimit, cfg.RateBurst, cfg.ProxyHeaders).wrap(h)
+	}
+	s.handler = s.logRequests(h)
 	return s, nil
 }
 
@@ -105,16 +114,22 @@ func (s *Server) ImportFile(ctx context.Context, path string) error {
 		return err
 	}
 	// A file may hold a single realm or a list of realms.
-	var reps []admin.RealmRep
+	var raws []json.RawMessage
 	if trimmed := strings.TrimSpace(string(b)); strings.HasPrefix(trimmed, "[") {
-		err = json.Unmarshal(b, &reps)
+		err = json.Unmarshal(b, &raws)
 	} else {
-		var rep admin.RealmRep
-		err = json.Unmarshal(b, &rep)
-		reps = []admin.RealmRep{rep}
+		raws = []json.RawMessage{b}
 	}
 	if err != nil {
 		return fmt.Errorf("%s: %w", path, err)
+	}
+	var reps []admin.RealmRep
+	for _, raw := range raws {
+		rep := admin.NewRealmRep() // absent settings keep Keycloak's defaults
+		if err := json.Unmarshal(raw, &rep); err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		reps = append(reps, rep)
 	}
 	for i := range reps {
 		rep := &reps[i]
@@ -191,6 +206,9 @@ func (s *Server) RunJanitor(ctx context.Context, every time.Duration) {
 		case <-t.C:
 			if err := s.Svc.Store.PurgeExpired(ctx, s.Svc.Now()); err != nil && ctx.Err() == nil {
 				s.Log.Error("purge expired", "err", err)
+			}
+			if err := s.Svc.PurgeExpiredEvents(ctx); err != nil && ctx.Err() == nil {
+				s.Log.Error("purge events", "err", err)
 			}
 		}
 	}

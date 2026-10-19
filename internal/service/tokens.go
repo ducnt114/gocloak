@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/rsa"
 	"errors"
 
 	"github.com/ducnt114/gocloak/internal/jwt"
@@ -15,6 +14,7 @@ const (
 	TokenBearer  = "Bearer"
 	TokenID      = "ID"
 	TokenRefresh = "Refresh"
+	TokenOffline = "Offline"
 	TokenCookie  = "Serialized-ID"
 )
 
@@ -25,27 +25,46 @@ var ErrInvalidToken = errors.New("invalid token")
 // VerifiedToken is a token that passed VerifyToken.
 type VerifiedToken struct {
 	Claims  jwt.Claims
-	User    *model.User        // nil if the subject no longer exists
+	User    *model.User        // nil if the token has no subject
 	Session *model.UserSession // nil for session-less tokens (client credentials)
 }
 
-// VerifyToken checks signature, issuer, type, expiry and revocation of a
-// token issued by realm, and that its user and SSO session are still valid.
-func (s *Service) VerifyToken(ctx context.Context, realm *model.Realm, token, issuer, typ string) (*VerifiedToken, error) {
-	keys, err := s.PublicKeys(ctx, realm.ID)
-	if err != nil {
-		return nil, err
-	}
-	claims, err := jwt.Verify(token, func(kid string) *rsa.PublicKey { return keys[kid] })
+// VerifyToken checks signature, issuer, type, expiry, not-before policies
+// and revocation of a token issued by realm, and that its user and session
+// are still valid. typs lists the accepted "typ" values (any when empty).
+func (s *Service) VerifyToken(ctx context.Context, realm *model.Realm, token, issuer string, typs ...string) (*VerifiedToken, error) {
+	claims, err := jwt.Verify(token, func(kid, alg string) *jwt.Key { return s.VerificationKey(ctx, realm.ID, kid, alg) })
 	if err != nil {
 		return nil, ErrInvalidToken
+	}
+	typ := claims.String("typ")
+	if len(typs) > 0 {
+		ok := false
+		for _, t := range typs {
+			ok = ok || t == typ
+		}
+		if !ok {
+			return nil, ErrInvalidToken
+		}
 	}
 	now := s.Now().Unix()
-	if claims.String("iss") != issuer || claims.Int("exp") < now {
+	if claims.String("iss") != issuer {
 		return nil, ErrInvalidToken
 	}
-	if typ != "" && claims.String("typ") != typ {
+	// Offline tokens have no expiry unless the realm sets a max lifespan.
+	if _, hasExp := claims["exp"]; hasExp || typ != TokenOffline {
+		if claims.Int("exp") < now {
+			return nil, ErrInvalidToken
+		}
+	}
+	iat := claims.Int("iat")
+	if iat < realm.Settings.NotBefore {
 		return nil, ErrInvalidToken
+	}
+	if azp := claims.String("azp"); azp != "" {
+		if c, err := s.Store.GetClientByClientID(ctx, realm.ID, azp); err == nil && iat < c.NotBefore {
+			return nil, ErrInvalidToken
+		}
 	}
 	if jti := claims.String("jti"); jti != "" {
 		revoked, err := s.Store.IsTokenRevoked(ctx, jti)
@@ -65,23 +84,42 @@ func (s *Service) VerifyToken(ctx context.Context, realm *model.Realm, token, is
 			}
 			return nil, err
 		}
-		if !u.Enabled || (u.NotBefore > 0 && claims.Int("iat") < u.NotBefore) {
+		if !u.Enabled || (u.NotBefore > 0 && iat < u.NotBefore) {
 			return nil, ErrInvalidToken
 		}
 		vt.User = u
 	}
 	if sid := claims.String("sid"); sid != "" {
-		us, err := s.Store.GetUserSession(ctx, sid)
+		us, err := s.tokenSession(ctx, sid, typ)
 		if err != nil {
-			if errors.Is(err, store.ErrNotFound) {
-				return nil, ErrInvalidToken
-			}
 			return nil, err
 		}
-		if us.RealmID != realm.ID || !s.SessionValid(realm, us) {
+		if us == nil || us.RealmID != realm.ID || !s.SessionValid(realm, us) {
 			return nil, ErrInvalidToken
 		}
 		vt.Session = us
 	}
 	return vt, nil
+}
+
+// tokenSession finds the session a token belongs to: offline tokens use
+// offline sessions, cookies online ones, and access/ID tokens either.
+func (s *Service) tokenSession(ctx context.Context, sid, typ string) (*model.UserSession, error) {
+	order := []bool{false, true}
+	switch typ {
+	case TokenOffline:
+		order = []bool{true}
+	case TokenRefresh, TokenCookie:
+		order = []bool{false}
+	}
+	for _, offline := range order {
+		us, err := s.Store.GetSession(ctx, sid, offline)
+		if err == nil {
+			return us, nil
+		}
+		if !errors.Is(err, store.ErrNotFound) {
+			return nil, err
+		}
+	}
+	return nil, nil
 }

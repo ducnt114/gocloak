@@ -169,6 +169,10 @@ func (s *Store) ListCredentials(ctx context.Context, userID string) ([]*model.Cr
 		FROM credentials WHERE user_id=? ORDER BY priority, created_date`, userID)
 }
 
+func (s *Store) UpdateCredentialSecret(ctx context.Context, id, secretData, credentialData string) error {
+	return s.execOne(ctx, `UPDATE credentials SET secret_data=?, credential_data=? WHERE id=?`, secretData, credentialData, id)
+}
+
 func (s *Store) DeleteCredential(ctx context.Context, userID, id string) error {
 	return s.execOne(ctx, `DELETE FROM credentials WHERE user_id=? AND id=?`, userID, id)
 }

@@ -1,7 +1,6 @@
 package oidc
 
 import (
-	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/ducnt114/gocloak/internal/jwt"
 	"github.com/ducnt114/gocloak/internal/model"
+	"github.com/ducnt114/gocloak/internal/policy"
 	"github.com/ducnt114/gocloak/internal/service"
 	"github.com/ducnt114/gocloak/internal/store"
 )
@@ -186,25 +186,55 @@ func (h *Handler) loginAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	username, pw := strings.TrimSpace(r.PostFormValue("username")), r.PostFormValue("password")
+	ev := &eventInfo{client: client, details: map[string]string{"auth_method": "openid-connect", "auth_type": "code",
+		"redirect_uri": as.Params["redirect_uri"], "username": username}}
+	fail := func(code, msg string) {
+		ev.err = code
+		h.event(r, realm, "LOGIN_ERROR", ev)
+		h.renderLogin(w, r, realm, as, username, msg, http.StatusUnauthorized)
+	}
 	user, err := h.Svc.FindLoginUser(ctx, realm, username)
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		h.serverErrorPage(w, r, err)
 		return
 	}
-	ok := false
-	if user != nil {
-		if ok, err = h.Svc.CheckPassword(ctx, user, pw); err != nil {
+	if user == nil {
+		fail("user_not_found", "Invalid username or password.")
+		return
+	}
+	ev.userID = user.ID
+	if !user.Enabled {
+		fail("user_disabled", "Account is disabled, contact your administrator.")
+		return
+	}
+	locked, err := h.Svc.TemporarilyLocked(ctx, realm, user)
+	if err != nil {
+		h.serverErrorPage(w, r, err)
+		return
+	}
+	if locked {
+		fail("user_temporarily_disabled", "Invalid username or password.")
+		return
+	}
+	ok, err := h.Svc.CheckPassword(ctx, user, pw)
+	if err != nil {
+		h.serverErrorPage(w, r, err)
+		return
+	}
+	if !ok {
+		if err := h.Svc.LoginFailed(ctx, realm, user, clientIP(r)); err != nil {
 			h.serverErrorPage(w, r, err)
 			return
 		}
-	}
-	if !ok {
-		h.Log.Info("login failed", "realm", realm.Name, "username", username, "client", client.ClientID)
-		h.renderLogin(w, r, realm, as, username, "Invalid username or password.", http.StatusUnauthorized)
+		fail("invalid_user_credentials", "Invalid username or password.")
 		return
 	}
-	if !user.Enabled {
-		h.renderLogin(w, r, realm, as, username, "Account is disabled, contact your administrator.", http.StatusUnauthorized)
+	if err := h.Svc.LoginSucceeded(ctx, realm, user); err != nil {
+		h.serverErrorPage(w, r, err)
+		return
+	}
+	if err := h.checkPasswordExpiry(r, realm, user); err != nil {
+		h.serverErrorPage(w, r, err)
 		return
 	}
 	as.UserID = user.ID
@@ -269,9 +299,19 @@ func (h *Handler) requiredAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.Svc.SetPassword(ctx, h.Svc.Store, user, pw, false); err != nil {
+		var pe *policy.Error
+		if errors.As(err, &pe) {
+			h.event(r, realm, "UPDATE_PASSWORD_ERROR", &eventInfo{client: client, userID: user.ID, err: "password_rejected"})
+			h.render(w, http.StatusBadRequest, "update-password", pageData{
+				Realm: realmTitle(realm), Title: "Update password", Error: pe.Message,
+				Action: h.loginActionURL(r, realm, "required-action", as.ID),
+			})
+			return
+		}
 		h.serverErrorPage(w, r, err)
 		return
 	}
+	h.event(r, realm, "UPDATE_PASSWORD", &eventInfo{client: client, userID: user.ID})
 	h.continueLogin(w, r, realm, client, user, as)
 }
 
@@ -308,6 +348,9 @@ func (h *Handler) finishLogin(w http.ResponseWriter, r *http.Request, realm *mod
 		h.serverErrorPage(w, r, err)
 		return
 	}
+	h.event(r, realm, "LOGIN", &eventInfo{client: client, userID: user.ID, sessionID: us.ID, details: map[string]string{
+		"auth_method": "openid-connect", "auth_type": "code", "redirect_uri": params["redirect_uri"],
+		"consent": "no_consent_required", "code_id": us.ID, "username": user.Username}})
 	h.redirectResult(w, r, params["redirect_uri"], params["response_mode"], url.Values{
 		"code": {code.Code}, "state": {params["state"]}, "session_state": {us.ID}, "iss": {h.URLs.Issuer(r, realm.Name)},
 	})
@@ -353,7 +396,7 @@ func (h *Handler) clearCookie(w http.ResponseWriter, r *http.Request, realm *mod
 // is signed so that knowing a session id (the "sid" claim) is not enough to
 // hijack a session.
 func (h *Handler) setIdentityCookie(w http.ResponseWriter, r *http.Request, realm *model.Realm, user *model.User, us *model.UserSession) error {
-	kid, key, err := h.Svc.SigningKey(r.Context(), realm.ID)
+	key, err := h.Svc.SigningKey(r.Context(), realm, "HS512")
 	if err != nil {
 		return err
 	}
@@ -361,7 +404,7 @@ func (h *Handler) setIdentityCookie(w http.ResponseWriter, r *http.Request, real
 	tok, err := jwt.Sign(jwt.Claims{
 		"typ": service.TokenCookie, "iss": h.URLs.Issuer(r, realm.Name), "sub": user.ID, "sid": us.ID,
 		"exp": exp.Unix(), "iat": h.Svc.Now().Unix(), "jti": service.NewID(),
-	}, kid, key)
+	}, key)
 	if err != nil {
 		return err
 	}
@@ -401,12 +444,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	var client *model.Client
 	if hint := r.FormValue("id_token_hint"); hint != "" {
 		// Expired ID tokens are acceptable as hints, so only the signature is checked.
-		keys, err := h.Svc.PublicKeys(ctx, realm.ID)
-		if err != nil {
-			h.serverErrorPage(w, r, err)
-			return
-		}
-		claims, err := jwt.Verify(hint, func(kid string) *rsa.PublicKey { return keys[kid] })
+		claims, err := jwt.Verify(hint, func(kid, alg string) *jwt.Key { return h.Svc.VerificationKey(ctx, realm.ID, kid, alg) })
 		if err != nil || claims.String("iss") != h.URLs.Issuer(r, realm.Name) {
 			h.errorPage(w, r, http.StatusBadRequest, "Invalid parameter: id_token_hint")
 			return
@@ -450,7 +488,8 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 			h.serverErrorPage(w, r, err)
 			return
 		}
-		h.Log.Info("logout", "realm", realm.Name, "session", us.ID)
+		h.event(r, realm, "LOGOUT", &eventInfo{client: client, userID: us.UserID, sessionID: us.ID,
+			details: map[string]string{"redirect_uri": redirect}})
 	}
 	h.clearCookie(w, r, realm, identityCookie)
 	if redirect != "" {
@@ -486,7 +525,7 @@ func (h *Handler) backchannelLogout(w http.ResponseWriter, r *http.Request, real
 		h.writeError(w, err)
 		return
 	}
-	vt, err := h.Svc.VerifyToken(r.Context(), realm, r.PostFormValue("refresh_token"), h.URLs.Issuer(r, realm.Name), service.TokenRefresh)
+	vt, err := h.Svc.VerifyToken(r.Context(), realm, r.PostFormValue("refresh_token"), h.URLs.Issuer(r, realm.Name), service.TokenRefresh, service.TokenOffline)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidToken) {
 			h.writeError(w, errInvalidGrant("Invalid refresh token"))
@@ -500,10 +539,11 @@ func (h *Handler) backchannelLogout(w http.ResponseWriter, r *http.Request, real
 		return
 	}
 	if vt.Session != nil {
-		if err := h.Svc.Store.DeleteUserSession(r.Context(), vt.Session.ID); err != nil {
+		if err := h.Svc.Store.DeleteSession(r.Context(), vt.Session); err != nil {
 			h.writeError(w, err)
 			return
 		}
+		h.event(r, realm, "LOGOUT", &eventInfo{client: client, userID: vt.Session.UserID, sessionID: vt.Session.ID})
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

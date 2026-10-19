@@ -78,7 +78,8 @@ func (h Hasher) Hash(password string) (secretData, credentialData string, err er
 			return "", "", err
 		}
 		if cd.HashIterations <= 0 {
-			cd.HashIterations = 210000
+			// Keycloak's defaults per algorithm (OWASP recommendations).
+			cd.HashIterations = map[string]int{"pbkdf2-sha512": 210000, "pbkdf2-sha256": 600000, "pbkdf2": 1300000}[h.Algorithm]
 		}
 		sum, err = pbkdf2.Key(hf, password, salt, cd.HashIterations, 64)
 		if err != nil {
@@ -159,4 +160,11 @@ func pbkdf2Hash(alg string) (func() hash.Hash, error) {
 		return sha1.New, nil
 	}
 	return nil, errors.New("unsupported password hash algorithm: " + alg)
+}
+
+// Params returns the algorithm and iteration count of a stored credential.
+func Params(credentialData string) (algorithm string, iterations int) {
+	var cd CredentialData
+	json.Unmarshal([]byte(credentialData), &cd)
+	return cd.Algorithm, cd.HashIterations
 }

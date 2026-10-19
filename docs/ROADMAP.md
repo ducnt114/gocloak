@@ -86,7 +86,7 @@ scope is left for when organizations exist. Found while comparing: Keycloak 26
 drops user attributes that are not declared in its user profile; gocloak keeps
 them. A declarative user profile is added to M3.
 
-## M2 — Security hardening (M)
+## M2 — Security hardening (M) ✅ done
 
 - **Brute force detection**: per-user failure counting with Keycloak's settings
   (`bruteForceProtected`, `failureFactor`, `waitIncrementSeconds`,
@@ -119,6 +119,12 @@ them. A declarative user profile is added to M3.
 Acceptance: a scripted password-guessing run is locked out per policy; offline
 tokens keep working after SSO logout and stop after revocation; key rotation
 keeps previously issued tokens verifiable.
+
+Done notes: behaviour checked against Keycloak 26.0.7 (policy error bodies,
+lockout responses, refresh/offline token claims, reuse errors) and recorded as
+golden files. Not done: `tls_client_auth` (needs mTLS termination), AES and
+RSA-OAEP keys (only used for encrypted tokens), `quickLoginCheck` with
+millisecond-exact Keycloak timing beyond what the golden scenarios cover.
 
 ## M3 — Account lifecycle and MFA (L)
 
@@ -276,8 +282,6 @@ To fix opportunistically, at the latest in the milestone noted:
 - `EffectiveRoles` loads all roles and composite edges of a realm on every
   call, and admin requests recompute the caller's roles each time (M11).
 - Admin API has no CORS support for browser-based tools (M7).
-- Refresh tokens are signed with RS256; Keycloak uses HS512. Harmless for
-  clients, but revisit with key providers (M2).
 - Sessions and auth codes live in the database; fine for one node, revisit for
   clustering (M11).
 - Admin error messages only partly match Keycloak's wording (ongoing).

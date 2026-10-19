@@ -34,6 +34,7 @@ type Handler struct {
 type httpError struct {
 	status int
 	msg    string
+	key    string // Keycloak message key, e.g. invalidPasswordMinLengthMessage
 }
 
 func (e *httpError) Error() string { return e.msg }
@@ -81,6 +82,7 @@ type principal struct {
 	createRealm bool            // master realm "create-realm"
 	mgmtRoles   map[string]bool // realm-management roles in principal's realm
 	mgmtClient  string          // realm-management client UUID of principal's realm
+	clientUUID  string          // client the token was issued to
 }
 
 // can reports whether the caller holds perm in the realm target.
@@ -173,6 +175,9 @@ func (h *Handler) authenticate(r *http.Request) (*principal, error) {
 	if mgmt != nil {
 		p.mgmtClient = mgmt.ID
 	}
+	if c, err := h.Svc.Store.GetClientByClientID(ctx, realm.ID, vt.Claims.String("azp")); err == nil {
+		p.clientUUID = c.ID
+	}
 	for _, role := range roles {
 		switch {
 		case role.ClientID == "" && realm.Name == service.MasterRealm && role.Name == service.AdminRole:
@@ -186,38 +191,81 @@ func (h *Handler) authenticate(r *http.Request) (*principal, error) {
 	return p, nil
 }
 
+// recorder captures the status and Location of a response.
+type recorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *recorder) WriteHeader(code int) {
+	if r.status == 0 {
+		r.status = code
+	}
+	r.ResponseWriter.WriteHeader(code)
+}
+
+func (r *recorder) Write(b []byte) (int, error) {
+	if r.status == 0 {
+		r.status = http.StatusOK
+	}
+	return r.ResponseWriter.Write(b)
+}
+
 func (h *Handler) wrap(fn handlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p, err := h.authenticate(r)
-		if err == nil {
-			err = fn(w, r, p)
-		}
 		if err != nil {
 			h.writeError(w, r, err)
+			return
+		}
+		body := readBody(r)
+		rec := &recorder{ResponseWriter: w}
+		if err := fn(rec, r, p); err != nil {
+			h.writeError(rec, r, err)
+			return
+		}
+		if r.Method != http.MethodGet && rec.status < 300 && !strings.HasSuffix(r.URL.Path, "/partial-export") {
+			h.recordAdminEvent(r, p, body, rec.Header().Get("Location"))
 		}
 	}
 }
 
+func (h *Handler) recordAdminEvent(r *http.Request, p *principal, body []byte, location string) {
+	realmName, e := adminEventFor(r, p, body, location)
+	realm, err := h.Svc.Store.GetRealmByName(r.Context(), realmName)
+	if err != nil {
+		return // e.g. the realm was just deleted
+	}
+	h.Svc.RecordAdminEvent(r.Context(), realm, e)
+}
+
 func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	var he *httpError
+	if pe, ok := policyError(err); ok {
+		he = pe
+	}
 	switch {
+	case he != nil:
 	case errors.As(err, &he):
 	case errors.Is(err, store.ErrNotFound):
-		he = &httpError{http.StatusNotFound, "Resource not found"}
+		he = &httpError{status: http.StatusNotFound, msg: "Resource not found"}
 	case errors.Is(err, store.ErrConflict):
 		msg := strings.TrimPrefix(err.Error(), store.ErrConflict.Error()+": ")
 		if strings.Contains(msg, "constraint failed") {
 			msg = "Conflict detected. See logs for details"
 		}
-		he = &httpError{http.StatusConflict, msg}
+		he = &httpError{status: http.StatusConflict, msg: msg}
 	case errors.Is(err, service.ErrValidation):
-		he = &httpError{http.StatusBadRequest, strings.TrimPrefix(err.Error(), service.ErrValidation.Error()+": ")}
+		he = &httpError{status: http.StatusBadRequest, msg: strings.TrimPrefix(err.Error(), service.ErrValidation.Error()+": ")}
 	default:
 		h.Log.Error("admin api error", "method", r.Method, "path", r.URL.Path, "err", err)
-		he = &httpError{http.StatusInternalServerError, "unknown_error"}
+		he = &httpError{status: http.StatusInternalServerError, msg: "unknown_error"}
 	}
 	body := map[string]string{"error": he.msg}
-	if he.status == http.StatusBadRequest || he.status == http.StatusConflict {
+	switch {
+	case he.key != "":
+		body = map[string]string{"error": he.key, "error_description": he.msg}
+	case he.status == http.StatusBadRequest || he.status == http.StatusConflict:
 		body = map[string]string{"errorMessage": he.msg}
 	}
 	if he.status == http.StatusUnauthorized {
@@ -328,6 +376,25 @@ func (h *Handler) Register(mux *http.ServeMux) {
 		{"POST " + R + "/logout-all", h.logoutAll},
 		{"GET " + R + "/keys", h.getKeys},
 		{"POST " + R + "/partial-export", h.partialExport},
+		{"POST " + R + "/push-revocation", h.pushRevocation},
+		{"GET " + R + "/components", h.listComponents},
+		{"POST " + R + "/components", h.createComponent},
+		{"GET " + R + "/components/{id}", h.getComponent},
+		{"PUT " + R + "/components/{id}", h.updateComponent},
+		{"DELETE " + R + "/components/{id}", h.deleteComponent},
+		{"GET " + R + "/attack-detection/brute-force/users/{id}", h.bruteForceStatus},
+		{"DELETE " + R + "/attack-detection/brute-force/users/{id}", h.clearBruteForceUser},
+		{"DELETE " + R + "/attack-detection/brute-force/users", h.clearBruteForce},
+		{"GET " + R + "/events", h.listEvents},
+		{"DELETE " + R + "/events", h.deleteEvents},
+		{"GET " + R + "/events/config", h.getEventsConfig},
+		{"PUT " + R + "/events/config", h.updateEventsConfig},
+		{"GET " + R + "/admin-events", h.listAdminEvents},
+		{"DELETE " + R + "/admin-events", h.deleteAdminEvents},
+		{"GET " + R + "/users/{id}/offline-sessions/{client}", h.userOfflineSessions},
+		{"GET " + R + "/users/{id}/consents", h.userConsents},
+		{"DELETE " + R + "/users/{id}/consents/{client}", h.revokeConsent},
+		{"POST " + R + "/clients/{id}/push-revocation", h.clientPushRevocation},
 
 		// users
 		{"GET " + R + "/users", h.listUsers},

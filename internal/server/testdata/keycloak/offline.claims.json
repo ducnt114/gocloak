@@ -1,0 +1,11 @@
+{
+  "aud": "{base}/realms/compat",
+  "azp": "web",
+  "iat": "<volatile>",
+  "iss": "{base}/realms/compat",
+  "jti": "<volatile>",
+  "scope": "acr basic email offline_access openid profile roles web-origins",
+  "sid": "<volatile>",
+  "sub": "<volatile>",
+  "typ": "Offline"
+}

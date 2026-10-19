@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"path/filepath"
 	"testing"
+
+	"github.com/ducnt114/gocloak/internal/jwt"
 )
 
 func TestMigrateFreshAndV0Database(t *testing.T) {
@@ -38,6 +40,12 @@ func TestMigrateFreshAndV0Database(t *testing.T) {
 		sso_session_idle_timeout, sso_session_max_lifespan, created_at) VALUES ('r1', 'old', 300, 60, 1800, 36000, 0)`); err != nil {
 		t.Fatal(err)
 	}
+	key, _ := jwt.GenerateRSA(2048, "RS256", "old")
+	pemStr, _ := jwt.EncodePrivateKey(key.Private)
+	if _, err := raw.Exec(`INSERT INTO realm_keys (id, realm_id, algorithm, private_pem, active, priority, created_at)
+		VALUES ('k1', 'r1', 'RS256', ?, 1, 100, 0)`, pemStr); err != nil {
+		t.Fatal(err)
+	}
 	raw.Close()
 
 	st, err := Open(Config{URL: path})
@@ -58,6 +66,20 @@ func TestMigrateFreshAndV0Database(t *testing.T) {
 	}
 	if r, _ = st.GetRealmByName(ctx, "old"); !r.Settings.ResetPasswordAllowed {
 		t.Fatal("settings not persisted")
+	}
+	if r.Settings.FailureFactor != 30 || r.Settings.OfflineSessionIdleTimeout != 2592000 {
+		t.Fatalf("defaults not applied to old realm: %+v", r.Settings)
+	}
+	comps, err := st.ListComponents(ctx, "r1", "org.keycloak.keys.KeyProvider")
+	if err != nil {
+		t.Fatal(err)
+	}
+	providers := map[string]string{}
+	for _, c := range comps {
+		providers[c.ProviderID] = c.Get("privateKey")
+	}
+	if providers["rsa-generated"] != pemStr || len(comps) != 2 {
+		t.Fatalf("keys not migrated: %v", providers)
 	}
 }
 

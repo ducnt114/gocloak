@@ -103,6 +103,10 @@ func TestKeycloakCompatibility(t *testing.T) {
 	r.json(&errBody)
 	got["invalid-scope"] = map[string]any{"status": float64(r.status), "error": errBody["error"]}
 
+	for k, v := range securityScenarios(e, admin) {
+		got[k] = v
+	}
+
 	files, err := filepath.Glob("testdata/keycloak/*.json")
 	if err != nil || len(files) == 0 {
 		t.Fatalf("no golden files: %v", err)
@@ -138,7 +142,8 @@ func decodeJWT(t *testing.T, tok string) map[string]any {
 }
 
 var volatileClaims = map[string]bool{"exp": true, "iat": true, "jti": true, "sid": true, "auth_time": true, "sub": true,
-	"at_hash": true, "session_state": true, "nonce": true, "clientHost": true, "clientAddress": true}
+	"at_hash": true, "session_state": true, "nonce": true, "clientHost": true, "clientAddress": true,
+	"reuse_id": true, "lastFailure": true, "failedLoginNotBefore": true, "lastIPFailure": true}
 
 // normalize mirrors normalise() in scripts/compat/tokens.py.
 func normalize(e *env, claims map[string]any) any {
@@ -182,4 +187,81 @@ func sortWords(s string) string {
 	w := strings.Fields(s)
 	sort.Strings(w)
 	return strings.Join(w, " ")
+}
+
+// securityScenarios mirrors security() in scripts/compat/tokens.py.
+func securityScenarios(e *env, admin string) map[string]any {
+	t := e.t
+	const R = "/admin/realms/compat"
+	tokenURL := "/realms/compat/protocol/openid-connect/token"
+	out := map[string]any{}
+	realm := func(settings map[string]any) {
+		e.expect(e.do(nil, "PUT", R, admin, settings, nil), 204)
+	}
+	password := func(user, pw string, extra ...string) *response {
+		f := url.Values{"grant_type": {"password"}, "client_id": {"web"}, "client_secret": {"web-secret"}, "username": {user}, "password": {pw}}
+		for i := 0; i+1 < len(extra); i += 2 {
+			f.Set(extra[i], extra[i+1])
+		}
+		return e.do(nil, "POST", tokenURL, "", nil, f)
+	}
+	refresh := func(token string) *response {
+		return e.do(nil, "POST", tokenURL, "", nil, url.Values{"grant_type": {"refresh_token"}, "client_id": {"web"},
+			"client_secret": {"web-secret"}, "refresh_token": {token}})
+	}
+	outcome := func(r *response) map[string]any {
+		var body map[string]any
+		json.Unmarshal(r.body, &body)
+		return map[string]any{"status": float64(r.status), "error": body["error"], "error_description": body["error_description"]}
+	}
+	body := func(r *response) map[string]any {
+		var b map[string]any
+		e.expect(r, 200).json(&b)
+		return b
+	}
+
+	mallory := idFromLocation(t, e.expect(e.do(nil, "POST", R+"/users", admin, map[string]any{"username": "mallory",
+		"email": "mallory@example.com", "firstName": "M", "lastName": "M", "enabled": true,
+		"credentials": []any{map[string]any{"type": "password", "value": "pass1234", "temporary": false}}}, nil), 201))
+
+	realm(map[string]any{"passwordPolicy": "length(8) and digits(1) and passwordHistory(1)"})
+	for _, c := range []struct{ name, pw string }{{"short", "short"}, {"no-digit", "abcdefgh"}, {"history", "pass1234"}} {
+		out["policy."+c.name] = outcome(e.do(nil, "PUT", R+"/users/"+mallory+"/reset-password", admin,
+			map[string]any{"type": "password", "value": c.pw, "temporary": false}, nil))
+	}
+	realm(map[string]any{"passwordPolicy": ""})
+
+	b := body(password("mallory", "pass1234"))
+	out["refresh.claims"] = normalize(e, decodeJWT(t, b["refresh_token"].(string)))
+	out["refresh.response"] = map[string]any{"refresh_expires_in": b["refresh_expires_in"].(float64) > 0, "not-before-policy": b["not-before-policy"]}
+	b = body(password("mallory", "pass1234", "scope", "openid offline_access"))
+	out["offline.claims"] = normalize(e, decodeJWT(t, b["refresh_token"].(string)))
+	out["offline.response"] = map[string]any{"refresh_expires_in": b["refresh_expires_in"], "scope": sortWords(b["scope"].(string))}
+	rb := body(refresh(b["refresh_token"].(string)))
+	out["offline.refresh"] = map[string]any{"status": float64(200), "typ": decodeJWT(t, rb["refresh_token"].(string))["typ"]}
+
+	realm(map[string]any{"revokeRefreshToken": true, "refreshTokenMaxReuse": 1})
+	first := body(password("mallory", "pass1234"))["refresh_token"].(string)
+	r := refresh(first)
+	second := body(r)["refresh_token"].(string)
+	var seq []any
+	for _, res := range []*response{r, refresh(first), refresh(first), refresh(second)} {
+		o := outcome(res)
+		seq = append(seq, map[string]any{"status": o["status"], "error_description": o["error_description"]})
+	}
+	out["rotation"] = seq
+	realm(map[string]any{"revokeRefreshToken": false})
+
+	realm(map[string]any{"bruteForceProtected": true, "failureFactor": 2, "waitIncrementSeconds": 60, "quickLoginCheckMilliSeconds": 0})
+	out["bruteforce.attempts"] = []any{outcome(password("mallory", "wrong")), outcome(password("mallory", "wrong")), outcome(password("mallory", "pass1234"))}
+	var status map[string]any
+	e.expect(e.do(nil, "GET", R+"/attack-detection/brute-force/users/"+mallory, admin, nil, nil), 200).json(&status)
+	out["bruteforce.status"] = normalize(e, status)
+	var user map[string]any
+	e.expect(e.do(nil, "GET", R+"/users/"+mallory, admin, nil, nil), 200).json(&user)
+	out["bruteforce.user-enabled"] = map[string]any{"enabled": user["enabled"]}
+	e.expect(e.do(nil, "DELETE", R+"/attack-detection/brute-force/users/"+mallory, admin, nil, nil), 204)
+	out["bruteforce.after-clear"] = map[string]any{"status": float64(password("mallory", "pass1234").status)}
+	realm(map[string]any{"bruteForceProtected": false})
+	return out
 }

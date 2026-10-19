@@ -20,6 +20,14 @@ func scanSession(sc scanner) (*model.UserSession, error) {
 	return us, nil
 }
 
+// sessionTable is user_sessions or offline_sessions.
+func sessionTable(offline bool) string {
+	if offline {
+		return "offline_sessions"
+	}
+	return "user_sessions"
+}
+
 func (s *Store) CreateUserSession(ctx context.Context, us *model.UserSession) error {
 	if us.Clients == nil {
 		us.Clients = map[string]bool{}
@@ -27,7 +35,7 @@ func (s *Store) CreateUserSession(ctx context.Context, us *model.UserSession) er
 	if us.Notes == nil {
 		us.Notes = map[string]string{}
 	}
-	return s.exec(ctx, `INSERT INTO user_sessions (`+sessionCols+`) VALUES (?,?,?,?,?,?,?,?,?)`,
+	return s.exec(ctx, `INSERT INTO `+sessionTable(us.Offline)+` (`+sessionCols+`) VALUES (?,?,?,?,?,?,?,?,?)`,
 		us.ID, us.RealmID, us.UserID, us.IPAddress, us.Started.Unix(), us.LastRefresh.Unix(), us.RememberMe, toJSON(us.Clients), toJSON(us.Notes))
 }
 
@@ -35,24 +43,50 @@ func (s *Store) UpdateUserSession(ctx context.Context, us *model.UserSession) er
 	if us.Notes == nil {
 		us.Notes = map[string]string{}
 	}
-	return s.execOne(ctx, `UPDATE user_sessions SET last_refresh=?, clients=?, notes=? WHERE id=?`,
+	return s.execOne(ctx, `UPDATE `+sessionTable(us.Offline)+` SET last_refresh=?, clients=?, notes=? WHERE id=?`,
 		us.LastRefresh.Unix(), toJSON(us.Clients), toJSON(us.Notes), us.ID)
 }
 
+// GetUserSession returns an online session.
 func (s *Store) GetUserSession(ctx context.Context, id string) (*model.UserSession, error) {
-	return scanSession(s.q.QueryRowContext(ctx, `SELECT `+sessionCols+` FROM user_sessions WHERE id=?`, id))
+	return s.GetSession(ctx, id, false)
+}
+
+// GetSession returns an online or offline session.
+func (s *Store) GetSession(ctx context.Context, id string, offline bool) (*model.UserSession, error) {
+	us, err := scanSession(s.q.QueryRowContext(ctx, `SELECT `+sessionCols+` FROM `+sessionTable(offline)+` WHERE id=?`, id))
+	if err == nil {
+		us.Offline = offline
+	}
+	return us, err
+}
+
+func (s *Store) listSessions(ctx context.Context, offline bool, where string, args ...any) ([]*model.UserSession, error) {
+	list, err := queryList(ctx, s, scanSession, `SELECT `+sessionCols+` FROM `+sessionTable(offline)+` WHERE `+where+` ORDER BY started`, args...)
+	for _, us := range list {
+		us.Offline = offline
+	}
+	return list, err
 }
 
 func (s *Store) ListUserSessions(ctx context.Context, userID string) ([]*model.UserSession, error) {
-	return queryList(ctx, s, scanSession, `SELECT `+sessionCols+` FROM user_sessions WHERE user_id=? ORDER BY started`, userID)
+	return s.listSessions(ctx, false, `user_id=?`, userID)
+}
+
+func (s *Store) ListOfflineSessions(ctx context.Context, userID string) ([]*model.UserSession, error) {
+	return s.listSessions(ctx, true, `user_id=?`, userID)
 }
 
 func (s *Store) ListRealmSessions(ctx context.Context, realmID string) ([]*model.UserSession, error) {
-	return queryList(ctx, s, scanSession, `SELECT `+sessionCols+` FROM user_sessions WHERE realm_id=? ORDER BY started`, realmID)
+	return s.listSessions(ctx, false, `realm_id=?`, realmID)
 }
 
 func (s *Store) DeleteUserSession(ctx context.Context, id string) error {
 	return s.exec(ctx, `DELETE FROM user_sessions WHERE id=?`, id)
+}
+
+func (s *Store) DeleteSession(ctx context.Context, us *model.UserSession) error {
+	return s.exec(ctx, `DELETE FROM `+sessionTable(us.Offline)+` WHERE id=?`, us.ID)
 }
 
 func (s *Store) DeleteUserSessionsOfUser(ctx context.Context, userID string) error {
@@ -140,7 +174,35 @@ func (s *Store) PurgeExpired(ctx context.Context, now time.Time) error {
 		}
 	}
 	// SSO sessions: idle timeout or max lifespan exceeded, per realm settings.
-	return s.exec(ctx, `DELETE FROM user_sessions WHERE id IN (
+	if err := s.exec(ctx, `DELETE FROM user_sessions WHERE id IN (
 		SELECT us.id FROM user_sessions us JOIN realms r ON r.id=us.realm_id
-		WHERE us.last_refresh + r.sso_session_idle_timeout < ? OR us.started + r.sso_session_max_lifespan < ?)`, n, n)
+		WHERE us.last_refresh + r.sso_session_idle_timeout < ? OR us.started + r.sso_session_max_lifespan < ?)`, n, n); err != nil {
+		return err
+	}
+	return s.purgeOffline(ctx, now)
+}
+
+// purgeOffline removes offline sessions idle for longer than the realm's
+// offline idle timeout (or past the optional max lifespan).
+func (s *Store) purgeOffline(ctx context.Context, now time.Time) error {
+	realms, err := s.ListRealms(ctx)
+	if err != nil {
+		return err
+	}
+	for _, r := range realms {
+		idle := r.Settings.OfflineSessionIdleTimeout
+		if idle <= 0 {
+			continue
+		}
+		q := `DELETE FROM offline_sessions WHERE realm_id=? AND (last_refresh < ?`
+		args := []any{r.ID, now.Unix() - int64(idle)}
+		if r.Settings.OfflineSessionMaxLifespanEnabled && r.Settings.OfflineSessionMaxLifespan > 0 {
+			q += ` OR started < ?`
+			args = append(args, now.Unix()-int64(r.Settings.OfflineSessionMaxLifespan))
+		}
+		if err := s.exec(ctx, q+`)`, args...); err != nil {
+			return err
+		}
+	}
+	return nil
 }

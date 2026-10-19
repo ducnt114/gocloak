@@ -6,19 +6,20 @@ package service
 import (
 	"context"
 	"crypto/rand"
-	"crypto/rsa"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 
-	"github.com/ducnt114/gocloak/internal/jwt"
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/password"
+	"github.com/ducnt114/gocloak/internal/policy"
 	"github.com/ducnt114/gocloak/internal/store"
 )
 
@@ -68,19 +69,24 @@ type Service struct {
 	Store  *store.Store
 	Hasher password.Hasher
 	Now    func() time.Time
+	Log    *slog.Logger
+	// ExtraListeners are event listeners available to realms besides
+	// "jboss-logging", by id.
+	ExtraListeners map[string]EventListener
 
 	mu   sync.RWMutex
 	keys map[string]*keySet // realm id -> keys
 }
 
-type keySet struct {
-	activeKid string
-	active    *rsa.PrivateKey
-	public    map[string]*rsa.PublicKey
-}
-
 func New(st *store.Store) *Service {
 	return &Service{Store: st, Hasher: password.Default, Now: time.Now, keys: map[string]*keySet{}}
+}
+
+func (s *Service) logger() *slog.Logger {
+	if s.Log == nil {
+		return slog.Default()
+	}
+	return s.Log
 }
 
 // NewID returns a random UUID, the id format Keycloak uses.
@@ -111,6 +117,7 @@ func NewRealm(name string) *model.Realm {
 		SSOSessionMaxLifespan: 36000,
 		LoginWithEmailAllowed: true,
 		Attributes:            map[string]string{},
+		Settings:              model.DefaultRealmSettings(),
 	}
 }
 
@@ -130,7 +137,7 @@ func (s *Service) CreateRealm(ctx context.Context, st *store.Store, r *model.Rea
 	if err := st.CreateRealm(ctx, r); err != nil {
 		return err
 	}
-	if err := s.RotateKey(ctx, st, r.ID); err != nil {
+	if err := s.CreateDefaultKeys(ctx, st, r); err != nil {
 		return err
 	}
 	if err := st.CreateRole(ctx, defaultRole); err != nil {
@@ -225,79 +232,8 @@ func (s *Service) DeleteRealm(ctx context.Context, r *model.Realm) error {
 	if err := s.Store.DeleteRealm(ctx, r.ID); err != nil {
 		return err
 	}
-	s.mu.Lock()
-	delete(s.keys, r.ID)
-	s.mu.Unlock()
+	s.InvalidateKeys(r.ID)
 	return nil
-}
-
-// ---------------------------------------------------------------- keys
-
-// RotateKey generates a new active RSA key for the realm. Older keys remain
-// available for verification.
-func (s *Service) RotateKey(ctx context.Context, st *store.Store, realmID string) error {
-	_, pemStr, kid, err := jwt.GenerateKey()
-	if err != nil {
-		return err
-	}
-	err = st.CreateRealmKey(ctx, &model.RealmKey{ID: kid, RealmID: realmID, Algorithm: "RS256", PrivatePEM: pemStr,
-		Active: true, Priority: int(s.Now().Unix() % 1_000_000_000), CreatedAt: s.Now()})
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	delete(s.keys, realmID)
-	s.mu.Unlock()
-	return nil
-}
-
-func (s *Service) loadKeys(ctx context.Context, realmID string) (*keySet, error) {
-	s.mu.RLock()
-	ks := s.keys[realmID]
-	s.mu.RUnlock()
-	if ks != nil {
-		return ks, nil
-	}
-	keys, err := s.Store.ListRealmKeys(ctx, realmID)
-	if err != nil {
-		return nil, err
-	}
-	ks = &keySet{public: map[string]*rsa.PublicKey{}}
-	for _, k := range keys {
-		pk, err := jwt.ParsePrivateKey(k.PrivatePEM)
-		if err != nil {
-			return nil, fmt.Errorf("realm key %s: %w", k.ID, err)
-		}
-		ks.public[k.ID] = &pk.PublicKey
-		if ks.active == nil && k.Active {
-			ks.active, ks.activeKid = pk, k.ID
-		}
-	}
-	if ks.active == nil {
-		return nil, errors.New("realm has no active signing key")
-	}
-	s.mu.Lock()
-	s.keys[realmID] = ks
-	s.mu.Unlock()
-	return ks, nil
-}
-
-// SigningKey returns the active key of a realm.
-func (s *Service) SigningKey(ctx context.Context, realmID string) (string, *rsa.PrivateKey, error) {
-	ks, err := s.loadKeys(ctx, realmID)
-	if err != nil {
-		return "", nil, err
-	}
-	return ks.activeKid, ks.active, nil
-}
-
-// PublicKeys returns all verification keys of a realm, by kid.
-func (s *Service) PublicKeys(ctx context.Context, realmID string) (map[string]*rsa.PublicKey, error) {
-	ks, err := s.loadKeys(ctx, realmID)
-	if err != nil {
-		return nil, err
-	}
-	return ks.public, nil
 }
 
 // ---------------------------------------------------------------- clients
@@ -418,18 +354,103 @@ func (s *Service) checkEmail(ctx context.Context, st *store.Store, realm *model.
 	return nil
 }
 
-// SetPassword replaces the user's password. A temporary password forces the
-// user to choose a new one on next login.
+// CredentialPasswordHistory is the credential type of previous passwords.
+const CredentialPasswordHistory = "password-history"
+
+// passwordPolicy parses the realm's password policy.
+func passwordPolicy(realm *model.Realm) (*policy.Policy, error) {
+	p, err := policy.Parse(realm.Settings.PasswordPolicy)
+	if err != nil {
+		return nil, validationf("%s", err.Error())
+	}
+	return p, nil
+}
+
+func (s *Service) hasherFor(p *policy.Policy) password.Hasher {
+	if p.HashAlgorithm == "" {
+		h := s.Hasher
+		if p.HashIterations > 0 {
+			h.Iterations = p.HashIterations
+		}
+		return h
+	}
+	return password.Hasher{Algorithm: p.HashAlgorithm, Iterations: p.HashIterations}
+}
+
+// SetPassword replaces the user's password after checking the realm's
+// password policy (violations are *policy.Error). A temporary password
+// forces the user to choose a new one on next login. With a
+// passwordHistory policy the previous password is kept as history.
 func (s *Service) SetPassword(ctx context.Context, st *store.Store, u *model.User, pw string, temporary bool) error {
 	if pw == "" {
 		return validationf("password must not be empty")
 	}
-	sd, cd, err := s.Hasher.Hash(pw)
+	realm, err := st.GetRealm(ctx, u.RealmID)
+	if err != nil {
+		return err
+	}
+	pol, err := passwordPolicy(realm)
+	if err != nil {
+		return err
+	}
+	if perr := pol.Validate(pw, policy.Subject{Username: u.Username, Email: u.Email}); perr != nil {
+		return perr
+	}
+	creds, err := st.ListCredentials(ctx, u.ID)
+	if err != nil {
+		return err
+	}
+	var current *model.Credential
+	var history []*model.Credential
+	for _, c := range creds {
+		switch c.Type {
+		case model.CredentialPassword:
+			current = c
+		case CredentialPasswordHistory:
+			history = append(history, c)
+		}
+	}
+	// newest history first
+	sort.Slice(history, func(i, j int) bool { return history[i].CreatedDate > history[j].CreatedDate })
+	if pol.History > 0 {
+		recent := history
+		if len(recent) > pol.History-1 {
+			recent = recent[:pol.History-1]
+		}
+		if current != nil {
+			recent = append([]*model.Credential{current}, recent...)
+		}
+		for _, c := range recent {
+			if ok, _ := password.Verify(pw, c.SecretData, c.CredentialData); ok {
+				return pol.HistoryError()
+			}
+		}
+	}
+	sd, cd, err := s.hasherFor(pol).Hash(pw)
 	if err != nil {
 		return err
 	}
 	if err := st.DeleteCredentialsOfType(ctx, u.ID, model.CredentialPassword); err != nil {
 		return err
+	}
+	if err := st.DeleteCredentialsOfType(ctx, u.ID, CredentialPasswordHistory); err != nil {
+		return err
+	}
+	if pol.History > 1 {
+		keep := history
+		if current != nil {
+			old := *current
+			old.ID, old.Type = NewID(), CredentialPasswordHistory
+			keep = append([]*model.Credential{&old}, keep...)
+		}
+		if len(keep) > pol.History-1 {
+			keep = keep[:pol.History-1]
+		}
+		for _, c := range keep {
+			if err := st.CreateCredential(ctx, c); err != nil {
+				return err
+			}
+		}
 	}
 	if err := st.CreateCredential(ctx, &model.Credential{ID: NewID(), UserID: u.ID, Type: model.CredentialPassword,
 		SecretData: sd, CredentialData: cd, CreatedDate: s.nowMillis(), Priority: 10}); err != nil {
@@ -447,7 +468,9 @@ func (s *Service) SetPassword(ctx context.Context, st *store.Store, u *model.Use
 	return nil
 }
 
-// CheckPassword verifies pw against the user's stored password.
+// CheckPassword verifies pw against the user's stored password. A correct
+// password stored with other hashing parameters than the realm's policy is
+// re-hashed, as Keycloak does.
 func (s *Service) CheckPassword(ctx context.Context, u *model.User, pw string) (bool, error) {
 	creds, err := s.Store.ListCredentials(ctx, u.ID)
 	if err != nil {
@@ -462,7 +485,51 @@ func (s *Service) CheckPassword(ctx context.Context, u *model.User, pw string) (
 			return false, err
 		}
 		if ok {
+			s.rehashIfNeeded(ctx, u, c, pw)
 			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (s *Service) rehashIfNeeded(ctx context.Context, u *model.User, c *model.Credential, pw string) {
+	realm, err := s.Store.GetRealm(ctx, u.RealmID)
+	if err != nil {
+		return
+	}
+	pol, err := passwordPolicy(realm)
+	if err != nil || (pol.HashAlgorithm == "" && pol.HashIterations == 0) {
+		return
+	}
+	h := s.hasherFor(pol)
+	alg, iter := password.Params(c.CredentialData)
+	if alg == h.Algorithm && (h.Iterations == 0 || iter == h.Iterations) {
+		return
+	}
+	sd, cd, err := h.Hash(pw)
+	if err != nil {
+		return
+	}
+	if err := s.Store.UpdateCredentialSecret(ctx, c.ID, sd, cd); err != nil {
+		s.logger().Warn("rehash password", "user", u.ID, "err", err)
+	}
+}
+
+// PasswordExpired reports whether the forceExpiredPasswordChange policy
+// requires the user to choose a new password.
+func (s *Service) PasswordExpired(ctx context.Context, realm *model.Realm, u *model.User) (bool, error) {
+	pol, err := passwordPolicy(realm)
+	if err != nil || pol.ExpireDays == 0 {
+		return false, err
+	}
+	creds, err := s.Store.ListCredentials(ctx, u.ID)
+	if err != nil {
+		return false, err
+	}
+	for _, c := range creds {
+		if c.Type == model.CredentialPassword {
+			age := s.Now().UnixMilli() - c.CreatedDate
+			return age > int64(pol.ExpireDays)*24*3600*1000, nil
 		}
 	}
 	return false, nil
@@ -607,6 +674,16 @@ func (s *Service) expandRoles(ctx context.Context, realmID string, seeds map[str
 // idle timeout and max lifespan.
 func (s *Service) SessionValid(realm *model.Realm, us *model.UserSession) bool {
 	now := s.Now()
+	if us.Offline {
+		idle := realm.Settings.OfflineSessionIdleTimeout
+		if idle > 0 && now.After(us.LastRefresh.Add(time.Duration(idle)*time.Second)) {
+			return false
+		}
+		if realm.Settings.OfflineSessionMaxLifespanEnabled {
+			return !now.After(us.Started.Add(time.Duration(realm.Settings.OfflineSessionMaxLifespan) * time.Second))
+		}
+		return true
+	}
 	if now.After(us.LastRefresh.Add(time.Duration(realm.SSOSessionIdleTimeout) * time.Second)) {
 		return false
 	}

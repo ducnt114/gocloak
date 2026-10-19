@@ -45,6 +45,24 @@ func usersToRep(users []*model.User) []UserRep {
 	return out
 }
 
+// withLockStatus reports users locked by brute force detection as
+// disabled, as Keycloak does.
+func (h *Handler) withLockStatus(r *http.Request, realm *model.Realm, reps []UserRep) ([]UserRep, error) {
+	if !realm.Settings.BruteForceProtected {
+		return reps, nil
+	}
+	for i := range reps {
+		st, err := h.Svc.LockStatus(r.Context(), realm, *reps[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		if st.Disabled {
+			reps[i].Enabled = ptr(false)
+		}
+	}
+	return reps, nil
+}
+
 // briefUsers drops attributes, as Keycloak's briefRepresentation does.
 func briefUsers(reps []UserRep) []UserRep {
 	for i := range reps {
@@ -62,10 +80,14 @@ func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request, p *principal
 	if err != nil {
 		return err
 	}
-	if r.URL.Query().Get("briefRepresentation") == "true" {
-		return ok(w, briefUsers(usersToRep(users)))
+	reps, err := h.withLockStatus(r, realm, usersToRep(users))
+	if err != nil {
+		return err
 	}
-	return ok(w, usersToRep(users))
+	if r.URL.Query().Get("briefRepresentation") == "true" {
+		return ok(w, briefUsers(reps))
+	}
+	return ok(w, reps)
 }
 
 func (h *Handler) countUsers(w http.ResponseWriter, r *http.Request, p *principal) error {
@@ -124,7 +146,11 @@ func (h *Handler) getUser(w http.ResponseWriter, r *http.Request, p *principal) 
 	if err != nil {
 		return err
 	}
-	return ok(w, userToRep(u))
+	reps, err := h.withLockStatus(r, realm, []UserRep{userToRep(u)})
+	if err != nil {
+		return err
+	}
+	return ok(w, reps[0])
 }
 
 func (h *Handler) updateUser(w http.ResponseWriter, r *http.Request, p *principal) error {

@@ -1,0 +1,8 @@
+{
+  "disabled": true,
+  "failedLoginNotBefore": "<volatile>",
+  "lastFailure": "<volatile>",
+  "lastIPFailure": "<volatile>",
+  "numFailures": 2,
+  "numTemporaryLockouts": 1
+}

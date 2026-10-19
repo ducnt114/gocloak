@@ -73,6 +73,7 @@ Main options (flag / environment variable):
 | `--hostname` | `KC_HOSTNAME` | derived from the request |
 | `--proxy-headers xforwarded` | `KC_PROXY_HEADERS` | do not trust `X-Forwarded-*` |
 | `--import-dir` | `GOCLOAK_IMPORT_DIR` | none |
+| `--rate-limit`, `--rate-burst` | `GOCLOAK_RATE_LIMIT`, `GOCLOAK_RATE_BURST` | 100 requests/s per client IP, burst 200 (`0` disables); behind a proxy use `--proxy-headers` so the client IP is used |
 | `--log-level` | `KC_LOG_LEVEL` | `info` (`debug` in dev mode) |
 | — | `KC_BOOTSTRAP_ADMIN_USERNAME` / `KC_BOOTSTRAP_ADMIN_PASSWORD` (or legacy `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD`) | admin created with the master realm on first start |
 
@@ -86,7 +87,21 @@ Main options (flag / environment variable):
   `prompt=none|login`, `max_age`, `login_hint`, `iss` in the response
 - SSO across clients through a signed `KEYCLOAK_IDENTITY` cookie
 - Grants: `authorization_code`, `password`, `client_credentials` (service accounts), `refresh_token`
-- Client authentication: `client_secret_basic`, `client_secret_post`; public and bearer-only clients
+- Client authentication: `client_secret_basic`, `client_secret_post`, `client_secret_jwt` and
+  `private_key_jwt` (client JWKS URL, inline JWKS or certificate, replay protection); public and
+  bearer-only clients
+- Offline tokens (`offline_access`) backed by offline sessions that survive logout, refresh token
+  rotation (`revokeRefreshToken`, `refreshTokenMaxReuse`), realm / client / user not-before policies
+- Signing keys as Keycloak key providers: `rsa-generated`, `rsa` (imported), `ecdsa-generated`,
+  `hmac-generated`; RS256/384/512, PS256/384/512, ES256/384/512 per realm or per client
+  (`access.token.signed.response.alg`, `id.token.signed.response.alg`), HS512 refresh tokens,
+  key rotation with passive keys, certificates (`x5c`) in the JWKS
+- Brute force detection (temporary and permanent lockout, `MULTIPLE` / `LINEAR` strategies) and
+  password policies (`length`, `maxLength`, `digits`, `lowerCase`, `upperCase`, `specialChars`,
+  `notUsername`, `notEmail`, `notContainsUsername`, `regexPattern`, `passwordHistory`,
+  `forceExpiredPasswordChange`, `hashAlgorithm`, `hashIterations`) with Keycloak's error messages
+- Login and admin events with Keycloak's event types and details, the `jboss-logging` listener,
+  expiration, and per IP rate limiting of `/realms` and `/admin`
 - `userinfo`, token introspection, token revocation (RFC 7009)
 - RP-initiated logout (`id_token_hint`, `post_logout_redirect_uri`, confirmation page) and
   Keycloak's back-channel logout with a refresh token
@@ -104,10 +119,13 @@ Main options (flag / environment variable):
 **Admin REST API** (`/admin/realms/...`, Keycloak paths and JSON)
 
 - Realms: list, create (including full realm import with nested roles, clients, groups, users),
-  get, partial update, delete, `logout-all`, `keys`, `partial-export`
+  get, partial update, delete, `logout-all`, `keys`, `partial-export`, `push-revocation`,
+  `components` (key providers), `events`, `events/config`, `admin-events`,
+  `attack-detection/brute-force`
 - Users: search (`search`, `username`, `email`, `firstName`, `lastName`, `exact`, `enabled`,
   `q` attribute queries, `briefRepresentation`, `first`, `max`), count, CRUD with partial updates, `reset-password`, credentials, sessions,
-  logout, group membership, role mappings (realm, client, composite, available)
+  logout, group membership, role mappings (realm, client, composite, available), offline sessions,
+  consents (offline tokens)
 - Clients: search, CRUD, client secret get / regenerate, service account user, user sessions,
   client roles, protocol mappers, default / optional client scopes, scope mappings,
   `evaluate-scopes` (example access token, ID token, userinfo, applied mappers)
@@ -133,9 +151,8 @@ Main options (flag / environment variable):
 
 SAML, identity brokering / social login, LDAP/Kerberos user federation, the declarative user
 profile (gocloak keeps any user attribute, while Keycloak 26 drops undeclared ones by default),
-script mappers, fine-grained authorization services (UMA), consent, offline tokens, OTP/WebAuthn,
-registration and reset-password emails, brute force detection, events, themes, the admin and
-account consoles, clustering, JWT client authentication, token exchange,
+script mappers, fine-grained authorization services (UMA), consent screens, OTP/WebAuthn, registration and
+reset-password emails, themes, the admin and account consoles, clustering, token exchange,
 device flow, CIBA, PAR.
 
 The plan for these is in [docs/ROADMAP.md](docs/ROADMAP.md).
@@ -145,7 +162,8 @@ The plan for these is in [docs/ROADMAP.md](docs/ROADMAP.md).
 `scripts/compat/tokens.py` sets up the same realm on gocloak and on a real Keycloak through the
 admin REST API, requests tokens for several scenarios (default scopes, optional scopes, no
 `openid`, a client without full scope, client credentials, an invalid scope) and diffs the
-claims of access tokens, ID tokens and userinfo:
+claims of access tokens, ID tokens, refresh and offline tokens and userinfo, as well as the
+responses for password policy violations, brute force lockouts and refresh token reuse:
 
 ```sh
 scripts/compat/tokens.py --keycloak http://localhost:8180 --gocloak http://localhost:8080
@@ -162,7 +180,8 @@ cmd/gocloak          CLI entry point
 internal/model       domain types
 internal/store       SQLite / PostgreSQL persistence, versioned migrations (migrations/)
 internal/password    Keycloak-compatible password hashing
-internal/jwt         RS256 JWS and JWK
+internal/policy      password policies
+internal/jwt         JWS (RS/PS/ES/HS), JWK, key generation
 internal/service     realm provisioning, users, roles, keys, token verification
 internal/oidc        protocol endpoints and login pages (templates/)
 internal/admin       admin REST API and realm import

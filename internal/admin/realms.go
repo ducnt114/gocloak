@@ -6,8 +6,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/ducnt114/gocloak/internal/jwt"
 	"github.com/ducnt114/gocloak/internal/model"
+	"github.com/ducnt114/gocloak/internal/policy"
 	"github.com/ducnt114/gocloak/internal/service"
 	"github.com/ducnt114/gocloak/internal/store"
 )
@@ -46,12 +46,15 @@ func (h *Handler) createRealm(w http.ResponseWriter, r *http.Request, p *princip
 	if !p.superAdmin && !p.createRealm {
 		return forbidden()
 	}
-	var rep RealmRep
+	rep := NewRealmRep()
 	if err := decode(r, &rep); err != nil {
 		return err
 	}
 	if rep.Realm == nil || *rep.Realm == "" {
 		return badRequest("Realm name cannot be empty")
+	}
+	if _, err := policy.Parse(rep.PasswordPolicy); err != nil {
+		return badRequest(err.Error())
 	}
 	if _, err := h.Svc.Store.GetRealmByName(r.Context(), *rep.Realm); err == nil {
 		return conflict("Conflict detected. See logs for details")
@@ -101,6 +104,9 @@ func (h *Handler) updateRealm(w http.ResponseWriter, r *http.Request, p *princip
 	if realm.Name == "" {
 		return badRequest("Realm name cannot be empty")
 	}
+	if _, err := policy.Parse(realm.Settings.PasswordPolicy); err != nil {
+		return badRequest(err.Error())
+	}
 	if err := h.Svc.Store.UpdateRealm(r.Context(), realm); err != nil {
 		return err
 	}
@@ -128,41 +134,4 @@ func (h *Handler) logoutAll(w http.ResponseWriter, r *http.Request, p *principal
 		return err
 	}
 	return ok(w, map[string]any{})
-}
-
-func (h *Handler) getKeys(w http.ResponseWriter, r *http.Request, p *principal) error {
-	realm, err := h.realmFor(r, p, permViewRealm)
-	if err != nil {
-		return err
-	}
-	keys, err := h.Svc.Store.ListRealmKeys(r.Context(), realm.ID)
-	if err != nil {
-		return err
-	}
-	type keyRep struct {
-		Kid       string `json:"kid"`
-		Type      string `json:"type"`
-		Algorithm string `json:"algorithm"`
-		Use       string `json:"use"`
-		Status    string `json:"status"`
-		Priority  int    `json:"priority"`
-		PublicKey string `json:"publicKey"`
-	}
-	out := []keyRep{}
-	active := map[string]string{}
-	activeSet := false
-	for _, k := range keys {
-		pk, err := jwt.ParsePrivateKey(k.PrivatePEM)
-		if err != nil {
-			return err
-		}
-		status := "PASSIVE"
-		if k.Active && !activeSet {
-			status, activeSet = "ACTIVE", true
-			active[k.Algorithm] = k.ID
-		}
-		out = append(out, keyRep{Kid: k.ID, Type: "RSA", Algorithm: k.Algorithm, Use: "SIG", Status: status,
-			Priority: k.Priority, PublicKey: jwt.PublicKeyBase64(&pk.PublicKey)})
-	}
-	return ok(w, map[string]any{"active": active, "keys": out})
 }

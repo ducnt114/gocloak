@@ -8,14 +8,14 @@ import (
 
 const clientCols = `id, realm_id, client_id, name, description, enabled, public_client, bearer_only, secret,
 	root_url, base_url, redirect_uris, web_origins, standard_flow_enabled, direct_access_grants_enabled,
-	service_accounts_enabled, full_scope_allowed, protocol, attributes`
+	service_accounts_enabled, full_scope_allowed, protocol, attributes, client_authenticator_type, not_before`
 
 func scanClient(sc scanner) (*model.Client, error) {
 	c := &model.Client{Attributes: map[string]string{}}
 	err := sc.Scan(&c.ID, &c.RealmID, &c.ClientID, &c.Name, &c.Description, &c.Enabled, &c.PublicClient,
 		&c.BearerOnly, &c.Secret, &c.RootURL, &c.BaseURL, jsonCol{&c.RedirectURIs}, jsonCol{&c.WebOrigins},
 		&c.StandardFlowEnabled, &c.DirectAccessGrantsEnabled, &c.ServiceAccountsEnabled, &c.FullScopeAllowed,
-		&c.Protocol, jsonCol{&c.Attributes})
+		&c.Protocol, jsonCol{&c.Attributes}, &c.ClientAuthenticatorType, &c.NotBefore)
 	if err != nil {
 		return nil, mapErr(err)
 	}
@@ -32,22 +32,26 @@ func clientArgs(c *model.Client) []any {
 	if c.Attributes == nil {
 		c.Attributes = map[string]string{}
 	}
+	if c.ClientAuthenticatorType == "" {
+		c.ClientAuthenticatorType = "client-secret"
+	}
 	return []any{c.ClientID, c.Name, c.Description, c.Enabled, c.PublicClient, c.BearerOnly, c.Secret,
 		c.RootURL, c.BaseURL, toJSON(c.RedirectURIs), toJSON(c.WebOrigins), c.StandardFlowEnabled,
-		c.DirectAccessGrantsEnabled, c.ServiceAccountsEnabled, c.FullScopeAllowed, c.Protocol, toJSON(c.Attributes)}
+		c.DirectAccessGrantsEnabled, c.ServiceAccountsEnabled, c.FullScopeAllowed, c.Protocol, toJSON(c.Attributes),
+		c.ClientAuthenticatorType, c.NotBefore}
 }
 
 func (s *Store) CreateClient(ctx context.Context, c *model.Client) error {
 	args := append([]any{c.ID, c.RealmID}, clientArgs(c)...)
-	return s.exec(ctx, `INSERT INTO clients (`+clientCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, args...)
+	return s.exec(ctx, `INSERT INTO clients (`+clientCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, args...)
 }
 
 func (s *Store) UpdateClient(ctx context.Context, c *model.Client) error {
 	args := append(clientArgs(c), c.ID)
 	return s.execOne(ctx, `UPDATE clients SET client_id=?, name=?, description=?, enabled=?, public_client=?,
 		bearer_only=?, secret=?, root_url=?, base_url=?, redirect_uris=?, web_origins=?, standard_flow_enabled=?,
-		direct_access_grants_enabled=?, service_accounts_enabled=?, full_scope_allowed=?, protocol=?, attributes=?
-		WHERE id=?`, args...)
+		direct_access_grants_enabled=?, service_accounts_enabled=?, full_scope_allowed=?, protocol=?, attributes=?,
+		client_authenticator_type=?, not_before=? WHERE id=?`, args...)
 }
 
 // DeleteClient removes a client together with its roles and service account user.

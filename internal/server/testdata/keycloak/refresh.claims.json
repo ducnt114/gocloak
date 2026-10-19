@@ -1,0 +1,12 @@
+{
+  "aud": "{base}/realms/compat",
+  "azp": "web",
+  "exp": "<volatile>",
+  "iat": "<volatile>",
+  "iss": "{base}/realms/compat",
+  "jti": "<volatile>",
+  "scope": "acr basic email profile roles web-origins",
+  "sid": "<volatile>",
+  "sub": "<volatile>",
+  "typ": "Refresh"
+}

@@ -1,0 +1,4 @@
+{
+  "refresh_expires_in": 0,
+  "scope": "email offline_access openid profile"
+}
