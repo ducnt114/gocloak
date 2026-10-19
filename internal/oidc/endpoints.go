@@ -64,7 +64,8 @@ func (h *Handler) discovery(w http.ResponseWriter, r *http.Request) {
 		"frontchannel_logout_session_supported":                    true,
 		"backchannel_logout_supported":                             true,
 		"backchannel_logout_session_supported":                     true,
-		"grant_types_supported":                                    []string{"authorization_code", "client_credentials", "password", "refresh_token"},
+		"grant_types_supported":                                    []string{"authorization_code", "client_credentials", "password", "refresh_token", grantDeviceCode},
+		"device_authorization_endpoint":                            p + "/auth/device",
 		"response_types_supported":                                 []string{"code"},
 		"response_modes_supported":                                 []string{"query", "fragment", "form_post"},
 		"subject_types_supported":                                  []string{"public"},
@@ -173,6 +174,8 @@ func (h *Handler) tokenGrant(r *http.Request) (*tokenResponse, error) {
 		return h.grantClientCredentials(r, realm, client)
 	case "refresh_token":
 		return h.grantRefreshToken(r, realm, client)
+	case grantDeviceCode:
+		return h.grantDevice(r, realm, client)
 	}
 	return nil, &oauthError{http.StatusBadRequest, "unsupported_grant_type", "Unsupported grant_type"}
 }

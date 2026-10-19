@@ -338,6 +338,10 @@ func (h *Handler) finishLogin(w http.ResponseWriter, r *http.Request, realm *mod
 		h.serverErrorPage(w, r, err)
 		return
 	}
+	if params[keyDevice] != "" {
+		h.finishDeviceLogin(w, r, realm, client, user, us, params)
+		return
+	}
 	if client.Protocol == service.ProtocolSAML {
 		h.samlLoginResponse(w, r, realm, client, user, us, params)
 		return

@@ -3,6 +3,7 @@ package admin
 import (
 	"encoding/json"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/ducnt114/gocloak/internal/model"
@@ -26,6 +27,9 @@ type RealmRep struct {
 	RegistrationAllowed    *bool    `json:"registrationAllowed,omitempty"`
 	Attributes             strMap   `json:"attributes,omitempty"`
 	DefaultRole            *RoleRep `json:"defaultRole,omitempty"`
+	// Kept in attributes, shown at the top level too (as Keycloak does).
+	OAuth2DeviceCodeLifespan    *int `json:"oauth2DeviceCodeLifespan,omitempty"`
+	OAuth2DevicePollingInterval *int `json:"oauth2DevicePollingInterval,omitempty"`
 
 	// Settings flatten into the realm JSON, as in Keycloak. PUT requests
 	// apply them by decoding the body onto the stored settings, so absent
@@ -236,6 +240,12 @@ func realmToRep(r *model.Realm, defaultRole *model.Role) RealmRep {
 		dr := roleToRep(defaultRole, r.ID)
 		rep.DefaultRole = &dr
 	}
+	for attr, field := range map[string]**int{"oauth2DeviceCodeLifespan": &rep.OAuth2DeviceCodeLifespan,
+		"oauth2DevicePollingInterval": &rep.OAuth2DevicePollingInterval} {
+		if n, err := strconv.Atoi(r.Attributes[attr]); err == nil {
+			*field = ptr(n)
+		}
+	}
 	return rep
 }
 
@@ -252,6 +262,15 @@ func applyRealmRep(r *model.Realm, rep *RealmRep) {
 	set(&r.RegistrationAllowed, rep.RegistrationAllowed)
 	if rep.Attributes != nil {
 		r.Attributes = rep.Attributes
+	}
+	for attr, v := range map[string]*int{"oauth2DeviceCodeLifespan": rep.OAuth2DeviceCodeLifespan,
+		"oauth2DevicePollingInterval": rep.OAuth2DevicePollingInterval} {
+		if v != nil {
+			if r.Attributes == nil {
+				r.Attributes = map[string]string{}
+			}
+			r.Attributes[attr] = strconv.Itoa(*v)
+		}
 	}
 }
 

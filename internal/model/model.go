@@ -241,6 +241,22 @@ type Client struct {
 	ConsentRequired bool
 }
 
+// DeviceCode is a pending OAuth 2.0 device authorization (RFC 8628).
+type DeviceCode struct {
+	DeviceCode string
+	UserCode   string
+	RealmID    string
+	ClientID   string // client UUID
+	Scope      string
+	Nonce      string
+	Status     string // pending, approved or denied
+	UserID     string // set when approved
+	SessionID  string
+	Interval   int   // seconds between polls
+	LastPoll   int64 // unix seconds
+	ExpiresAt  time.Time
+}
+
 // UserConsent is what a user granted a client: client scope ids, and the
 // client's own id when it has a consent text of its own.
 type UserConsent struct {

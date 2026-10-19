@@ -5299,7 +5299,7 @@
   },
   {
    "dependencies": [],
-   "enabled": false,
+   "enabled": true,
    "label": "OAuth 2.0 Device Authorization Grant",
    "name": "DEVICE_FLOW",
    "type": "DEFAULT"
@@ -5413,7 +5413,7 @@
   },
   {
    "dependencies": [],
-   "enabled": false,
+   "enabled": true,
    "label": "OAuth 2.0 Pushed Authorization Requests (PAR)",
    "name": "PAR",
    "type": "DEFAULT"
@@ -5674,7 +5674,6 @@
    "CLIENT_TYPES",
    "CLUSTERLESS",
    "DECLARATIVE_UI",
-   "DEVICE_FLOW",
    "DOCKER",
    "DPOP",
    "DYNAMIC_SCOPES",
@@ -5686,7 +5685,6 @@
    "OID4VC_VCI",
    "OPENTELEMETRY",
    "ORGANIZATION",
-   "PAR",
    "PASSKEYS",
    "RECOVERY_CODES",
    "SCRIPTS",

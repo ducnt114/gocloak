@@ -19,7 +19,9 @@ const keyConsented = "_consented"
 // pendingConsent returns what the user still has to consent to for a login
 // (nothing when the client does not require consent).
 func (h *Handler) pendingConsent(ctx context.Context, realm *model.Realm, client *model.Client, user *model.User, params map[string]string) ([]service.ConsentItem, error) {
-	if !client.ConsentRequired {
+	// device logins always ask, as the device is not where the user is
+	device := params[keyDevice] != ""
+	if !client.ConsentRequired && !device {
 		return nil, nil
 	}
 	scopes, _, _, err := resolveScopes(ctx, h.Svc.Store, realm, client, params["scope"])
@@ -27,7 +29,7 @@ func (h *Handler) pendingConsent(ctx context.Context, realm *model.Realm, client
 		return nil, err
 	}
 	items := service.ConsentItems(client, scopes)
-	if strings.Contains(params["prompt"], "consent") {
+	if strings.Contains(params["prompt"], "consent") || device {
 		return items, nil
 	}
 	consent, err := h.Svc.Store.GetConsent(ctx, user.ID, client.ID)
@@ -58,7 +60,7 @@ func slicesContains(list []string, v string) bool {
 // consentDetail is the "consent" detail of LOGIN events.
 func consentDetail(c *model.Client, params map[string]string) string {
 	switch {
-	case !c.ConsentRequired:
+	case !c.ConsentRequired && params[keyDevice] == "":
 		return "no_consent_required"
 	case params[keyConsented] != "":
 		return "consent_granted"
@@ -117,6 +119,10 @@ func (h *Handler) consentEndpoint(w http.ResponseWriter, r *http.Request) {
 		h.event(r, realm, "LOGIN_ERROR", &eventInfo{client: client, userID: user.ID, err: "rejected_by_user"})
 		_ = h.Svc.Store.DeleteAuthSession(ctx, as.ID)
 		h.clearCookie(w, r, realm, authSessionCookie)
+		if as.Params[keyDevice] != "" {
+			h.denyDevice(w, r, realm, as.Params)
+			return
+		}
 		if client.Protocol == service.ProtocolSAML {
 			h.samlSendStatus(w, r, realm, client, as.Params, saml.StatusRequester, saml.StatusRequestDenied)
 			return
@@ -126,7 +132,7 @@ func (h *Handler) consentEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	items, err := h.pendingConsent(ctx, realm, client, user, as.Params)
-	if err == nil {
+	if err == nil && client.ConsentRequired {
 		err = h.Svc.GrantConsent(ctx, h.Svc.Store, realm.ID, user.ID, client, items)
 	}
 	if err != nil {

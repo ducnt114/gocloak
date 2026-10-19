@@ -13,6 +13,14 @@
 </form>
 {{template "footer" .}}{{end}}
 
+{{define "login-oauth2-device-verify-user-code.html"}}{{template "header" .}}
+<form id="kc-user-verify-device-user-code-form" method="post" action="{{.Action}}">
+  <label for="device-user-code">{{.T "verifyOAuth2DeviceUserCode"}}</label>
+  <input type="text" id="device-user-code" name="device_user_code" autocomplete="off" autofocus>
+  <button type="submit" id="kc-login">{{.T "doSubmit"}}</button>
+</form>
+{{template "footer" .}}{{end}}
+
 {{define "login-oauth-grant.html"}}{{template "header" .}}
 <p>{{.T "oauthGrantRequest"}}</p>
 <ul id="kc-oauth">{{range .Items}}<li>{{$.T .}}</li>{{end}}</ul>
