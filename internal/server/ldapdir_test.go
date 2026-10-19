@@ -70,6 +70,9 @@ func (d *realDir) URL() string { return d.url }
 
 func (d *realDir) clear(base string) {
 	res, err := d.c.Search(ldap.NewSearchRequest(base, ldap.ScopeWholeSubtree, 0, 0, 0, false, "(objectClass=*)", []string{"dn"}, nil))
+	if ldap.IsErrorWithCode(err, ldap.LDAPResultNoSuchObject) {
+		return
+	}
 	if err != nil {
 		d.t.Fatal(err)
 	}

@@ -56,22 +56,20 @@ jobs:
 
   test-openldap:
     runs-on: ubuntu-latest
-    services:
-      openldap:
-        image: osixia/openldap:1.5.0
-        env:
-          LDAP_ORGANISATION: Example
-          LDAP_DOMAIN: example.org
-          LDAP_ADMIN_PASSWORD: secret
-        ports: ["389:389"]
     env:
-      GOCLOAK_TEST_LDAP_URL: ldap://localhost:389
+      GOCLOAK_TEST_LDAP_URL: ldap://127.0.0.1:3890
       GOCLOAK_TEST_LDAP_PASSWORD: secret
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: start OpenLDAP
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends slapd
+          sudo systemctl stop slapd || true
+          sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.slapd 2>/dev/null || true
+          sudo DIR=/var/lib/ldap/gocloak-ci scripts/ci/openldap.sh
       - run: go test -count=1 -run 'TestLDAP' -v ./internal/server
 
   docker:

@@ -22,7 +22,7 @@ const (
 // (backend nested in devs).
 func seedDirectory(t *testing.T) directory {
 	d := newDirectory(t)
-	d.Add("dc=example,dc=org", map[string][]string{"objectClass": {"dcObject", "organization"}, "dc": {"example"}})
+	d.Add("dc=example,dc=org", map[string][]string{"objectClass": {"dcObject", "organization"}, "dc": {"example"}, "o": {"Example"}})
 	d.Add(peopleDN, map[string][]string{"objectClass": {"organizationalUnit"}, "ou": {"people"}})
 	d.Add(groupsDN, map[string][]string{"objectClass": {"organizationalUnit"}, "ou": {"groups"}})
 	for _, u := range [][4]string{{"jdoe", "John", "Doe", "jdoe@example.org"}, {"asmith", "Ann", "Smith", "ann@example.org"}, {"bob", "Bob", "Builder", "bob@example.org"}} {
