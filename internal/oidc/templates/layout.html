@@ -1,0 +1,41 @@
+{{define "header"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{{.Title}}{{if .Realm}} | {{.Realm}}{{end}}</title>
+<style>
+:root{--bg:#f0f0f0;--card:#fff;--text:#151515;--muted:#6a6e73;--accent:#0066cc;--accent-hover:#004080;--border:#d2d2d2;--error-bg:#faeae8;--error:#a30000;--info-bg:#e7f1fa}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1d21;--card:#26292d;--text:#e0e0e0;--muted:#a3a3a3;--accent:#4d9cf0;--accent-hover:#73b1f5;--border:#444548;--error-bg:#3b1f1f;--error:#ff8f8f;--info-bg:#1f2f3f}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;padding:48px 16px}
+.realm{font-size:26px;font-weight:300;letter-spacing:.04em;text-transform:uppercase;margin-bottom:24px;text-align:center}
+.card{width:100%;max-width:460px;background:var(--card);border-top:4px solid var(--accent);border-radius:4px;box-shadow:0 2px 12px rgba(0,0,0,.12);padding:32px 36px}
+h1{font-size:22px;font-weight:500;margin:0 0 24px;text-align:center}
+label{display:block;font-size:14px;font-weight:500;margin:0 0 6px}
+input[type=text],input[type=password]{width:100%;padding:9px 10px;font:inherit;color:var(--text);background:var(--card);border:1px solid var(--border);border-bottom-color:var(--muted);border-radius:2px;margin-bottom:18px}
+input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+button{width:100%;padding:10px;font:inherit;font-weight:500;color:#fff;background:var(--accent);border:0;border-radius:3px;cursor:pointer;margin-top:6px}
+button:hover{background:var(--accent-hover)}
+.alert{padding:10px 12px;border-radius:3px;margin-bottom:20px;font-size:14px}
+.alert-error{background:var(--error-bg);color:var(--error)}
+.alert-info{background:var(--info-bg)}
+p{margin:0 0 12px}
+.muted{color:var(--muted);font-size:13px;text-align:center;margin-top:24px}
+</style>
+</head>
+<body>
+{{if .Realm}}<div class="realm">{{.Realm}}</div>{{end}}
+<main class="card">
+<h1>{{.Title}}</h1>
+{{if .Error}}<div class="alert alert-error" role="alert">{{.Error}}</div>{{end}}
+{{if .Message}}<div class="alert alert-info">{{.Message}}</div>{{end}}
+{{end}}
+
+{{define "footer"}}
+</main>
+<p class="muted">Powered by gocloak</p>
+</body>
+</html>
+{{end}}

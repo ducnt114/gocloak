@@ -1,0 +1,9 @@
+{{template "header" .}}
+<form id="kc-form-login" method="post" action="{{.Action}}">
+  <label for="username">{{.UsernameLabel}}</label>
+  <input id="username" name="username" type="text" value="{{.Username}}" autocomplete="username" autofocus required>
+  <label for="password">Password</label>
+  <input id="password" name="password" type="password" autocomplete="current-password" required>
+  <button type="submit" id="kc-login">Sign In</button>
+</form>
+{{template "footer" .}}
