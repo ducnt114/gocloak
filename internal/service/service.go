@@ -844,6 +844,15 @@ func (s *Service) Bootstrap(ctx context.Context, adminUser, adminPassword string
 		return false, err
 	}
 	err = s.Store.WithTx(ctx, func(tx *store.Store) error {
+		// another node may be bootstrapping the same database
+		if err := tx.TxLock(ctx, "bootstrap"); err != nil {
+			return err
+		}
+		if _, err := tx.GetRealmByName(ctx, MasterRealm); err == nil {
+			return errBootstrapped
+		} else if !errors.Is(err, store.ErrNotFound) {
+			return err
+		}
 		master := NewRealm(MasterRealm)
 		master.DisplayName = "Keycloak"
 		if err := s.CreateRealm(ctx, tx, master); err != nil {
@@ -854,8 +863,13 @@ func (s *Service) Bootstrap(ctx context.Context, adminUser, adminPassword string
 		}
 		return s.ensureAdmin(ctx, tx, master, adminUser, adminPassword)
 	})
+	if errors.Is(err, errBootstrapped) {
+		return false, nil
+	}
 	return err == nil, err
 }
+
+var errBootstrapped = errors.New("bootstrapped by another node")
 
 // EnsureAdmin creates, or resets the password of, a master realm user with
 // the admin and create-realm roles.

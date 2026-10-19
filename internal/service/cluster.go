@@ -25,7 +25,7 @@ func (s *Service) RunInvalidation(ctx context.Context) {
 			s.invalidateKeysLocal("")
 		}
 	}, func() {
-		// notifications may have been missed while disconnected
+		// notifications may have been missed before listening
 		s.Store.InvalidateConfigCache()
 		s.invalidateKeysLocal("")
 	})

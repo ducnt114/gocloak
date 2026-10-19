@@ -138,3 +138,47 @@ func TestCluster(t *testing.T) {
 		u2()
 	}
 }
+
+// TestClusterConcurrentStart starts three nodes at once on an empty
+// database, as a deployment with several replicas does.
+func TestClusterConcurrentStart(t *testing.T) {
+	if os.Getenv("GOCLOAK_TEST_POSTGRES_URL") == "" {
+		t.Skip("needs GOCLOAK_TEST_POSTGRES_URL")
+	}
+	db := testDB(t)
+	type result struct {
+		app *Server
+		err error
+	}
+	results := make(chan result, 3)
+	for i := 0; i < 3; i++ {
+		go func() {
+			app, err := New(context.Background(), Config{DB: db, AdminUser: "admin", AdminPassword: "admin",
+				Log: slog.New(slog.NewTextHandler(testLogOut(), nil))})
+			results <- result{app, err}
+		}()
+	}
+	var nodes []*Server
+	for i := 0; i < 3; i++ {
+		r := <-results
+		if r.err != nil {
+			t.Error(r.err)
+			continue
+		}
+		t.Cleanup(func() { r.app.Close() })
+		nodes = append(nodes, r.app)
+	}
+	if t.Failed() {
+		return
+	}
+	for _, n := range nodes {
+		srv := httptest.NewServer(n.Handler())
+		e := &env{t: t, srv: srv, app: n}
+		e.adminToken()
+		srv.Close()
+	}
+	realms, err := nodes[0].Svc.Store.ListRealms(context.Background())
+	if err != nil || len(realms) != 1 {
+		t.Fatalf("realms: %d %v", len(realms), err)
+	}
+}

@@ -30,17 +30,15 @@ func (s *Store) Notify(ctx context.Context, topic, key string) error {
 
 // Listen calls fn for the invalidations other nodes send (and the ones this
 // node sends), until ctx ends; the connection is reopened after failures.
-// onReconnect runs after a lost connection, as notifications may have been
-// missed (callers drop their whole cache).
-func (s *Store) Listen(ctx context.Context, fn func(topic, key string), onReconnect func()) {
+// onListening runs each time the node starts listening, the first time
+// included: notifications sent before were missed, so callers drop their
+// whole cache.
+func (s *Store) Listen(ctx context.Context, fn func(topic, key string), onListening func()) {
 	if s.driver != Postgres {
 		return
 	}
-	for first := true; ctx.Err() == nil; first = false {
-		if !first {
-			onReconnect()
-		}
-		if err := s.listenOnce(ctx, fn); ctx.Err() == nil && err != nil && s.OnListenError != nil {
+	for ctx.Err() == nil {
+		if err := s.listenOnce(ctx, fn, onListening); ctx.Err() == nil && err != nil && s.OnListenError != nil {
 			s.OnListenError(err)
 		}
 		select {
@@ -51,7 +49,7 @@ func (s *Store) Listen(ctx context.Context, fn func(topic, key string), onReconn
 	}
 }
 
-func (s *Store) listenOnce(ctx context.Context, fn func(topic, key string)) error {
+func (s *Store) listenOnce(ctx context.Context, fn func(topic, key string), onListening func()) error {
 	conn, err := s.db.Conn(ctx)
 	if err != nil {
 		return err
@@ -70,6 +68,7 @@ func (s *Store) listenOnce(ctx context.Context, fn func(topic, key string)) erro
 		if _, err := c.Exec(ctx, "LISTEN "+invalidationChannel); err != nil {
 			return err
 		}
+		onListening()
 		for {
 			n, err := c.WaitForNotification(ctx)
 			if err != nil {
@@ -81,15 +80,32 @@ func (s *Store) listenOnce(ctx context.Context, fn func(topic, key string)) erro
 	})
 }
 
+// TxLock waits for a cluster-wide lock held until the end of the
+// transaction tx runs in. On SQLite, where transactions already exclude each
+// other, it does nothing.
+func (s *Store) TxLock(ctx context.Context, name string) error {
+	if s.driver != Postgres {
+		return nil
+	}
+	if !s.inTx {
+		return errors.New("TxLock outside a transaction")
+	}
+	return s.exec(ctx, `SELECT pg_advisory_xact_lock(?)`, lockID(name))
+}
+
+func lockID(name string) int64 {
+	h := fnv.New64a()
+	h.Write([]byte(name))
+	return int64(h.Sum64() >> 1)
+}
+
 // TryLock takes a cluster-wide lock for a job if no other node holds it; the
 // returned function releases it. On SQLite it always succeeds.
 func (s *Store) TryLock(ctx context.Context, name string) (func(), bool, error) {
 	if s.driver != Postgres {
 		return func() {}, true, nil
 	}
-	h := fnv.New64a()
-	h.Write([]byte(name))
-	id := int64(h.Sum64() >> 1)
+	id := lockID(name)
 	conn, err := s.db.Conn(ctx)
 	if err != nil {
 		return nil, false, err

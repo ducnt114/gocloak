@@ -300,16 +300,22 @@ func (s *Store) migrate(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
-		version BIGINT PRIMARY KEY, name TEXT NOT NULL, applied_at BIGINT NOT NULL)`); err != nil {
+	// nodes starting together on a new database take turns
+	err = s.WithTx(ctx, func(tx *Store) error {
+		if err := tx.TxLock(ctx, "migrate"); err != nil {
+			return err
+		}
+		_, err := tx.q.(cachingQuerier).q.(rebinder).q.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
+		version BIGINT PRIMARY KEY, name TEXT NOT NULL, applied_at BIGINT NOT NULL)`)
+		return err
+	})
+	if err != nil {
 		return err
 	}
 	for _, m := range migs {
 		err := s.WithTx(ctx, func(tx *Store) error {
-			if s.driver == Postgres {
-				if err := tx.exec(ctx, `SELECT pg_advisory_xact_lock(726173)`); err != nil {
-					return err
-				}
+			if err := tx.TxLock(ctx, "migrate"); err != nil {
+				return err
 			}
 			var n int
 			if err := tx.q.QueryRowContext(ctx, `SELECT count(*) FROM schema_migrations WHERE version=?`, m.version).Scan(&n); err != nil {

@@ -84,6 +84,9 @@ func (c *queryCache) lookup(key string) (*cachedRows, uint64) {
 // store keeps rows read since generation gen, unless the cache was
 // invalidated meanwhile (they might predate the write).
 func (c *queryCache) store(key string, e *cachedRows, gen uint64) {
+	if len(e.rows) == 0 {
+		return // what is missing may be created by a node whose notice was missed
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.gen != gen {
