@@ -654,8 +654,7 @@ func (h *Handler) userOfflineSessions(w http.ResponseWriter, r *http.Request, p 
 	return ok(w, out)
 }
 
-// userConsents lists the clients holding offline tokens of the user, the
-// only kind of grant gocloak stores (consent screens are not implemented).
+// userConsents lists the consents and offline tokens of a user by client.
 func (h *Handler) userConsents(w http.ResponseWriter, r *http.Request, p *principal) error {
 	realm, err := h.realmFor(r, p, permViewUsers)
 	if err != nil {
@@ -665,7 +664,7 @@ func (h *Handler) userConsents(w http.ResponseWriter, r *http.Request, p *princi
 	if err != nil {
 		return err
 	}
-	sessions, err := h.Svc.Store.ListOfflineSessions(r.Context(), u.ID)
+	grants, err := h.Svc.UserGrants(r.Context(), realm, u)
 	if err != nil {
 		return err
 	}
@@ -681,25 +680,21 @@ func (h *Handler) userConsents(w http.ResponseWriter, r *http.Request, p *princi
 		AdditionalGrants    []grant  `json:"additionalGrants"`
 	}
 	out := []consent{}
-	seen := map[string]bool{}
-	for _, s := range sessions {
-		for cid := range s.Clients {
-			if seen[cid] {
-				continue
-			}
-			seen[cid] = true
-			c, err := h.Svc.Store.GetClient(r.Context(), realm.ID, cid)
-			if err != nil {
-				continue
-			}
-			out = append(out, consent{ClientID: c.ClientID, GrantedClientScopes: []string{}, CreatedDate: s.Started.UnixMilli(),
-				LastUpdatedDate: s.LastRefresh.UnixMilli(), AdditionalGrants: []grant{{Client: c.ClientID, Key: "Offline Token"}}})
+	for _, g := range grants {
+		c := consent{ClientID: g.Client.ClientID, GrantedClientScopes: []string{}, CreatedDate: g.Created,
+			LastUpdatedDate: g.Updated, AdditionalGrants: []grant{}}
+		for _, it := range g.Items {
+			c.GrantedClientScopes = append(c.GrantedClientScopes, it.Name)
 		}
+		if g.Offline {
+			c.AdditionalGrants = append(c.AdditionalGrants, grant{Client: g.Client.ID, Key: "Offline Token"})
+		}
+		out = append(out, c)
 	}
 	return ok(w, out)
 }
 
-// revokeConsent removes a client's offline tokens for the user.
+// revokeConsent removes the consent and the offline tokens of a client.
 func (h *Handler) revokeConsent(w http.ResponseWriter, r *http.Request, p *principal) error {
 	realm, err := h.realmFor(r, p, permManageUsers)
 	if err != nil {
@@ -716,28 +711,12 @@ func (h *Handler) revokeConsent(w http.ResponseWriter, r *http.Request, p *princ
 	if err != nil {
 		return err
 	}
-	sessions, err := h.Svc.Store.ListOfflineSessions(r.Context(), u.ID)
+	found, err := h.Svc.RevokeGrant(r.Context(), u, c)
 	if err != nil {
 		return err
 	}
-	found := false
-	for _, s := range sessions {
-		if !s.Clients[c.ID] {
-			continue
-		}
-		found = true
-		delete(s.Clients, c.ID)
-		if len(s.Clients) == 0 {
-			err = h.Svc.Store.DeleteSession(r.Context(), s)
-		} else {
-			err = h.Svc.Store.UpdateUserSession(r.Context(), s)
-		}
-		if err != nil {
-			return err
-		}
-	}
 	if !found {
-		return notFound("Consent nor offline token not found")
+		return errStatus(http.StatusNotFound, "Consent nor offline token not found")
 	}
 	return noContent(w)
 }

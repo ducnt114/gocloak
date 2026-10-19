@@ -580,15 +580,42 @@ func (h *Handler) apiCredentialLabel(w http.ResponseWriter, r *http.Request, c *
 
 // applicationRep is Keycloak's account ClientRepresentation.
 type applicationRep struct {
-	ClientID            string `json:"clientId"`
-	ClientName          string `json:"clientName"`
-	Description         string `json:"description,omitempty"`
-	UserConsentRequired bool   `json:"userConsentRequired"`
-	InUse               bool   `json:"inUse"`
-	OfflineAccess       bool   `json:"offlineAccess"`
-	RootURL             string `json:"rootUrl,omitempty"`
-	BaseURL             string `json:"baseUrl,omitempty"`
-	EffectiveURL        string `json:"effectiveUrl,omitempty"`
+	ClientID            string      `json:"clientId"`
+	ClientName          string      `json:"clientName"`
+	Description         string      `json:"description,omitempty"`
+	UserConsentRequired bool        `json:"userConsentRequired"`
+	InUse               bool        `json:"inUse"`
+	OfflineAccess       bool        `json:"offlineAccess"`
+	RootURL             string      `json:"rootUrl,omitempty"`
+	BaseURL             string      `json:"baseUrl,omitempty"`
+	EffectiveURL        string      `json:"effectiveUrl,omitempty"`
+	Consent             *consentRep `json:"consent,omitempty"`
+}
+
+// consentRep is Keycloak's account ConsentRepresentation.
+type consentRep struct {
+	GrantedScopes   []grantedScope `json:"grantedScopes"`
+	CreatedDate     int64          `json:"createdDate"`
+	LastUpdatedDate int64          `json:"lastUpdatedDate"`
+}
+
+type grantedScope struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	DisplayText string `json:"displayTest"` // sic, as in Keycloak
+}
+
+// consentText translates a consent text ("${key}" or literal).
+func (h *Handler) consentText(realm *model.Realm, locale, text string) string {
+	key := service.MessageRef(text)
+	if key == "" {
+		return text
+	}
+	th, err := h.Themes.Get(theme.Login, realm.Settings.LoginTheme)
+	if err != nil {
+		return key
+	}
+	return th.Message(locale, key)
 }
 
 // applications lists the clients the user is logged in to or has offline
@@ -613,9 +640,29 @@ func (h *Handler) applications(ctx context.Context, c *caller, base string) ([]a
 			offline[cid] = true
 		}
 	}
+	grants, err := h.Svc.UserGrants(ctx, c.realm, c.user)
+	if err != nil {
+		return nil, err
+	}
+	consents := map[string]*service.ClientGrant{}
+	for _, g := range grants {
+		if g.Consent != nil {
+			consents[g.Client.ID] = g
+		}
+	}
+	locale := "en"
+	if l := c.user.Attributes["locale"]; len(l) > 0 && l[0] != "" {
+		locale = l[0]
+	}
 	out := []applicationRep{}
 	seen := map[string]bool{}
-	for _, m := range []map[string]bool{inUse, offline} {
+	for _, m := range []map[string]bool{inUse, offline, func() map[string]bool {
+		ids := map[string]bool{}
+		for id := range consents {
+			ids[id] = true
+		}
+		return ids
+	}()} {
 		for cid := range m {
 			if seen[cid] {
 				continue
@@ -629,8 +676,16 @@ func (h *Handler) applications(ctx context.Context, c *caller, base string) ([]a
 			if name == "" || strings.HasPrefix(name, "${") {
 				name = cl.ClientID
 			}
-			out = append(out, applicationRep{ClientID: cl.ClientID, ClientName: name, Description: cl.Description,
-				InUse: inUse[cid], OfflineAccess: offline[cid], RootURL: cl.RootURL, BaseURL: cl.BaseURL, EffectiveURL: clientURL(base, cl)})
+			app := applicationRep{ClientID: cl.ClientID, ClientName: name, Description: cl.Description, UserConsentRequired: cl.ConsentRequired,
+				InUse: inUse[cid], OfflineAccess: offline[cid], RootURL: cl.RootURL, BaseURL: cl.BaseURL, EffectiveURL: clientURL(base, cl)}
+			if g := consents[cid]; g != nil {
+				app.Consent = &consentRep{GrantedScopes: []grantedScope{}, CreatedDate: g.Created, LastUpdatedDate: g.Updated}
+				for _, it := range g.Items {
+					app.Consent.GrantedScopes = append(app.Consent.GrantedScopes, grantedScope{ID: it.ID, Name: it.Text,
+						DisplayText: h.consentText(c.realm, locale, it.Text)})
+				}
+			}
+			out = append(out, app)
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ClientID < out[j].ClientID })
@@ -645,29 +700,14 @@ func (h *Handler) apiApplications(w http.ResponseWriter, r *http.Request, c *cal
 	return writeJSON(w, http.StatusOK, list)
 }
 
-// revokeOffline removes a client's offline tokens of the user.
+// revokeOffline removes the consent and the offline tokens a user gave a client.
 func (h *Handler) revokeOffline(ctx context.Context, c *caller, clientID string) error {
 	cl, err := h.Svc.Store.GetClientByClientID(ctx, c.realm.ID, clientID)
 	if err != nil {
 		return &apiError{http.StatusNotFound, map[string]string{"errorMessage": "Client not found"}}
 	}
-	offs, err := h.Svc.Store.ListOfflineSessions(ctx, c.user.ID)
-	if err != nil {
+	if _, err := h.Svc.RevokeGrant(ctx, c.user, cl); err != nil {
 		return err
-	}
-	for _, s := range offs {
-		if !s.Clients[cl.ID] {
-			continue
-		}
-		delete(s.Clients, cl.ID)
-		if len(s.Clients) == 0 {
-			err = h.Svc.Store.DeleteSession(ctx, s)
-		} else {
-			err = h.Svc.Store.UpdateUserSession(ctx, s)
-		}
-		if err != nil {
-			return err
-		}
 	}
 	h.Svc.RecordEvent(ctx, c.realm, &model.Event{Type: "REVOKE_GRANT", UserID: c.user.ID, ClientID: service.AccountClient,
 		Details: map[string]string{"revoked_client": clientID}})

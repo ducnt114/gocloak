@@ -84,6 +84,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /realms/{realm}/login-actions/authenticate", h.authenticateEndpoint)
 	mux.HandleFunc("POST /realms/{realm}/login-actions/authenticate", h.authenticateEndpoint)
 	mux.HandleFunc("GET /realms/{realm}/login-actions/required-action", h.requiredActionEndpoint)
+	mux.HandleFunc("POST /realms/{realm}/login-actions/consent", h.consentEndpoint)
 	mux.HandleFunc("POST /realms/{realm}/login-actions/required-action", h.requiredActionEndpoint)
 	mux.HandleFunc("GET /realms/{realm}/login-actions/registration", h.registrationEndpoint)
 	mux.HandleFunc("GET /realms/{realm}/login-actions/reset-credentials", h.resetCredentialsEndpoint)
@@ -115,6 +116,9 @@ func errInvalidGrant(d string) *oauthError {
 }
 func errInvalidClient(d string) *oauthError {
 	return &oauthError{http.StatusUnauthorized, "invalid_client", d}
+}
+func errInvalidClient400(d string) *oauthError {
+	return &oauthError{http.StatusBadRequest, "invalid_client", d}
 }
 func errUnauthorizedClient(d string) *oauthError {
 	return &oauthError{http.StatusBadRequest, "unauthorized_client", d}

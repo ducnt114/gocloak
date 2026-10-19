@@ -13,6 +13,15 @@
 </form>
 {{template "footer" .}}{{end}}
 
+{{define "login-oauth-grant.html"}}{{template "header" .}}
+<p>{{.T "oauthGrantRequest"}}</p>
+<ul id="kc-oauth">{{range .Items}}<li>{{$.T .}}</li>{{end}}</ul>
+<form method="post" action="{{.Action}}">
+  <button type="submit" name="accept" id="kc-login" value="Yes">{{.T "doYes"}}</button>
+  <button type="submit" class="secondary" name="cancel" id="kc-cancel" value="No">{{.T "doNo"}}</button>
+</form>
+{{template "footer" .}}{{end}}
+
 {{define "frontchannel-logout.html"}}{{template "header" .}}
 <p>{{.T "frontchannel-logout.message"}}</p>
 {{if .Items}}<ul id="kc-logout-clients">{{range .Items}}<li>{{.}}</li>{{end}}</ul>{{end}}

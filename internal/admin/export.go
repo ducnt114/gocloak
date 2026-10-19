@@ -287,6 +287,25 @@ func exportUsers(ctx context.Context, svc *service.Service, realm *model.Realm, 
 			ur.FederatedIdentities = append(ur.FederatedIdentities, FederatedIdentityRep{IdentityProvider: l.IdentityProvider,
 				UserID: l.FederatedUserID, UserName: l.FederatedUsername})
 		}
+		consents, err := st.ListConsents(ctx, u.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, cn := range consents {
+			c, err := st.GetClient(ctx, realm.ID, cn.ClientID)
+			if err != nil {
+				continue
+			}
+			cr := ClientConsentRep{ClientID: c.ClientID, GrantedClientScopes: []string{}, CreatedDate: cn.Created, LastUpdatedDate: cn.Updated}
+			for _, id := range cn.Scopes {
+				if id == c.ID {
+					cr.GrantedClientScopes = append(cr.GrantedClientScopes, c.ClientID)
+				} else if sc, err := st.GetClientScope(ctx, realm.ID, id); err == nil {
+					cr.GrantedClientScopes = append(cr.GrantedClientScopes, sc.Name)
+				}
+			}
+			ur.ClientConsents = append(ur.ClientConsents, cr)
+		}
 		out = append(out, ur)
 	}
 	return out, nil

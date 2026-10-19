@@ -299,6 +299,24 @@ func importUser(ctx context.Context, svc *service.Service, tx *store.Store, real
 		}
 	}
 
+	for _, cr := range ur.ClientConsents {
+		c, err := tx.GetClientByClientID(ctx, realm.ID, cr.ClientID)
+		if err != nil {
+			continue
+		}
+		consent := &model.UserConsent{UserID: u.ID, ClientID: c.ID, Created: cr.CreatedDate, Updated: cr.LastUpdatedDate}
+		for _, name := range cr.GrantedClientScopes {
+			if name == c.ClientID {
+				consent.Scopes = append(consent.Scopes, c.ID)
+			} else if sc, err := tx.GetClientScopeByName(ctx, realm.ID, name); err == nil {
+				consent.Scopes = append(consent.Scopes, sc.ID)
+			}
+		}
+		if err := tx.SaveConsent(ctx, realm.ID, consent); err != nil {
+			return nil, err
+		}
+	}
+
 	if len(ur.Groups) > 0 {
 		all, err := tx.ListAllGroups(ctx, realm.ID)
 		if err != nil {

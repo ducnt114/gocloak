@@ -216,7 +216,15 @@ func (h *Handler) samlAuthnRequest(w http.ResponseWriter, r *http.Request, realm
 	}
 	if q.IsPassive {
 		us, user := h.ssoSession(r, realm)
-		if us == nil || len(user.RequiredActions) > 0 {
+		var pending []service.ConsentItem
+		if us != nil {
+			var err error
+			if pending, err = h.pendingConsent(r.Context(), realm, client, user, params); err != nil {
+				h.serverErrorPage(w, r, err)
+				return
+			}
+		}
+		if us == nil || len(user.RequiredActions) > 0 || len(pending) > 0 {
 			h.samlSendStatus(w, r, realm, client, params, saml.StatusResponder, saml.StatusNoPassive)
 			return
 		}
@@ -474,7 +482,7 @@ func (h *Handler) samlLoginResponse(w http.ResponseWriter, r *http.Request, real
 	resp := &saml.Response{ID: saml.NewID(), InResponseTo: params[pSAMLRequestID], Destination: acs, Issuer: issuer,
 		IssueInstant: now, Assertion: el}
 	h.event(r, realm, "LOGIN", &eventInfo{client: client, userID: user.ID, sessionID: us.ID, details: map[string]string{
-		"auth_method": "saml", "redirect_uri": acs, "consent": "no_consent_required", "code_id": us.ID, "username": user.Username}})
+		"auth_method": "saml", "redirect_uri": acs, "consent": consentDetail(client, params), "code_id": us.ID, "username": user.Username}})
 	h.samlSend(w, r, signer, client.Attributes[service.SAMLServerSignature] == "true", resp.Element(), "SAMLResponse",
 		acs, params[pSAMLBinding], params[pSAMLRelay])
 }

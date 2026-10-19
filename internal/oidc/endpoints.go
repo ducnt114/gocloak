@@ -292,6 +292,10 @@ func (h *Handler) grantPassword(r *http.Request, realm *model.Realm, client *mod
 	if len(pending) > 0 {
 		return fail("resolve_required_actions", errInvalidGrant("Account is not fully set up"))
 	}
+	if client.ConsentRequired {
+		// no page to ask for consent in a direct grant
+		return fail("consent_denied", errInvalidClient400("Client requires user consent"))
+	}
 	session, err := h.newSession(r, realm, user, client, nil)
 	if err != nil {
 		return nil, err

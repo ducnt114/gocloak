@@ -173,6 +173,14 @@ func (h *Handler) completeAction(fc *flowContext, alias string) error {
 // code, or, for admin requested actions, to the given redirect or a page.
 func (h *Handler) finishAuthentication(fc *flowContext) {
 	ctx := fc.ctx()
+	if fc.as.Params[keyMode] != modeExecution {
+		if asked, err := h.askConsent(fc); err != nil {
+			h.serverErrorPage(fc.w, fc.r, err)
+			return
+		} else if asked {
+			return
+		}
+	}
 	if err := h.Svc.Store.DeleteAuthSession(ctx, fc.as.ID); err != nil {
 		h.serverErrorPage(fc.w, fc.r, err)
 		return

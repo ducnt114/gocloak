@@ -237,6 +237,18 @@ type Client struct {
 	// AdminURL is the client's management endpoint; SAML clients use it as
 	// the default assertion consumer and logout URL.
 	AdminURL string
+	// ConsentRequired makes users grant the client's scopes on a consent page.
+	ConsentRequired bool
+}
+
+// UserConsent is what a user granted a client: client scope ids, and the
+// client's own id when it has a consent text of its own.
+type UserConsent struct {
+	UserID   string
+	ClientID string // client UUID
+	Scopes   []string
+	Created  int64 // millis
+	Updated  int64
 }
 
 // User is a realm user. Service account users are linked to a client.

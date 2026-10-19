@@ -79,7 +79,8 @@ func (h *Handler) authorizeWith(w http.ResponseWriter, r *http.Request, binding 
 		return
 	}
 	fail := func(code, desc string) {
-		h.redirectResult(w, r, redirectURI, mode, url.Values{"error": {code}, "error_description": {desc}, "state": {q("state")}})
+		h.redirectResult(w, r, redirectURI, mode, url.Values{"error": {code}, "error_description": {desc}, "state": {q("state")},
+			"iss": {h.URLs.Issuer(r, realm.Name)}})
 	}
 	if q("response_type") != "code" {
 		fail("unsupported_response_type", "Client is not allowed to initiate browser login with given response_type. Only the authorization code flow is supported.")
@@ -141,6 +142,13 @@ func (h *Handler) authorizeWith(w http.ResponseWriter, r *http.Request, binding 
 		}
 		if len(user.RequiredActions) > 0 {
 			fail("interaction_required", "Interaction required")
+			return
+		}
+		if items, err := h.pendingConsent(ctx, realm, client, user, params); err != nil {
+			h.serverErrorPage(w, r, err)
+			return
+		} else if len(items) > 0 {
+			fail("interaction_required", "")
 			return
 		}
 		h.finishLogin(w, r, realm, client, user, us, params)
@@ -301,7 +309,7 @@ func (h *Handler) finishLogin(w http.ResponseWriter, r *http.Request, realm *mod
 	}
 	h.event(r, realm, "LOGIN", &eventInfo{client: client, userID: user.ID, sessionID: us.ID, details: map[string]string{
 		"auth_method": "openid-connect", "auth_type": "code", "redirect_uri": params["redirect_uri"],
-		"consent": "no_consent_required", "code_id": us.ID, "username": user.Username}})
+		"consent": consentDetail(client, params), "code_id": us.ID, "username": user.Username}})
 	h.redirectResult(w, r, params["redirect_uri"], params["response_mode"], url.Values{
 		"code": {code.Code}, "state": {params["state"]}, "session_state": {us.ID}, "iss": {h.URLs.Issuer(r, realm.Name)},
 	})

@@ -99,6 +99,14 @@ type ClientRep struct {
 	AuthorizationSettings              json.RawMessage     `json:"authorizationSettings,omitempty"`
 }
 
+// ClientConsentRep is a user's consent in realm exports.
+type ClientConsentRep struct {
+	ClientID            string   `json:"clientId"`
+	GrantedClientScopes []string `json:"grantedClientScopes"`
+	CreatedDate         int64    `json:"createdDate,omitempty"`
+	LastUpdatedDate     int64    `json:"lastUpdatedDate,omitempty"`
+}
+
 type CredentialRep struct {
 	ID             string `json:"id,omitempty"`
 	Type           string `json:"type,omitempty"`
@@ -135,6 +143,7 @@ type UserRep struct {
 	// Only used for create/import.
 	Credentials         []CredentialRep        `json:"credentials,omitempty"`
 	FederatedIdentities []FederatedIdentityRep `json:"federatedIdentities,omitempty"`
+	ClientConsents      []ClientConsentRep     `json:"clientConsents,omitempty"`
 	Groups              []string               `json:"groups,omitempty"`
 	RealmRoles          []string               `json:"realmRoles,omitempty"`
 	ClientRoles         map[string][]string    `json:"clientRoles,omitempty"`
@@ -257,7 +266,7 @@ func clientToRep(c *model.Client) ClientRep {
 		RootURL:                            ptr(c.RootURL), BaseURL: ptr(c.BaseURL), RedirectURIs: nonNil(c.RedirectURIs), WebOrigins: nonNil(c.WebOrigins),
 		StandardFlowEnabled: ptr(c.StandardFlowEnabled), ImplicitFlowEnabled: ptr(false),
 		DirectAccessGrantsEnabled: ptr(c.DirectAccessGrantsEnabled), ServiceAccountsEnabled: ptr(c.ServiceAccountsEnabled),
-		ConsentRequired: ptr(false), FullScopeAllowed: ptr(c.FullScopeAllowed), Protocol: ptr(c.Protocol),
+		ConsentRequired: ptr(c.ConsentRequired), FullScopeAllowed: ptr(c.FullScopeAllowed), Protocol: ptr(c.Protocol),
 		Attributes: c.Attributes, FrontchannelLogout: ptr(c.FrontchannelLogout), AdminURL: optional(c.AdminURL),
 	}
 }
@@ -311,6 +320,7 @@ func applyClientRep(c *model.Client, rep *ClientRep) {
 	set(&c.AdminURL, rep.AdminURL)
 	set(&c.BaseURL, rep.BaseURL)
 	set(&c.FrontchannelLogout, rep.FrontchannelLogout)
+	set(&c.ConsentRequired, rep.ConsentRequired)
 	if rep.RedirectURIs != nil {
 		c.RedirectURIs = rep.RedirectURIs
 	}

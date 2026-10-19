@@ -9,7 +9,7 @@ import (
 const clientCols = `id, realm_id, client_id, name, description, enabled, public_client, bearer_only, secret,
 	root_url, base_url, redirect_uris, web_origins, standard_flow_enabled, direct_access_grants_enabled,
 	service_accounts_enabled, full_scope_allowed, protocol, attributes, client_authenticator_type, not_before, flow_overrides,
-	frontchannel_logout, admin_url`
+	frontchannel_logout, admin_url, consent_required`
 
 func scanClient(sc scanner) (*model.Client, error) {
 	c := &model.Client{Attributes: map[string]string{}}
@@ -17,7 +17,7 @@ func scanClient(sc scanner) (*model.Client, error) {
 		&c.BearerOnly, &c.Secret, &c.RootURL, &c.BaseURL, jsonCol{&c.RedirectURIs}, jsonCol{&c.WebOrigins},
 		&c.StandardFlowEnabled, &c.DirectAccessGrantsEnabled, &c.ServiceAccountsEnabled, &c.FullScopeAllowed,
 		&c.Protocol, jsonCol{&c.Attributes}, &c.ClientAuthenticatorType, &c.NotBefore, jsonCol{&c.FlowOverrides},
-		&c.FrontchannelLogout, &c.AdminURL)
+		&c.FrontchannelLogout, &c.AdminURL, &c.ConsentRequired)
 	if err != nil {
 		return nil, mapErr(err)
 	}
@@ -43,12 +43,12 @@ func clientArgs(c *model.Client) []any {
 	return []any{c.ClientID, c.Name, c.Description, c.Enabled, c.PublicClient, c.BearerOnly, c.Secret,
 		c.RootURL, c.BaseURL, toJSON(c.RedirectURIs), toJSON(c.WebOrigins), c.StandardFlowEnabled,
 		c.DirectAccessGrantsEnabled, c.ServiceAccountsEnabled, c.FullScopeAllowed, c.Protocol, toJSON(c.Attributes),
-		c.ClientAuthenticatorType, c.NotBefore, toJSON(c.FlowOverrides), c.FrontchannelLogout, c.AdminURL}
+		c.ClientAuthenticatorType, c.NotBefore, toJSON(c.FlowOverrides), c.FrontchannelLogout, c.AdminURL, c.ConsentRequired}
 }
 
 func (s *Store) CreateClient(ctx context.Context, c *model.Client) error {
 	args := append([]any{c.ID, c.RealmID}, clientArgs(c)...)
-	return s.exec(ctx, `INSERT INTO clients (`+clientCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, args...)
+	return s.exec(ctx, `INSERT INTO clients (`+clientCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, args...)
 }
 
 func (s *Store) UpdateClient(ctx context.Context, c *model.Client) error {
@@ -56,7 +56,7 @@ func (s *Store) UpdateClient(ctx context.Context, c *model.Client) error {
 	return s.execOne(ctx, `UPDATE clients SET client_id=?, name=?, description=?, enabled=?, public_client=?,
 		bearer_only=?, secret=?, root_url=?, base_url=?, redirect_uris=?, web_origins=?, standard_flow_enabled=?,
 		direct_access_grants_enabled=?, service_accounts_enabled=?, full_scope_allowed=?, protocol=?, attributes=?,
-		client_authenticator_type=?, not_before=?, flow_overrides=?, frontchannel_logout=?, admin_url=? WHERE id=?`, args...)
+		client_authenticator_type=?, not_before=?, flow_overrides=?, frontchannel_logout=?, admin_url=?, consent_required=? WHERE id=?`, args...)
 }
 
 // DeleteClient removes a client together with its roles and service account user.
