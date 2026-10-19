@@ -68,6 +68,7 @@ func (h *Handler) discovery(w http.ResponseWriter, r *http.Request) {
 		"backchannel_logout_session_supported":                     true,
 		"grant_types_supported":                                    []string{"authorization_code", "client_credentials", "password", "refresh_token", grantDeviceCode, grantTokenExchange},
 		"device_authorization_endpoint":                            p + "/auth/device",
+		"registration_endpoint":                                    iss + "/clients-registrations/openid-connect",
 		"response_types_supported":                                 []string{"code"},
 		"response_modes_supported":                                 []string{"query", "fragment", "form_post"},
 		"subject_types_supported":                                  []string{"public"},

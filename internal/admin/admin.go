@@ -541,6 +541,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	add("GET "+R+"/users/{id}/unmanagedAttributes", h.unmanagedAttributes)
 	h.registerCertificateRoutes(R, add)
 	h.registerAuthzRoutes(R, add)
+	h.registerClientRegistration(mux, add)
 	add("GET "+R+"/clients/{id}/offline-sessions", h.clientSessions)
 	add("GET "+R+"/clients/{id}/session-count", h.clientSessions)
 	add("GET "+R+"/clients/{id}/offline-session-count", h.clientSessions)

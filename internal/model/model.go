@@ -241,6 +241,17 @@ type Client struct {
 	ConsentRequired bool
 }
 
+// InitialAccessToken lets clients register themselves (dynamic client
+// registration) a limited number of times.
+type InitialAccessToken struct {
+	ID         string
+	RealmID    string
+	Created    int64 // unix seconds
+	Expiration int   // seconds, 0 for none
+	Count      int
+	Remaining  int
+}
+
 // DeviceCode is a pending OAuth 2.0 device authorization (RFC 8628).
 type DeviceCode struct {
 	DeviceCode string

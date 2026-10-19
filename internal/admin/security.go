@@ -101,7 +101,7 @@ func (h *Handler) createComponent(w http.ResponseWriter, r *http.Request, p *pri
 		return err
 	}
 	switch rep.ProviderType {
-	case service.KeyProviderType, federation.ProviderType, federation.MapperType:
+	case service.KeyProviderType, federation.ProviderType, federation.MapperType, service.RegistrationPolicyType:
 	default:
 		return badRequest("Unsupported component type: " + rep.ProviderType)
 	}
@@ -118,6 +118,15 @@ func (h *Handler) createComponent(w http.ResponseWriter, r *http.Request, p *pri
 	}
 	if c.Config == nil {
 		c.Config = map[string][]string{}
+	}
+	if c.ProviderType == service.RegistrationPolicyType {
+		if !registrationPolicyProviders[c.ProviderID] || (c.SubType != "anonymous" && c.SubType != "authenticated") {
+			return badRequest("Unknown client registration policy " + c.ProviderID)
+		}
+		if err := h.Svc.Store.CreateComponent(r.Context(), c); err != nil {
+			return err
+		}
+		return created(w, r, c.ID)
 	}
 	if c.ProviderType != service.KeyProviderType {
 		if err := h.prepareFederationComponent(r.Context(), realm, c, nil); err != nil {
@@ -161,6 +170,15 @@ func (h *Handler) updateComponent(w http.ResponseWriter, r *http.Request, p *pri
 	}
 	for k, v := range rep.Config {
 		c.Config[k] = v
+	}
+	if c.ProviderType == service.RegistrationPolicyType {
+		if rep.Config != nil {
+			c.Config = rep.Config
+		}
+		if err := h.Svc.Store.UpdateComponent(r.Context(), &c); err != nil {
+			return err
+		}
+		return noContent(w)
 	}
 	if c.ProviderType != service.KeyProviderType {
 		if rep.Config != nil && c.ProviderType == federation.ProviderType {
@@ -720,6 +738,10 @@ func (h *Handler) revokeConsent(w http.ResponseWriter, r *http.Request, p *princ
 	}
 	return noContent(w)
 }
+
+// registrationPolicyProviders are the client registration policies gocloak applies.
+var registrationPolicyProviders = map[string]bool{"trusted-hosts": true, "consent-required": true, "scope": true,
+	"max-clients": true, "allowed-protocol-mappers": true, "allowed-client-templates": true}
 
 // policyError renders a password policy violation as Keycloak does.
 func policyError(err error) (*httpError, bool) {

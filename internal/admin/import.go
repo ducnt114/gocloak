@@ -577,6 +577,31 @@ func importComponents(ctx context.Context, svc *service.Service, tx *store.Store
 		}
 		svc.InvalidateKeys(realm.ID)
 	}
+	// client registration policies replace the defaults of the new realm
+	if policies := rep.Components[service.RegistrationPolicyType]; len(policies) > 0 {
+		existing, err := tx.ListComponents(ctx, realm.ID, service.RegistrationPolicyType)
+		if err != nil {
+			return err
+		}
+		for _, c := range existing {
+			if err := tx.DeleteComponent(ctx, realm.ID, c.ID); err != nil {
+				return err
+			}
+		}
+		for _, p := range policies {
+			if !registrationPolicyProviders[p.ProviderID] {
+				continue
+			}
+			c := &model.Component{ID: service.NewID(), RealmID: realm.ID, Name: p.Name, ProviderID: p.ProviderID,
+				ProviderType: service.RegistrationPolicyType, ParentID: realm.ID, SubType: p.SubType, Config: p.Config}
+			if c.Config == nil {
+				c.Config = map[string][]string{}
+			}
+			if err := tx.CreateComponent(ctx, c); err != nil {
+				return err
+			}
+		}
+	}
 	for _, sp := range rep.Components[federation.ProviderType] {
 		c := &model.Component{ID: sp.ID, RealmID: realm.ID, Name: sp.Name, ProviderID: sp.ProviderID,
 			ProviderType: federation.ProviderType, ParentID: realm.ID, SubType: sp.SubType, Config: sp.Config}

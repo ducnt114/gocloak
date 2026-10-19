@@ -165,6 +165,9 @@ func (s *Service) CreateRealm(ctx context.Context, st *store.Store, r *model.Rea
 	if err := s.CreateDefaultKeys(ctx, st, r); err != nil {
 		return err
 	}
+	if err := createRegistrationPolicies(ctx, st, r.ID); err != nil {
+		return err
+	}
 	if err := st.CreateRole(ctx, defaultRole); err != nil {
 		return err
 	}

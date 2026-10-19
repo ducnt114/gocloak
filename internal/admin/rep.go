@@ -101,6 +101,7 @@ type ClientRep struct {
 	OptionalClientScopes               []string            `json:"optionalClientScopes,omitempty"`
 	AuthorizationServicesEnabled       *bool               `json:"authorizationServicesEnabled,omitempty"`
 	AuthorizationSettings              json.RawMessage     `json:"authorizationSettings,omitempty"`
+	RegistrationAccessToken            string              `json:"registrationAccessToken,omitempty"`
 }
 
 // ClientConsentRep is a user's consent in realm exports.
