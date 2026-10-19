@@ -96,6 +96,33 @@ func TestCluster(t *testing.T) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
+	// a configuration change made on one node shows on all of them
+	var clients []map[string]any
+	e.expect(e.do(nil, "GET", "/admin/realms/demo/clients?clientId=web", admin, nil, nil), 200).json(&clients)
+	webID := clients[0]["id"].(string)
+	e.expect(e.do(nil, "POST", "/admin/realms/demo/clients/"+webID+"/protocol-mappers/models", admin, map[string]any{
+		"name": "tier", "protocol": "openid-connect", "protocolMapper": "oidc-hardcoded-claim-mapper",
+		"config": map[string]string{"claim.name": "tier", "claim.value": "gold", "jsonType.label": "String", "access.token.claim": "true"},
+	}, nil), 201)
+	deadline = time.Now().Add(5 * time.Second)
+	for {
+		withClaim := 0
+		for n := 0; n < 3; n++ {
+			got, r := e.passwordGrant("demo", "web", "web-secret", "alice", "wonderland")
+			e.expect(r, 200)
+			if claims(t, got.AccessToken).String("tier") == "gold" {
+				withClaim++
+			}
+		}
+		if withClaim == 3 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("only %d of 3 nodes use the new mapper", withClaim)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
 	// jobs run on one node at a time
 	unlock, ok, err := nodes[0].Svc.Store.TryLock(ctx, "test-job")
 	if err != nil || !ok {

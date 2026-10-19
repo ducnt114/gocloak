@@ -24,7 +24,7 @@ import (
 )
 
 type env struct {
-	t   *testing.T
+	t   testing.TB
 	srv *httptest.Server
 	app *Server
 }
@@ -35,7 +35,7 @@ func newEnv(t *testing.T) *env {
 }
 
 // newEnvWith starts a server whose configuration is adjusted by configure.
-func newEnvWith(t *testing.T, configure func(*Config)) *env {
+func newEnvWith(t testing.TB, configure func(*Config)) *env {
 	t.Helper()
 	cfg := Config{
 		DB: testDB(t), AdminUser: "admin", AdminPassword: "admin",
@@ -138,7 +138,7 @@ func (e *env) adminToken() string {
 	return t.AccessToken
 }
 
-func claims(t *testing.T, tok string) jwt.Claims {
+func claims(t testing.TB, tok string) jwt.Claims {
 	t.Helper()
 	_, c, err := jwt.Parse(tok)
 	if err != nil {
@@ -168,7 +168,7 @@ func clientRoles(c jwt.Claims, client string) []string {
 	return strs(cr["roles"])
 }
 
-func idFromLocation(t *testing.T, r *response) string {
+func idFromLocation(t testing.TB, r *response) string {
 	t.Helper()
 	loc := r.header.Get("Location")
 	if loc == "" {
@@ -633,7 +633,7 @@ func cookiejarNew() (http.CookieJar, error) { return cookiejar.New(nil) }
 
 var formActionRe = regexp.MustCompile(`action="([^"]+)"`)
 
-func formAction(t *testing.T, body []byte) string {
+func formAction(t testing.TB, body []byte) string {
 	t.Helper()
 	m := formActionRe.FindSubmatch(body)
 	if m == nil {

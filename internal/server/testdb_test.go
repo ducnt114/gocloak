@@ -16,7 +16,7 @@ import (
 // testDB returns the database for a test: a fresh SQLite file by default, or,
 // when GOCLOAK_TEST_POSTGRES_URL is set, a fresh schema in that PostgreSQL
 // database (dropped after the test).
-func testDB(t *testing.T) store.Config {
+func testDB(t testing.TB) store.Config {
 	t.Helper()
 	pgURL := os.Getenv("GOCLOAK_TEST_POSTGRES_URL")
 	if pgURL == "" {

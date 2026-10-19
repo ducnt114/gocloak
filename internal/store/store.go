@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -52,8 +53,9 @@ type querier interface {
 // rebinder rewrites the '?' placeholders used throughout the package into
 // '$n' for PostgreSQL. No query in this package has '?' inside a literal.
 type rebinder struct {
-	q  querier
-	pg bool
+	q     querier
+	pg    bool
+	stmts *stmtCache // prepared statements, for SQLite outside transactions
 }
 
 func (r rebinder) rebind(query string) string {
@@ -75,15 +77,63 @@ func (r rebinder) rebind(query string) string {
 }
 
 func (r rebinder) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	if st := r.stmts.get(ctx, query); st != nil {
+		return st.ExecContext(ctx, args...)
+	}
 	return r.q.ExecContext(ctx, r.rebind(query), args...)
 }
 
 func (r rebinder) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	if st := r.stmts.get(ctx, query); st != nil {
+		return st.QueryContext(ctx, args...)
+	}
 	return r.q.QueryContext(ctx, r.rebind(query), args...)
 }
 
 func (r rebinder) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	if st := r.stmts.get(ctx, query); st != nil {
+		return st.QueryRowContext(ctx, args...)
+	}
 	return r.q.QueryRowContext(ctx, r.rebind(query), args...)
+}
+
+// stmtCache keeps prepared statements of the most used queries. The SQLite
+// driver parses every query it is given again, which costs more than running
+// most of them; pgx keeps its own cache per connection.
+type stmtCache struct {
+	db *sql.DB
+	mu sync.RWMutex
+	m  map[string]*sql.Stmt
+}
+
+// maxCachedStmts bounds the cache: queries built with a variable number of
+// placeholders are many, and once it is full they are just not cached.
+const maxCachedStmts = 1000
+
+func (c *stmtCache) get(ctx context.Context, query string) *sql.Stmt {
+	if c == nil {
+		return nil
+	}
+	c.mu.RLock()
+	st, ok := c.m[query]
+	c.mu.RUnlock()
+	if ok {
+		return st
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if st, ok := c.m[query]; ok {
+		return st
+	}
+	if len(c.m) >= maxCachedStmts {
+		return nil
+	}
+	st, err := c.db.PrepareContext(ctx, query)
+	if err != nil {
+		return nil // the query runs unprepared and reports its error
+	}
+	c.m[query] = st
+	return st
 }
 
 // Store gives access to all persisted entities. A Store returned by WithTx
@@ -93,6 +143,7 @@ type Store struct {
 	q      querier
 	driver string
 	inTx   bool
+	cache  *queryCache
 
 	// OnListenError reports a lost invalidation connection (see Listen).
 	OnListenError func(error)
@@ -115,20 +166,26 @@ func Open(cfg Config) (*Store, error) {
 		// transactions take the write lock up front (_txlock=immediate) and
 		// other writers wait on busy_timeout instead of failing.
 		db.SetMaxOpenConns(8)
+		db.SetMaxIdleConns(8)
 	case Postgres:
 		if db, err = sql.Open("pgx", cfg.URL); err != nil {
 			return nil, err
 		}
 		db.SetMaxOpenConns(32)
+		// keep connections open under load instead of the default two
+		db.SetMaxIdleConns(32)
 		db.SetConnMaxIdleTime(5 * time.Minute)
 	default:
 		return nil, fmt.Errorf("unsupported database driver %q", cfg.Driver)
 	}
-	s := &Store{db: db, driver: cfg.Driver}
-	s.q = rebinder{q: db, pg: cfg.Driver == Postgres}
+	s := &Store{db: db, driver: cfg.Driver, cache: newQueryCache()}
+	s.q = cachingQuerier{q: rebinder{q: db, pg: cfg.Driver == Postgres}, cache: s.cache, written: s.configChanged}
 	if err := s.migrate(context.Background()); err != nil {
-		db.Close()
+		s.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
+	}
+	if cfg.Driver == SQLite {
+		s.q = cachingQuerier{q: rebinder{q: db, stmts: &stmtCache{db: db, m: map[string]*sql.Stmt{}}}, cache: s.cache, written: s.configChanged}
 	}
 	return s, nil
 }
@@ -137,7 +194,21 @@ func Open(cfg Config) (*Store, error) {
 func (s *Store) Driver() string { return s.driver }
 
 // Close closes the underlying database.
-func (s *Store) Close() error { return s.db.Close() }
+func (s *Store) Close() error {
+	s.cache.replay.Close()
+	return s.db.Close()
+}
+
+// configChanged empties the configuration cache after a committed write, on
+// this node and the others.
+func (s *Store) configChanged() {
+	s.cache.invalidate()
+	_ = s.Notify(context.Background(), TopicConfig, "")
+}
+
+// InvalidateConfigCache empties the configuration cache of this node (on a
+// notification from another one).
+func (s *Store) InvalidateConfigCache() { s.cache.invalidate() }
 
 // Ping checks database connectivity.
 func (s *Store) Ping(ctx context.Context) error { return s.db.PingContext(ctx) }
@@ -151,12 +222,20 @@ func (s *Store) WithTx(ctx context.Context, fn func(tx *Store) error) error {
 	if err != nil {
 		return err
 	}
-	txs := &Store{db: s.db, driver: s.driver, inTx: true, q: rebinder{q: tx, pg: s.driver == Postgres}}
+	dirty := false
+	txs := &Store{db: s.db, driver: s.driver, inTx: true, cache: s.cache}
+	txs.q = cachingQuerier{q: rebinder{q: tx, pg: s.driver == Postgres}, written: func() { dirty = true }}
 	if err := fn(txs); err != nil {
 		tx.Rollback()
 		return err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	if dirty {
+		s.configChanged()
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------- migrations
@@ -243,8 +322,13 @@ func (s *Store) migrate(ctx context.Context) error {
 				if err := m.fn(ctx, tx); err != nil {
 					return fmt.Errorf("%s: %w", m.name, err)
 				}
-			} else if _, err := tx.q.(rebinder).q.ExecContext(ctx, m.sql); err != nil {
-				return fmt.Errorf("%s: %w", m.name, err)
+			} else {
+				// the file as is: no placeholders to rebind
+				cq := tx.q.(cachingQuerier)
+				cq.written()
+				if _, err := cq.q.(rebinder).q.ExecContext(ctx, m.sql); err != nil {
+					return fmt.Errorf("%s: %w", m.name, err)
+				}
 			}
 			return tx.exec(ctx, `INSERT INTO schema_migrations (version, name, applied_at) VALUES (?,?,?)`, m.version, m.name, time.Now().Unix())
 		})

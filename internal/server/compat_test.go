@@ -130,7 +130,7 @@ func TestKeycloakCompatibility(t *testing.T) {
 	}
 }
 
-func decodeJWT(t *testing.T, tok string) map[string]any {
+func decodeJWT(t testing.TB, tok string) map[string]any {
 	t.Helper()
 	parts := strings.Split(tok, ".")
 	b, err := base64.RawURLEncoding.DecodeString(parts[1])
