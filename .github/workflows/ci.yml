@@ -84,4 +84,5 @@ jobs:
           for i in $(seq 1 30); do curl -sf localhost:8080/health/ready && break; sleep 1; done
           curl -sf -d grant_type=password -d client_id=admin-cli -d username=admin -d password=admin \
             localhost:8080/realms/master/protocol/openid-connect/token > /dev/null
+          curl -sf localhost:8080/admin/master/console/ | grep -q '"clientId":"security-admin-console"'
           docker logs gocloak

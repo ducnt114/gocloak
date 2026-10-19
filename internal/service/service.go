@@ -193,6 +193,9 @@ func (s *Service) CreateRealm(ctx context.Context, st *store.Store, r *model.Rea
 	if err := s.createBrokerClient(ctx, st, r); err != nil {
 		return err
 	}
+	if err := s.createConsoleClient(ctx, st, r, false); err != nil {
+		return err
+	}
 
 	mgmt := &model.Client{ID: NewID(), RealmID: r.ID, ClientID: RealmManagementClient, Name: "${client_realm-management}",
 		Enabled: true, BearerOnly: true, FullScopeAllowed: false, Protocol: "openid-connect"}
@@ -339,6 +342,17 @@ func (s *Service) CreateUser(ctx context.Context, st *store.Store, u *model.User
 	if realm.DefaultRoleID != "" {
 		if err := st.GrantUserRole(ctx, u.ID, realm.DefaultRoleID); err != nil {
 			return err
+		}
+	}
+	if u.ServiceAccountClientID == "" {
+		groups, err := st.ListDefaultGroups(ctx, realm.ID)
+		if err != nil {
+			return err
+		}
+		for _, g := range groups {
+			if err := st.AddUserToGroup(ctx, u.ID, g.ID); err != nil {
+				return err
+			}
 		}
 	}
 	if s.Federation != nil && u.FederationLink == "" && u.ServiceAccountClientID == "" && !federationDisabled(ctx) {

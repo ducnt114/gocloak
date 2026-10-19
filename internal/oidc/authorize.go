@@ -19,6 +19,7 @@ import (
 
 const (
 	identityCookie    = "KEYCLOAK_IDENTITY"
+	sessionCookie     = "KEYCLOAK_SESSION"
 	authSessionCookie = "AUTH_SESSION_ID"
 	authSessionTTL    = 30 * time.Minute
 )
@@ -362,6 +363,9 @@ func (h *Handler) setIdentityCookie(w http.ResponseWriter, r *http.Request, real
 		maxAge = int(time.Until(exp).Seconds())
 	}
 	h.setCookie(w, r, realm, identityCookie, tok, maxAge)
+	// readable by the login status iframe of keycloak-js applications
+	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: realm.Name + "/" + user.ID + "/" + us.ID, Path: h.cookiePath(realm),
+		MaxAge: maxAge, Secure: strings.HasPrefix(h.URLs.Base(r), "https://"), SameSite: http.SameSiteLaxMode})
 	return nil
 }
 
@@ -459,6 +463,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 			details: map[string]string{"redirect_uri": redirect}})
 	}
 	h.clearCookie(w, r, realm, identityCookie)
+	h.clearCookie(w, r, realm, sessionCookie)
 	if front != "" {
 		http.Redirect(w, r, front, http.StatusFound)
 		return

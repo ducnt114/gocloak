@@ -3,6 +3,8 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/ducnt114/gocloak/internal/account"
 	"github.com/ducnt114/gocloak/internal/admin"
+	"github.com/ducnt114/gocloak/internal/adminconsole"
 	"github.com/ducnt114/gocloak/internal/federation"
 	"github.com/ducnt114/gocloak/internal/oidc"
 	"github.com/ducnt114/gocloak/internal/service"
@@ -40,6 +43,12 @@ type Config struct {
 	// client IP on the protocol and admin endpoints (0 disables limiting).
 	RateLimit float64
 	RateBurst int
+	// AdminConsoleDir holds the jars of Keycloak's admin console (see
+	// 'gocloak download-admin-console'); without them /admin explains how
+	// to install it.
+	AdminConsoleDir string
+	// Version is the gocloak version.
+	Version string
 }
 
 // Server is a running gocloak instance.
@@ -102,17 +111,38 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 	oh := &oidc.Handler{Svc: svc, URLs: urls, Log: cfg.Log, Themes: themes}
 	oh.Register(mux)
 	(&account.Handler{Svc: svc, URLs: urls, Log: cfg.Log, Themes: themes, OIDC: oh}).Register(mux)
-	(&admin.Handler{Svc: svc, URLs: urls, Log: cfg.Log, Fed: fed}).Register(mux)
+	ah := &admin.Handler{Svc: svc, URLs: urls, Log: cfg.Log, Fed: fed, Version: cfg.Version, Themes: themes}
+	ah.Register(mux)
+	console := &adminconsole.Handler{Svc: svc, URLs: urls, Log: cfg.Log, ResourceVersion: resourceVersion(cfg.Version),
+		Whoami: ah.WhoamiHandler()}
+	if cfg.AdminConsoleDir != "" {
+		assets, err := adminconsole.Load(cfg.AdminConsoleDir)
+		if err != nil {
+			cfg.Log.Warn("admin console not available", "dir", cfg.AdminConsoleDir, "err", err)
+		} else {
+			console.Assets = assets
+			cfg.Log.Info("admin console enabled", "keycloak", assets.Version)
+		}
+	}
+	console.Register(mux)
 	mux.HandleFunc("GET /health", s.health)
 	mux.HandleFunc("GET /health/live", s.health)
 	mux.HandleFunc("GET /health/ready", s.health)
 	mux.HandleFunc("GET /{$}", s.welcome)
-	var h http.Handler = mux
+	var h http.Handler = admin.StripTrailingSlash(mux)
 	if cfg.RateLimit > 0 {
 		h = newRateLimiter(cfg.RateLimit, cfg.RateBurst, cfg.ProxyHeaders).wrap(h)
 	}
 	s.handler = s.logRequests(h)
 	return s, nil
+}
+
+// resourceVersion is the path segment versioning static resources: it
+// changes at every start, as in Keycloak, so that browsers fetch new files
+// after an upgrade (any value is served).
+func resourceVersion(version string) string {
+	sum := sha256.Sum256([]byte(version + "|" + time.Now().String()))
+	return hex.EncodeToString(sum[:])[:5]
 }
 
 // Handler returns the root HTTP handler.

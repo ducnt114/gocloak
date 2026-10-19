@@ -11,19 +11,19 @@ import (
 // PUT requests update only the attributes that are present, as Keycloak does.
 
 type RealmRep struct {
-	ID                     *string           `json:"id,omitempty"`
-	Realm                  *string           `json:"realm,omitempty"`
-	DisplayName            *string           `json:"displayName,omitempty"`
-	Enabled                *bool             `json:"enabled,omitempty"`
-	AccessTokenLifespan    *int              `json:"accessTokenLifespan,omitempty"`
-	AccessCodeLifespan     *int              `json:"accessCodeLifespan,omitempty"`
-	SSOSessionIdleTimeout  *int              `json:"ssoSessionIdleTimeout,omitempty"`
-	SSOSessionMaxLifespan  *int              `json:"ssoSessionMaxLifespan,omitempty"`
-	LoginWithEmailAllowed  *bool             `json:"loginWithEmailAllowed,omitempty"`
-	DuplicateEmailsAllowed *bool             `json:"duplicateEmailsAllowed,omitempty"`
-	RegistrationAllowed    *bool             `json:"registrationAllowed,omitempty"`
-	Attributes             map[string]string `json:"attributes,omitempty"`
-	DefaultRole            *RoleRep          `json:"defaultRole,omitempty"`
+	ID                     *string  `json:"id,omitempty"`
+	Realm                  *string  `json:"realm,omitempty"`
+	DisplayName            *string  `json:"displayName,omitempty"`
+	Enabled                *bool    `json:"enabled,omitempty"`
+	AccessTokenLifespan    *int     `json:"accessTokenLifespan,omitempty"`
+	AccessCodeLifespan     *int     `json:"accessCodeLifespan,omitempty"`
+	SSOSessionIdleTimeout  *int     `json:"ssoSessionIdleTimeout,omitempty"`
+	SSOSessionMaxLifespan  *int     `json:"ssoSessionMaxLifespan,omitempty"`
+	LoginWithEmailAllowed  *bool    `json:"loginWithEmailAllowed,omitempty"`
+	DuplicateEmailsAllowed *bool    `json:"duplicateEmailsAllowed,omitempty"`
+	RegistrationAllowed    *bool    `json:"registrationAllowed,omitempty"`
+	Attributes             strMap   `json:"attributes,omitempty"`
+	DefaultRole            *RoleRep `json:"defaultRole,omitempty"`
 
 	// Settings flatten into the realm JSON, as in Keycloak. PUT requests
 	// apply them by decoding the body onto the stored settings, so absent
@@ -45,6 +45,7 @@ type RealmRep struct {
 	RequiredActions             []requiredActionRep          `json:"requiredActions,omitempty"`
 	Components                  map[string][]componentExport `json:"components,omitempty"`
 	IdentityProviders           []IdentityProviderRep        `json:"identityProviders,omitempty"`
+	DefaultGroups               []string                     `json:"defaultGroups,omitempty"`
 	IdentityProviderMappers     []IdPMapperRep               `json:"identityProviderMappers,omitempty"`
 }
 
@@ -85,7 +86,7 @@ type ClientRep struct {
 	ConsentRequired                    *bool               `json:"consentRequired,omitempty"`
 	FullScopeAllowed                   *bool               `json:"fullScopeAllowed,omitempty"`
 	Protocol                           *string             `json:"protocol,omitempty"`
-	Attributes                         map[string]string   `json:"attributes,omitempty"`
+	Attributes                         strMap              `json:"attributes,omitempty"`
 	ProtocolMappers                    []ProtocolMapperRep `json:"protocolMappers,omitempty"`
 	DefaultClientScopes                []string            `json:"defaultClientScopes,omitempty"`
 	AuthenticationFlowBindingOverrides map[string]string   `json:"authenticationFlowBindingOverrides,omitempty"`
@@ -105,23 +106,23 @@ type CredentialRep struct {
 }
 
 type UserRep struct {
-	ID                     *string             `json:"id,omitempty"`
-	Username               *string             `json:"username,omitempty"`
-	Email                  *string             `json:"email,omitempty"`
-	EmailVerified          *bool               `json:"emailVerified,omitempty"`
-	FirstName              *string             `json:"firstName,omitempty"`
-	LastName               *string             `json:"lastName,omitempty"`
-	Enabled                *bool               `json:"enabled,omitempty"`
-	CreatedTimestamp       *int64              `json:"createdTimestamp,omitempty"`
-	Totp                   *bool               `json:"totp,omitempty"`
-	Attributes             map[string][]string `json:"attributes,omitempty"`
-	RequiredActions        []string            `json:"requiredActions"`
-	NotBefore              *int64              `json:"notBefore,omitempty"`
-	Access                 map[string]bool     `json:"access,omitempty"`
-	ServiceAccountClientID *string             `json:"serviceAccountClientId,omitempty"`
-	DisableableCredTypes   *[]string           `json:"disableableCredentialTypes,omitempty"`
-	FederationLink         *string             `json:"federationLink,omitempty"`
-	Origin                 *string             `json:"origin,omitempty"`
+	ID                     *string         `json:"id,omitempty"`
+	Username               *string         `json:"username,omitempty"`
+	Email                  *string         `json:"email,omitempty"`
+	EmailVerified          *bool           `json:"emailVerified,omitempty"`
+	FirstName              *string         `json:"firstName,omitempty"`
+	LastName               *string         `json:"lastName,omitempty"`
+	Enabled                *bool           `json:"enabled,omitempty"`
+	CreatedTimestamp       *int64          `json:"createdTimestamp,omitempty"`
+	Totp                   *bool           `json:"totp,omitempty"`
+	Attributes             listMap         `json:"attributes,omitempty"`
+	RequiredActions        []string        `json:"requiredActions"`
+	NotBefore              *int64          `json:"notBefore,omitempty"`
+	Access                 map[string]bool `json:"access,omitempty"`
+	ServiceAccountClientID *string         `json:"serviceAccountClientId,omitempty"`
+	DisableableCredTypes   *[]string       `json:"disableableCredentialTypes,omitempty"`
+	FederationLink         *string         `json:"federationLink,omitempty"`
+	Origin                 *string         `json:"origin,omitempty"`
 
 	UserProfileMetadata *profileMetadata `json:"userProfileMetadata,omitempty"`
 
@@ -134,14 +135,14 @@ type UserRep struct {
 }
 
 type RoleRep struct {
-	ID          *string             `json:"id,omitempty"`
-	Name        *string             `json:"name,omitempty"`
-	Description *string             `json:"description,omitempty"`
-	Composite   *bool               `json:"composite,omitempty"`
-	ClientRole  *bool               `json:"clientRole,omitempty"`
-	ContainerID *string             `json:"containerId,omitempty"`
-	Attributes  map[string][]string `json:"attributes,omitempty"`
-	Composites  *CompositesRep      `json:"composites,omitempty"`
+	ID          *string        `json:"id,omitempty"`
+	Name        *string        `json:"name,omitempty"`
+	Description *string        `json:"description,omitempty"`
+	Composite   *bool          `json:"composite,omitempty"`
+	ClientRole  *bool          `json:"clientRole,omitempty"`
+	ContainerID *string        `json:"containerId,omitempty"`
+	Attributes  listMap        `json:"attributes,omitempty"`
+	Composites  *CompositesRep `json:"composites,omitempty"`
 }
 
 type CompositesRep struct {
@@ -156,7 +157,7 @@ type GroupRep struct {
 	ParentID      *string             `json:"parentId,omitempty"`
 	SubGroupCount *int                `json:"subGroupCount,omitempty"`
 	SubGroups     []GroupRep          `json:"subGroups"`
-	Attributes    map[string][]string `json:"attributes,omitempty"`
+	Attributes    listMap             `json:"attributes,omitempty"`
 	RealmRoles    []string            `json:"realmRoles,omitempty"`
 	ClientRoles   map[string][]string `json:"clientRoles,omitempty"`
 	Access        map[string]bool     `json:"access,omitempty"`

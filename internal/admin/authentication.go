@@ -107,19 +107,19 @@ type execRep struct {
 }
 
 type authConfigRep struct {
-	ID     string            `json:"id,omitempty"`
-	Alias  string            `json:"alias"`
-	Config map[string]string `json:"config"`
+	ID     string `json:"id,omitempty"`
+	Alias  string `json:"alias"`
+	Config strMap `json:"config"`
 }
 
 type requiredActionRep struct {
-	Alias         string            `json:"alias"`
-	Name          string            `json:"name"`
-	ProviderID    string            `json:"providerId"`
-	Enabled       bool              `json:"enabled"`
-	DefaultAction bool              `json:"defaultAction"`
-	Priority      int               `json:"priority"`
-	Config        map[string]string `json:"config"`
+	Alias         string `json:"alias"`
+	Name          string `json:"name"`
+	ProviderID    string `json:"providerId"`
+	Enabled       bool   `json:"enabled"`
+	DefaultAction bool   `json:"defaultAction"`
+	Priority      int    `json:"priority"`
+	Config        strMap `json:"config"`
 }
 
 func requiredActionToRep(a *model.RequiredActionProvider) requiredActionRep {

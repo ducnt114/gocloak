@@ -170,6 +170,25 @@ func importContent(ctx context.Context, svc *service.Service, tx *store.Store, r
 			return err
 		}
 	}
+	if len(rep.DefaultGroups) > 0 {
+		all, err := tx.ListAllGroups(ctx, realm.ID)
+		if err != nil {
+			return err
+		}
+		t := &groupTree{paths: groupPaths(all), children: map[string][]*model.Group{}}
+		for _, g := range all {
+			t.children[g.ParentID] = append(t.children[g.ParentID], g)
+		}
+		for _, path := range rep.DefaultGroups {
+			g := t.find(splitPath(path))
+			if g == nil {
+				return badRequest("Default group " + path + " not found")
+			}
+			if err := tx.AddDefaultGroup(ctx, realm.ID, g.ID); err != nil {
+				return err
+			}
+		}
+	}
 	for i := range rep.Users {
 		if _, err := importUser(ctx, svc, tx, realm, &rep.Users[i]); err != nil {
 			return err

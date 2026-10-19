@@ -234,7 +234,7 @@ Active Directory specifics (objectGUID, unicodePwd, userAccountControl) are
 implemented but only tested against Keycloak's behaviour on paper. Not done:
 Kerberos, `ldap-server-capabilities`, the MSAD LDS mapper beyond enabled state.
 
-## M7 — Admin console (L)
+## M7 — Admin console (L) ✅ done
 
 Decision to take at the start of the milestone:
 
@@ -252,6 +252,19 @@ too large. Either way, the console authenticates through the
 
 Acceptance: an admin can manage realms, users, clients, roles, groups and
 sessions entirely from the browser.
+
+Done notes: option 1. Keycloak's admin console 26.0.7 runs unchanged against
+gocloak; its files are read from the keycloak-admin-ui and keycloak-themes jars
+(downloaded from Maven Central, bundled in the Docker image, not in the
+repository). A headless browser walkthrough (63 pages and create / update /
+delete of realms, users, passwords, clients, roles, groups, role mappings,
+identity providers) sends the same requests and gets the same results as
+against Keycloak 26.0.7. `/admin/serverinfo` is Keycloak's catalog reduced to
+the providers gocloak implements (`scripts/compat/serverinfo.py`), and features
+gocloak lacks (organizations, authorization, device flow, CIBA, PAR, client
+policies...) are disabled so the console hides them. Not done: realm
+localization texts (empty), partial import / export from the console, client
+installation formats, impersonation.
 
 ## M8 — Authorization services (XL)
 

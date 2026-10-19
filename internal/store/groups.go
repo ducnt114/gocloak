@@ -97,3 +97,17 @@ func (s *Store) GroupMembers(ctx context.Context, groupID string, first, max int
 		JOIN user_groups ug ON ug.user_id=u.id WHERE ug.group_id=? ORDER BY u.username LIMIT ? OFFSET ?`,
 		groupID, limit(max), first)
 }
+
+// ListDefaultGroups lists the groups new users of a realm join.
+func (s *Store) ListDefaultGroups(ctx context.Context, realmID string) ([]*model.Group, error) {
+	return queryList(ctx, s, scanGroup, `SELECT `+prefixed("realm_groups", groupCols)+` FROM realm_groups
+		JOIN realm_default_groups d ON d.group_id=realm_groups.id WHERE d.realm_id=? ORDER BY realm_groups.name`, realmID)
+}
+
+func (s *Store) AddDefaultGroup(ctx context.Context, realmID, groupID string) error {
+	return s.exec(ctx, `INSERT INTO realm_default_groups (realm_id, group_id) VALUES (?,?) ON CONFLICT DO NOTHING`, realmID, groupID)
+}
+
+func (s *Store) RemoveDefaultGroup(ctx context.Context, realmID, groupID string) error {
+	return s.exec(ctx, `DELETE FROM realm_default_groups WHERE realm_id=? AND group_id=?`, realmID, groupID)
+}

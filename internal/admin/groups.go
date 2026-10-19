@@ -288,3 +288,58 @@ func (h *Handler) groupMembers(w http.ResponseWriter, r *http.Request, p *princi
 	}
 	return ok(w, usersToRep(users))
 }
+
+// ---------------------------------------------------------------- default groups
+
+func (h *Handler) listDefaultGroups(w http.ResponseWriter, r *http.Request, p *principal) error {
+	realm, err := h.realmFor(r, p, permViewRealm)
+	if err != nil {
+		return err
+	}
+	groups, err := h.Svc.Store.ListDefaultGroups(r.Context(), realm.ID)
+	if err != nil {
+		return err
+	}
+	t, err := h.groupTree(r.Context(), realm.ID)
+	if err != nil {
+		return err
+	}
+	out := []GroupRep{}
+	for _, g := range groups {
+		rep := t.rep(g, 0)
+		rep.SubGroups = nil
+		out = append(out, rep)
+	}
+	return ok(w, out)
+}
+
+func (h *Handler) defaultGroup(w http.ResponseWriter, r *http.Request, p *principal, add bool) error {
+	realm, err := h.realmFor(r, p, permManageRealm)
+	if err != nil {
+		return err
+	}
+	g, err := h.Svc.Store.GetGroup(r.Context(), realm.ID, r.PathValue("groupId"))
+	if errors.Is(err, store.ErrNotFound) {
+		return notFound("Group not found")
+	}
+	if err != nil {
+		return err
+	}
+	if add {
+		err = h.Svc.Store.AddDefaultGroup(r.Context(), realm.ID, g.ID)
+	} else {
+		err = h.Svc.Store.RemoveDefaultGroup(r.Context(), realm.ID, g.ID)
+	}
+	if err != nil {
+		return err
+	}
+	return noContent(w)
+}
+
+func (h *Handler) addDefaultGroup(w http.ResponseWriter, r *http.Request, p *principal) error {
+	return h.defaultGroup(w, r, p, true)
+}
+
+func (h *Handler) removeDefaultGroup(w http.ResponseWriter, r *http.Request, p *principal) error {
+	return h.defaultGroup(w, r, p, false)
+}

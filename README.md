@@ -21,6 +21,17 @@ KC_BOOTSTRAP_ADMIN_USERNAME=admin KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
   ./gocloak start-dev
 ```
 
+The admin console needs Keycloak's console files, which are not part of the binary:
+
+```sh
+./gocloak download-admin-console --dir admin-console   # from Maven Central
+KC_BOOTSTRAP_ADMIN_USERNAME=admin KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+  ./gocloak start-dev --admin-console-dir admin-console
+# then open http://localhost:8080/admin/
+```
+
+Or through the admin REST API:
+
 ```sh
 # admin token from the master realm
 TOKEN=$(curl -s -d grant_type=password -d client_id=admin-cli \
@@ -43,7 +54,7 @@ curl -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
 curl http://localhost:8080/realms/demo/.well-known/openid-configuration
 ```
 
-With Docker:
+With Docker (the image includes the admin console):
 
 ```sh
 docker build -t gocloak .
@@ -182,6 +193,21 @@ Main options (flag / environment variable):
 - Role scope mappings for clients without full scope allowed
 - Tokens checked claim by claim against a real Keycloak 26 (see [Compatibility](#compatibility))
 
+**Admin console**
+
+- Keycloak's own admin console (keycloak-admin-ui 26.0.7, Apache License 2.0) served at
+  `/admin/{realm}/console/`, read from the Keycloak jars (`gocloak download-admin-console`,
+  `--admin-console-dir`); the Docker image includes them
+- The endpoints it needs beyond the admin REST API: `/admin/serverinfo` (Keycloak's provider
+  catalog reduced to what gocloak supports), `whoami`, the `ui-ext` extensions (realm names,
+  sessions, brute force users, flows, required actions, available / effective roles, realm and
+  user profile update), translations under `/resources/{realm}/admin/{locale}`, the
+  `security-admin-console` client of every realm, and the keycloak-js iframes (third-party
+  cookie check, login status iframe with the `KEYCLOAK_SESSION` cookie)
+- Realms, users (credentials, role mappings, groups, sessions), clients, roles, groups, client
+  scopes, identity providers, user federation, authentication flows, events and realm settings
+  are managed from the console
+
 **Admin REST API** (`/admin/realms/...`, Keycloak paths and JSON)
 
 - Realms: list, create (including full realm import with nested roles, clients, groups, users),
@@ -202,7 +228,8 @@ Main options (flag / environment variable):
   `evaluate-scopes` (example access token, ID token, userinfo, applied mappers)
 - Client scopes: CRUD, protocol mappers, scope mappings, realm default / optional scopes
 - Roles: realm and client roles CRUD, composites, users in role, `roles-by-id`
-- Groups: tree listing, count, `group-by-path`, CRUD, children, members, role mappings
+- Groups: tree listing, count, `group-by-path`, CRUD, children, members, role mappings, default
+  groups
 - Identity providers: `identity-provider/instances` CRUD, mappers, `mapper-types`,
   `providers/{id}`, `import-config`; users' `federated-identity` links and the `idpAlias` /
   `idpUserId` user search
@@ -215,7 +242,9 @@ Main options (flag / environment variable):
 
 - New realms get the same built-ins as Keycloak: `default-roles-{realm}` (with `offline_access`,
   `uma_authorization`, `account/view-profile`, `account/manage-account`), the `account`,
-  `admin-cli`, `broker` and `realm-management` clients and their roles.
+  `admin-cli`, `broker`, `security-admin-console` and `realm-management` clients and their roles.
+- JSON input is read as leniently as Keycloak's (Jackson): single values for lists, booleans
+  and numbers for strings, trailing slashes in admin paths.
 - Passwords are stored in Keycloak's credential format. New passwords use argon2id with
   Keycloak's parameters; `argon2`, `pbkdf2-sha512`, `pbkdf2-sha256` and `pbkdf2` hashes from a
   Keycloak export are verified as is, so users keep their passwords after migration.
@@ -224,8 +253,8 @@ Main options (flag / environment variable):
 ## Not implemented yet
 
 SAML, Kerberos, script mappers,
-fine-grained authorization services (UMA), consent screens, reCAPTCHA, organizations, the admin
-console, FreeMarker themes (gocloak themes use Go templates; Keycloak message bundles work as is),
+fine-grained authorization services (UMA), consent screens, reCAPTCHA, organizations,
+FreeMarker themes (gocloak themes use Go templates; Keycloak message bundles work as is),
 clustering, token exchange, device flow, CIBA, PAR.
 
 The plan for these is in [docs/ROADMAP.md](docs/ROADMAP.md).

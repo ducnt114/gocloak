@@ -22,6 +22,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -238,4 +239,23 @@ func (t *Theme) Open(p string) (fs.File, error) {
 		}
 	}
 	return nil, fs.ErrNotExist
+}
+
+// Names lists the themes of a type: the built-in one, then the theme
+// directories providing that type.
+func (m *Manager) Names(typ string) []string {
+	names := []string{Default}
+	if m.Dir == "" {
+		return names
+	}
+	entries, err := os.ReadDir(m.Dir)
+	if err != nil {
+		return names
+	}
+	for _, e := range entries {
+		if st, err := os.Stat(filepath.Join(m.Dir, e.Name(), typ)); err == nil && st.IsDir() && !builtinNames[e.Name()] {
+			names = append(names, e.Name())
+		}
+	}
+	return names
 }

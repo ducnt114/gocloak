@@ -91,6 +91,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /realms/{realm}/login-actions/action-token", h.actionToken)
 	mux.HandleFunc("GET /resources/{theme}/{type}/{path...}", h.resources)
 	h.registerBroker(mux)
+	h.registerIframes(mux)
 }
 
 // ---------------------------------------------------------------- helpers
@@ -253,7 +254,7 @@ func resolveURI(base string, c *model.Client, u string) string {
 	if !strings.HasPrefix(u, "/") {
 		return u
 	}
-	root := strings.ReplaceAll(c.RootURL, "${authBaseUrl}", base)
+	root := strings.ReplaceAll(strings.ReplaceAll(c.RootURL, "${authBaseUrl}", base), "${authAdminUrl}", base)
 	if root == "" {
 		root = base
 	}

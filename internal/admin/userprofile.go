@@ -327,3 +327,29 @@ func (h *Handler) storageCredentialTypes(w http.ResponseWriter, r *http.Request,
 // federatedAttributes are the attributes user storage providers add.
 var federatedAttributes = map[string]bool{"LDAP_ID": true, "LDAP_ENTRY_DN": true, "createTimestamp": true, "modifyTimestamp": true,
 	"KERBEROS_PRINCIPAL": true}
+
+// unmanagedAttributes implements GET /users/{id}/unmanagedAttributes: the
+// attributes the user profile does not declare, when the realm keeps them.
+func (h *Handler) unmanagedAttributes(w http.ResponseWriter, r *http.Request, p *principal) error {
+	realm, err := h.realmFor(r, p, permViewUsers)
+	if err != nil {
+		return err
+	}
+	u, err := h.loadUser(r, realm)
+	if err != nil {
+		return err
+	}
+	cfg, err := h.Svc.UserProfile(r.Context(), h.Svc.Store, realm)
+	if err != nil {
+		return err
+	}
+	out := map[string][]string{}
+	if cfg.UnmanagedAttributePolicy != "" {
+		for k, v := range u.Attributes {
+			if cfg.Attribute(k) == nil && !federatedAttributes[k] {
+				out[k] = v
+			}
+		}
+	}
+	return ok(w, out)
+}

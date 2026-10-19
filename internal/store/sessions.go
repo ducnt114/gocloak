@@ -77,6 +77,11 @@ func (s *Store) ListOfflineSessions(ctx context.Context, userID string) ([]*mode
 	return s.listSessions(ctx, true, `user_id=?`, userID)
 }
 
+// ListRealmOfflineSessions lists a realm's offline sessions.
+func (s *Store) ListRealmOfflineSessions(ctx context.Context, realmID string) ([]*model.UserSession, error) {
+	return s.listSessions(ctx, true, `realm_id=?`, realmID)
+}
+
 func (s *Store) ListRealmSessions(ctx context.Context, realmID string) ([]*model.UserSession, error) {
 	return s.listSessions(ctx, false, `realm_id=?`, realmID)
 }

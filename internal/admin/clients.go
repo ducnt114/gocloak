@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/service"
@@ -323,7 +324,11 @@ func (h *Handler) clientSessions(w http.ResponseWriter, r *http.Request, p *prin
 	if err != nil {
 		return err
 	}
-	all, err := h.Svc.Store.ListRealmSessions(r.Context(), realm.ID)
+	list := h.Svc.Store.ListRealmSessions
+	if strings.Contains(r.URL.Path, "offline-session") {
+		list = h.Svc.Store.ListRealmOfflineSessions
+	}
+	all, err := list(r.Context(), realm.ID)
 	if err != nil {
 		return err
 	}
@@ -337,5 +342,8 @@ func (h *Handler) clientSessions(w http.ResponseWriter, r *http.Request, p *prin
 	if err != nil {
 		return err
 	}
-	return ok(w, out)
+	if strings.HasSuffix(r.URL.Path, "-count") {
+		return ok(w, map[string]int{"count": len(out)})
+	}
+	return ok(w, page(r, out))
 }

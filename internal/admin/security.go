@@ -58,6 +58,9 @@ func (h *Handler) listComponents(w http.ResponseWriter, r *http.Request, p *prin
 		return err
 	}
 	parent, name := r.URL.Query().Get("parent"), r.URL.Query().Get("name")
+	if parent == "" {
+		parent = r.URL.Query().Get("parentId") // the admin console's name for it
+	}
 	out := []ComponentRep{}
 	for _, c := range comps {
 		if (parent != "" && c.ParentID != parent) || (name != "" && c.Name != name) {

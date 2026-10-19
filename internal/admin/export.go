@@ -171,6 +171,13 @@ func Export(ctx context.Context, svc *service.Service, realm *model.Realm, opts 
 			}
 			rep.Groups = append(rep.Groups, gr)
 		}
+		defaults, err := st.ListDefaultGroups(ctx, realm.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, g := range defaults {
+			rep.DefaultGroups = append(rep.DefaultGroups, paths[g.ID])
+		}
 	}
 
 	if opts.Groups || opts.Clients {

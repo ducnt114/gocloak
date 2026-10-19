@@ -22,6 +22,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/oidc"
 	"github.com/ducnt114/gocloak/internal/service"
 	"github.com/ducnt114/gocloak/internal/store"
+	"github.com/ducnt114/gocloak/internal/theme"
 	"github.com/ducnt114/gocloak/internal/userprofile"
 )
 
@@ -31,6 +32,18 @@ type Handler struct {
 	URLs oidc.URLs
 	Log  *slog.Logger
 	Fed  *federation.Manager
+	// Version is the gocloak version shown by serverinfo.
+	Version string
+	// Themes lists the themes for serverinfo.
+	Themes *theme.Manager
+}
+
+// ThemeNames lists the themes of a type.
+func (h *Handler) ThemeNames(typ string) []string {
+	if h.Themes == nil {
+		return []string{theme.Default}
+	}
+	return h.Themes.Names(typ)
 }
 
 // httpError is an error with an HTTP status, rendered as Keycloak does.
@@ -510,6 +523,21 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	h.registerAuthenticationRoutes(R, add)
 	h.registerBrokeringRoutes(R, add)
 	h.registerFederationRoutes(R, add)
+	h.registerConsoleRoutes(R, add)
+	add("GET "+R+"/roles-by-id/{roleId}/composites", h.roleByIDComposites)
+	add("GET "+R+"/roles-by-id/{roleId}/composites/realm", h.roleByIDComposites)
+	add("GET "+R+"/roles-by-id/{roleId}/composites/clients/{client}", h.roleByIDComposites)
+	add("POST "+R+"/roles-by-id/{roleId}/composites", h.addRoleByIDComposites)
+	add("DELETE "+R+"/roles-by-id/{roleId}/composites", h.removeRoleByIDComposites)
+	add("GET "+R+"/users/{id}/unmanagedAttributes", h.unmanagedAttributes)
+	h.registerCertificateRoutes(R, add)
+	add("GET "+R+"/clients/{id}/offline-sessions", h.clientSessions)
+	add("GET "+R+"/clients/{id}/session-count", h.clientSessions)
+	add("GET "+R+"/clients/{id}/offline-session-count", h.clientSessions)
+	add("GET "+R+"/components/{id}/sub-component-types", h.subComponentTypes)
+	add("GET "+R+"/default-groups", h.listDefaultGroups)
+	add("PUT "+R+"/default-groups/{groupId}", h.addDefaultGroup)
+	add("DELETE "+R+"/default-groups/{groupId}", h.removeDefaultGroup)
 	add("GET "+R+"/users/profile", h.getUserProfile)
 	add("PUT "+R+"/users/profile", h.putUserProfile)
 	add("GET "+R+"/users/profile/metadata", h.getUserProfileMetadata)

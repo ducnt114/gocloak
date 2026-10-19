@@ -13,6 +13,13 @@ import (
 
 func (h *Handler) loadUser(r *http.Request, realm *model.Realm) (*model.User, error) {
 	u, err := h.Svc.Store.GetUser(r.Context(), realm.ID, r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) && r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/users/"+r.PathValue("id")) {
+		// Keycloak finds users by id in any realm: the admin console reads
+		// the logged in admin through the realm being administered.
+		if p, perr := h.authenticate(r); perr == nil && p.user.ID == r.PathValue("id") {
+			return p.user, nil
+		}
+	}
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, notFound("User")
 	}

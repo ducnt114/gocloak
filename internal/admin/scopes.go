@@ -18,17 +18,17 @@ type ClientScopeRep struct {
 	Name            *string             `json:"name,omitempty"`
 	Description     *string             `json:"description,omitempty"`
 	Protocol        *string             `json:"protocol,omitempty"`
-	Attributes      map[string]string   `json:"attributes,omitempty"`
+	Attributes      strMap              `json:"attributes,omitempty"`
 	ProtocolMappers []ProtocolMapperRep `json:"protocolMappers,omitempty"`
 }
 
 // ProtocolMapperRep mirrors Keycloak's ProtocolMapperRepresentation.
 type ProtocolMapperRep struct {
-	ID             string            `json:"id,omitempty"`
-	Name           string            `json:"name"`
-	Protocol       string            `json:"protocol"`
-	ProtocolMapper string            `json:"protocolMapper"`
-	Config         map[string]string `json:"config"`
+	ID             string `json:"id,omitempty"`
+	Name           string `json:"name"`
+	Protocol       string `json:"protocol"`
+	ProtocolMapper string `json:"protocolMapper"`
+	Config         strMap `json:"config"`
 }
 
 // ScopeMappingRep is an entry of a realm export's scopeMappings /
@@ -687,4 +687,66 @@ func (h *Handler) registerScopeRoutes(R string, add func(pattern string, fn hand
 	add("GET "+ev+"/generate-example-id-token", h.evaluate("id"))
 	add("GET "+ev+"/generate-example-userinfo", h.evaluate("userinfo"))
 	add("GET "+ev+"/protocol-mappers", h.evaluateMappers)
+	add("GET "+ev+"/scope-mappings/{container}/granted", h.evaluateScopeMappings(true))
+	add("GET "+ev+"/scope-mappings/{container}/not-granted", h.evaluateScopeMappings(false))
+}
+
+// evaluateScopeMappings lists the roles of a container (the realm name or
+// a client id) that the client's scope grants, or does not grant.
+func (h *Handler) evaluateScopeMappings(granted bool) handlerFunc {
+	return func(w http.ResponseWriter, r *http.Request, p *principal) error {
+		realm, err := h.realmFor(r, p, permViewClients)
+		if err != nil {
+			return err
+		}
+		c, err := h.loadClient(r, realm)
+		if err != nil {
+			return err
+		}
+		ctx := r.Context()
+		containerUUID := ""
+		if container := r.PathValue("container"); container != realm.Name && container != realm.ID {
+			cc, err := h.Svc.Store.GetClient(ctx, realm.ID, container)
+			if err != nil {
+				return notFound("No client with id " + container)
+			}
+			containerUUID = cc.ID
+		}
+		roles, err := h.Svc.Store.ListRoles(ctx, realm.ID, containerUUID, "", 0, 1<<30)
+		if err != nil {
+			return err
+		}
+		allowed := map[string]bool{}
+		if !c.FullScopeAllowed {
+			mapped, err := h.Svc.Store.ListScopeMappings(ctx, c.ID)
+			if err != nil {
+				return err
+			}
+			scopes, err := oidc.AppliedScopes(ctx, h.Svc.Store, realm, c, r.URL.Query().Get("scope"))
+			if err != nil {
+				return err
+			}
+			for _, cs := range scopes {
+				sm, err := h.Svc.Store.ListScopeMappings(ctx, cs.ID)
+				if err != nil {
+					return err
+				}
+				mapped = append(mapped, sm...)
+			}
+			expanded, err := h.Svc.ExpandComposites(ctx, realm.ID, mapped)
+			if err != nil {
+				return err
+			}
+			for _, role := range expanded {
+				allowed[role.ID] = true
+			}
+		}
+		var out []*model.Role
+		for _, role := range roles {
+			if (c.FullScopeAllowed || allowed[role.ID]) == granted {
+				out = append(out, role)
+			}
+		}
+		return ok(w, rolesToRep(out, realm.ID))
+	}
 }

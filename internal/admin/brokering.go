@@ -29,30 +29,30 @@ func init() {
 
 // IdentityProviderRep is Keycloak's IdentityProviderRepresentation.
 type IdentityProviderRep struct {
-	Alias                       *string           `json:"alias,omitempty"`
-	DisplayName                 *string           `json:"displayName,omitempty"`
-	InternalID                  *string           `json:"internalId,omitempty"`
-	ProviderID                  *string           `json:"providerId,omitempty"`
-	Enabled                     *bool             `json:"enabled,omitempty"`
-	UpdateProfileFirstLoginMode *string           `json:"updateProfileFirstLoginMode,omitempty"`
-	TrustEmail                  *bool             `json:"trustEmail,omitempty"`
-	StoreToken                  *bool             `json:"storeToken,omitempty"`
-	AddReadTokenRoleOnCreate    *bool             `json:"addReadTokenRoleOnCreate,omitempty"`
-	AuthenticateByDefault       *bool             `json:"authenticateByDefault,omitempty"`
-	LinkOnly                    *bool             `json:"linkOnly,omitempty"`
-	HideOnLogin                 *bool             `json:"hideOnLogin,omitempty"`
-	FirstBrokerLoginFlowAlias   *string           `json:"firstBrokerLoginFlowAlias,omitempty"`
-	PostBrokerLoginFlowAlias    *string           `json:"postBrokerLoginFlowAlias,omitempty"`
-	Config                      map[string]string `json:"config"`
+	Alias                       *string `json:"alias,omitempty"`
+	DisplayName                 *string `json:"displayName,omitempty"`
+	InternalID                  *string `json:"internalId,omitempty"`
+	ProviderID                  *string `json:"providerId,omitempty"`
+	Enabled                     *bool   `json:"enabled,omitempty"`
+	UpdateProfileFirstLoginMode *string `json:"updateProfileFirstLoginMode,omitempty"`
+	TrustEmail                  *bool   `json:"trustEmail,omitempty"`
+	StoreToken                  *bool   `json:"storeToken,omitempty"`
+	AddReadTokenRoleOnCreate    *bool   `json:"addReadTokenRoleOnCreate,omitempty"`
+	AuthenticateByDefault       *bool   `json:"authenticateByDefault,omitempty"`
+	LinkOnly                    *bool   `json:"linkOnly,omitempty"`
+	HideOnLogin                 *bool   `json:"hideOnLogin,omitempty"`
+	FirstBrokerLoginFlowAlias   *string `json:"firstBrokerLoginFlowAlias,omitempty"`
+	PostBrokerLoginFlowAlias    *string `json:"postBrokerLoginFlowAlias,omitempty"`
+	Config                      strMap  `json:"config"`
 }
 
 // IdPMapperRep is Keycloak's IdentityProviderMapperRepresentation.
 type IdPMapperRep struct {
-	ID                     string            `json:"id,omitempty"`
-	Name                   string            `json:"name"`
-	IdentityProviderAlias  string            `json:"identityProviderAlias"`
-	IdentityProviderMapper string            `json:"identityProviderMapper"`
-	Config                 map[string]string `json:"config"`
+	ID                     string `json:"id,omitempty"`
+	Name                   string `json:"name"`
+	IdentityProviderAlias  string `json:"identityProviderAlias"`
+	IdentityProviderMapper string `json:"identityProviderMapper"`
+	Config                 strMap `json:"config"`
 }
 
 // FederatedIdentityRep is Keycloak's FederatedIdentityRepresentation.

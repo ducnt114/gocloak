@@ -25,6 +25,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ducnt114/gocloak/internal/adminconsole"
 	"github.com/ducnt114/gocloak/internal/server"
 	"github.com/ducnt114/gocloak/internal/store"
 )
@@ -57,6 +58,8 @@ Usage:
   gocloak export --realm <name> --file <path>
                                    export a realm (or --dir for all realms) and exit
   gocloak bootstrap-admin          create or reset a master realm admin and exit
+  gocloak download-admin-console --dir <dir>
+                                   download Keycloak's admin console (from Maven Central)
   gocloak version
 
 Run 'gocloak <command> -h' for the flags of a command.
@@ -79,6 +82,8 @@ func main() {
 		err = bootstrapAdmin(args)
 	case "export":
 		err = exportCmd(args)
+	case "download-admin-console":
+		err = downloadConsole(args)
 	case "version", "--version", "-v":
 		fmt.Println("gocloak", version)
 	case "help", "-h", "--help":
@@ -171,6 +176,7 @@ func start(args []string, dev bool) error {
 	proxy := fs.String("proxy-headers", env("KC_PROXY_HEADERS"), "trust X-Forwarded-* headers when set to 'xforwarded' (env KC_PROXY_HEADERS)")
 	importDir := fs.String("import-dir", env("GOCLOAK_IMPORT_DIR"), "import realm exports (*.json) from this directory at startup (env GOCLOAK_IMPORT_DIR)")
 	themesDir := fs.String("themes-dir", envDefault("", "GOCLOAK_THEMES_DIR"), "directory of custom themes (env GOCLOAK_THEMES_DIR)")
+	consoleDir := fs.String("admin-console-dir", env("GOCLOAK_ADMIN_CONSOLE_DIR"), "directory of the admin console jars, see 'gocloak download-admin-console' (env GOCLOAK_ADMIN_CONSOLE_DIR)")
 	themeCache := fs.Bool("theme-cache", !dev, "cache themes (disable while developing a theme)")
 	rateLimit := fs.Float64("rate-limit", atof(envDefault("100", "GOCLOAK_RATE_LIMIT")), "requests per second allowed per client IP on /realms and /admin, 0 to disable (env GOCLOAK_RATE_LIMIT)")
 	rateBurst := fs.Int("rate-burst", atoi(envDefault("200", "GOCLOAK_RATE_BURST")), "burst size of the per IP rate limit (env GOCLOAK_RATE_BURST)")
@@ -193,6 +199,7 @@ func start(args []string, dev bool) error {
 	srv, err := server.New(ctx, server.Config{
 		DB: dbCfg, Hostname: *hostname, ProxyHeaders: *proxy != "", ImportDir: *importDir, Log: log,
 		RateLimit: *rateLimit, RateBurst: *rateBurst, ThemesDir: *themesDir, NoThemeCache: !*themeCache,
+		AdminConsoleDir: *consoleDir, Version: version,
 		AdminUser:     env("KC_BOOTSTRAP_ADMIN_USERNAME", "KEYCLOAK_ADMIN"),
 		AdminPassword: env("KC_BOOTSTRAP_ADMIN_PASSWORD", "KEYCLOAK_ADMIN_PASSWORD"),
 	})
@@ -362,4 +369,16 @@ func atof(s string) float64 {
 		return 0
 	}
 	return f
+}
+
+func downloadConsole(args []string) error {
+	fs := flag.NewFlagSet("download-admin-console", flag.ExitOnError)
+	dir := fs.String("dir", envDefault("admin-console", "GOCLOAK_ADMIN_CONSOLE_DIR"), "directory to download the jars to")
+	ver := fs.String("version", adminconsole.Version, "Keycloak version of the admin console")
+	fs.Parse(args)
+	err := adminconsole.Download(context.Background(), *dir, *ver, func(f string, a ...any) { fmt.Printf(f+"\n", a...) })
+	if err == nil {
+		fmt.Printf("done: start gocloak with --admin-console-dir %s\n", *dir)
+	}
+	return err
 }

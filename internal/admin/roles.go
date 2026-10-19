@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/ducnt114/gocloak/internal/model"
 	"github.com/ducnt114/gocloak/internal/service"
@@ -355,16 +356,21 @@ func (h *Handler) changeComposites(w http.ResponseWriter, r *http.Request, p *pr
 	if err != nil {
 		return err
 	}
+	return h.applyComposites(w, r, p, rc.realm, role, add)
+}
+
+// applyComposites adds or removes the composites listed in the body.
+func (h *Handler) applyComposites(w http.ResponseWriter, r *http.Request, p *principal, realm *model.Realm, role *model.Role, add bool) error {
 	var reps []RoleRep
 	if err := decode(r, &reps); err != nil {
 		return err
 	}
-	children, err := h.resolveAnyRoles(r.Context(), rc.realm, reps)
+	children, err := h.resolveAnyRoles(r.Context(), realm, reps)
 	if err != nil {
 		return err
 	}
 	if add {
-		if err := h.checkGrantable(r.Context(), p, rc.realm, children); err != nil {
+		if err := h.checkGrantable(r.Context(), p, realm, children); err != nil {
 			return err
 		}
 	}
@@ -734,4 +740,44 @@ func (h *Handler) addGroupClientRoles(w http.ResponseWriter, r *http.Request, p 
 }
 func (h *Handler) removeGroupClientRoles(w http.ResponseWriter, r *http.Request, p *principal) error {
 	return h.groupMappingsHandler(true, change(false, h))(w, r, p)
+}
+
+// ---------------------------------------------------------------- composites by role id
+
+func (h *Handler) roleByIDComposites(w http.ResponseWriter, r *http.Request, p *principal) error {
+	realm, role, err := h.roleByID(r, p, false)
+	if err != nil {
+		return err
+	}
+	children, err := h.Svc.Store.ListComposites(r.Context(), role.ID)
+	if err != nil {
+		return err
+	}
+	clientUUID, filter := r.PathValue("client"), r.URL.Path
+	var out []*model.Role
+	for _, c := range children {
+		switch {
+		case strings.HasSuffix(filter, "/composites/realm") && c.ClientID != "":
+		case clientUUID != "" && c.ClientID != clientUUID:
+		default:
+			out = append(out, c)
+		}
+	}
+	return ok(w, rolesToRep(out, realm.ID))
+}
+
+func (h *Handler) addRoleByIDComposites(w http.ResponseWriter, r *http.Request, p *principal) error {
+	realm, role, err := h.roleByID(r, p, true)
+	if err != nil {
+		return err
+	}
+	return h.applyComposites(w, r, p, realm, role, true)
+}
+
+func (h *Handler) removeRoleByIDComposites(w http.ResponseWriter, r *http.Request, p *principal) error {
+	realm, role, err := h.roleByID(r, p, true)
+	if err != nil {
+		return err
+	}
+	return h.applyComposites(w, r, p, realm, role, false)
 }
