@@ -127,6 +127,8 @@ registration and reset-password emails, brute force detection, events, themes, t
 account consoles, clustering (SQLite is single-node), JWT client authentication, token exchange,
 device flow, CIBA, PAR.
 
+The plan for these is in [docs/ROADMAP.md](docs/ROADMAP.md).
+
 ## Layout
 
 ```
