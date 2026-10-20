@@ -57,8 +57,8 @@ func (h *Handler) prepareFederationComponent(ctx context.Context, realm *model.R
 	return nil
 }
 
-// createFederationComponent saves a new LDAP provider with Keycloak's
-// default mappers.
+// createFederationComponent saves a new LDAP provider with the default
+// mappers.
 func (h *Handler) createFederationComponent(ctx context.Context, c *model.Component) error {
 	return h.withTx(ctx, func(tx *store.Store) error {
 		if err := tx.CreateComponent(ctx, c); err != nil {
@@ -78,7 +78,7 @@ func (h *Handler) createFederationComponent(ctx context.Context, c *model.Compon
 }
 
 // deleteFederationComponent removes an LDAP provider with its mappers and
-// the users imported from it, as Keycloak does.
+// the users imported from it.
 func (h *Handler) deleteFederationComponent(ctx context.Context, realm *model.Realm, c *model.Component) error {
 	if err := h.Fed.RemoveImportedUsers(ctx, realm, c); err != nil {
 		return err
@@ -120,7 +120,7 @@ func (h *Handler) syncUsers(w http.ResponseWriter, r *http.Request, p *principal
 	return ok(w, res)
 }
 
-// ldapErrorKey maps a directory error to Keycloak's error keys.
+// ldapErrorKey maps a directory error to an error message key.
 func ldapErrorKey(err error) string {
 	msg := err.Error()
 	for _, k := range []string{"connection refused", "no such host", "i/o timeout", "network is unreachable", "connection reset"} {

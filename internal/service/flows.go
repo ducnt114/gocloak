@@ -22,7 +22,7 @@ const (
 	ActionWebAuthnPasswordles = "webauthn-register-passwordless"
 )
 
-// DefaultRequiredActions are Keycloak 26's required action providers.
+// DefaultRequiredActions are the built-in required action providers.
 var DefaultRequiredActions = []model.RequiredActionProvider{
 	{Alias: ActionConfigureTOTP, Name: "Configure OTP", Enabled: true, Priority: 10},
 	{Alias: ActionTermsAndConditions, Name: "Terms and Conditions", Enabled: false, Priority: 20},
@@ -62,7 +62,7 @@ func otpSubflow(alias, otpAuthenticator string) *flowDef {
 	}}
 }
 
-// builtinFlows mirrors the flows Keycloak 26 creates in every realm.
+// builtinFlows are the flows created in every realm.
 var builtinFlows = []flowDef{
 	{"browser", "Browser based authentication", "basic-flow", []execDef{
 		{authenticator: "auth-cookie", requirement: model.Alternative},
@@ -179,7 +179,7 @@ func (s *Service) ProvisionAuthentication(ctx context.Context, st *store.Store, 
 
 // ---------------------------------------------------------------- user profile
 
-// User profile component, as stored by Keycloak.
+// User profile component type, provider id and config key.
 const (
 	UserProfileProviderType = "org.gocloak.userprofile.UserProfileProvider"
 	UserProfileProviderID   = "declarative-user-profile"

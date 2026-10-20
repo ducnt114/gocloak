@@ -6,8 +6,8 @@ import (
 )
 
 // enableLightweightTokens turns on lightweight access tokens for the
-// admin-cli and security-admin-console clients of existing realms, as
-// Keycloak 26 creates them, unless the attribute was set already.
+// admin-cli and security-admin-console clients of existing realms, as new
+// realms create them, unless the attribute was set already.
 func enableLightweightTokens(ctx context.Context, tx *Store) error {
 	type row struct{ id, attrs string }
 	rows, err := queryList(ctx, tx, func(sc scanner) (row, error) {

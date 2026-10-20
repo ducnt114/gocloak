@@ -390,7 +390,7 @@ func (h *Handler) afterFirstBrokerLogin(fc *flowContext) {
 // ---------------------------------------------------------------- account linking
 
 // LinkHash is the hash a client sends to /broker/{alias}/link, binding the
-// request to the user's session (Keycloak's client initiated account linking).
+// request to the user's session (client initiated account linking).
 func LinkHash(nonce, sessionID, clientID, alias string) string {
 	sum := sha256.Sum256([]byte(nonce + sessionID + clientID + alias))
 	return base64.RawURLEncoding.EncodeToString(sum[:])

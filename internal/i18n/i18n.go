@@ -1,4 +1,4 @@
-// Package i18n reads Keycloak message bundles (Java .properties files)
+// Package i18n reads message bundles (Java .properties files)
 // and formats their messages ({0}-style placeholders, as Java's MessageFormat).
 package i18n
 

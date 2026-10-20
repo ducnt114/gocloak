@@ -50,8 +50,8 @@ func (e *scopeError) Error() string { return "Invalid scopes: " + strings.Join(e
 
 // newTokenContext resolves the client scopes applied for the requested
 // scope parameter, the mappers to run and the roles allowed in tokens. With
-// strict, unknown requested scopes fail with a *scopeError (Keycloak's
-// invalid_scope); otherwise they are ignored (refresh, userinfo).
+// strict, unknown requested scopes fail with a *scopeError (invalid_scope);
+// otherwise they are ignored (refresh, userinfo).
 func newTokenContext(ctx context.Context, svc *service.Service, base string, realm *model.Realm, client *model.Client,
 	user *model.User, session *model.UserSession, requested string, strict bool) (*tokenContext, string, error) {
 	st := svc.Store
@@ -364,7 +364,7 @@ func (tc *tokenContext) applyOne(ctx context.Context, m *model.ProtocolMapper, c
 				addr[part.claim] = v[0]
 			}
 		}
-		claims["address"] = addr // Keycloak emits the object even when empty
+		claims["address"] = addr // the object is emitted even when empty
 	case service.MapperRealmRoles:
 		if len(tc.realmRoles) == 0 {
 			return nil
@@ -634,7 +634,7 @@ func addAudience(claims jwt.Claims, aud string) {
 	claims["aud"] = append(claims.Audience(), aud)
 }
 
-// finalizeAudience writes a single audience as a string, like Keycloak.
+// finalizeAudience writes a single audience as a string.
 func finalizeAudience(claims jwt.Claims) {
 	switch aud := claims.Audience(); len(aud) {
 	case 0:

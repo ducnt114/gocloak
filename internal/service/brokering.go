@@ -15,7 +15,7 @@ const (
 	ReadTokenRole = "read-token"
 )
 
-// createBrokerClient adds the broker client of a realm, as Keycloak does.
+// createBrokerClient adds the broker client of a realm.
 func (s *Service) createBrokerClient(ctx context.Context, st *store.Store, r *model.Realm) error {
 	c := &model.Client{ID: NewID(), RealmID: r.ID, ClientID: BrokerClient, Name: "${client_broker}",
 		Enabled: true, BearerOnly: true, StandardFlowEnabled: true, Protocol: "openid-connect"}

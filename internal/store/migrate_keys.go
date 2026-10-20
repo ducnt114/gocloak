@@ -13,7 +13,7 @@ import (
 )
 
 // migrateRealmSettingsDefaults fills settings added in M2 (brute force,
-// offline sessions, events...) with Keycloak's defaults in existing realms.
+// offline sessions, events...) with their defaults in existing realms.
 func migrateRealmSettingsDefaults(ctx context.Context, tx *Store) error {
 	type row struct{ id, settings string }
 	rows, err := queryList(ctx, tx, func(sc scanner) (row, error) {
@@ -38,7 +38,7 @@ func migrateRealmSettingsDefaults(ctx context.Context, tx *Store) error {
 
 // migrateRealmKeys turns the RSA keys of the realm_keys table into
 // rsa-generated key provider components (with a certificate) and adds the
-// HS512 key Keycloak uses for refresh tokens.
+// HS512 key refresh tokens are signed with.
 func migrateRealmKeys(ctx context.Context, tx *Store) error {
 	type key struct {
 		id, realmID, pem string

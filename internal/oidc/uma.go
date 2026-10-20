@@ -18,7 +18,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/store"
 )
 
-// UMA 2.0 and Keycloak authorization services: the uma-ticket grant (RPTs
+// UMA 2.0 and the authorization services: the uma-ticket grant (RPTs
 // and decisions), the protection API of resource servers, and the UMA
 // discovery document.
 

@@ -496,7 +496,7 @@ func resetChooseUserAction(fc *flowContext) (result, error) {
 		return 0, err
 	}
 	if user == nil || !user.Enabled || user.ServiceAccountClientID != "" {
-		// Keycloak does not reveal whether the account exists.
+		// The response does not reveal whether the account exists.
 		fc.h.event(fc.r, fc.realm, "SEND_RESET_PASSWORD_ERROR", &eventInfo{client: fc.client, err: "user_not_found",
 			details: map[string]string{"username": ident}})
 		fc.as.Params[keyNoUser] = "true"

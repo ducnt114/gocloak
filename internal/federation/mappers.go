@@ -220,7 +220,7 @@ func newEntry(cfg *Config, u *model.User, mappers []mapper) map[string][]string 
 			}
 			vals := modelValues(u, m.Get("user.model.attribute"))
 			if len(vals) == 0 && m.bool("is.mandatory.in.ldap") {
-				vals = []string{" "} // Keycloak's placeholder for mandatory attributes
+				vals = []string{" "} // placeholder for mandatory attributes
 			}
 			if len(vals) > 0 {
 				attrs[attr] = vals

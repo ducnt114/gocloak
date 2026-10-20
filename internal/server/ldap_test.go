@@ -302,7 +302,7 @@ func TestLDAPGroupAndRoleMappers(t *testing.T) {
 		t.Fatalf("membership not removed: %v", m)
 	}
 
-	// keycloakToFed creates LDAP groups for local ones
+	// gocloakToFed creates LDAP groups for local ones
 	e.expect(e.do(nil, "POST", "/admin/realms/demo/groups", admin, map[string]any{"name": "ops"}, nil), 201)
 	e.expect(e.do(nil, "POST", "/admin/realms/demo/user-storage/"+cid+"/mappers/"+gm+"/sync?direction=gocloakToFed", admin, nil, nil), 200).json(&res)
 	if d.Get("cn=ops,"+groupsDN) == nil {

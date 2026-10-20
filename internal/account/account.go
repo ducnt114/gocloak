@@ -1,7 +1,7 @@
 // Package account implements the account console of a realm
 // (/realms/{realm}/account): server-rendered pages for users to manage their
-// profile, credentials, sessions and applications, and Keycloak's account
-// REST API on the same paths for JSON requests.
+// profile, credentials, sessions and applications, and the account REST API
+// on the same paths for JSON requests.
 package account
 
 import (
@@ -133,8 +133,8 @@ func writeJSON(w http.ResponseWriter, status int, v any) error {
 	return nil
 }
 
-// api authenticates a bearer token issued by the realm, like Keycloak's
-// account REST service, and requires an account role.
+// api authenticates a bearer token issued by the realm, as the account REST
+// service does, and requires an account role.
 func (h *Handler) api(fn apiFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := func() error {
@@ -326,7 +326,7 @@ func (h *Handler) apiUpdateAccount(w http.ResponseWriter, r *http.Request, c *ca
 	return nil
 }
 
-// sessionRep is Keycloak's account SessionRepresentation.
+// sessionRep is the account SessionRepresentation.
 type sessionRep struct {
 	ID         string      `json:"id"`
 	IPAddress  string      `json:"ipAddress"`
@@ -581,7 +581,7 @@ func (h *Handler) apiCredentialLabel(w http.ResponseWriter, r *http.Request, c *
 	return nil
 }
 
-// applicationRep is Keycloak's account ClientRepresentation.
+// applicationRep is the account ClientRepresentation.
 type applicationRep struct {
 	ClientID            string      `json:"clientId"`
 	ClientName          string      `json:"clientName"`
@@ -595,7 +595,7 @@ type applicationRep struct {
 	Consent             *consentRep `json:"consent,omitempty"`
 }
 
-// consentRep is Keycloak's account ConsentRepresentation.
+// consentRep is the account ConsentRepresentation.
 type consentRep struct {
 	GrantedScopes   []grantedScope `json:"grantedScopes"`
 	CreatedDate     int64          `json:"createdDate"`
@@ -605,7 +605,7 @@ type consentRep struct {
 type grantedScope struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
-	DisplayText string `json:"displayTest"` // sic, as in Keycloak
+	DisplayText string `json:"displayTest"` // sic: the representation's field name
 }
 
 // consentText translates a consent text ("${key}" or literal).

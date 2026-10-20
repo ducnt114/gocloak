@@ -11,7 +11,7 @@ import (
 )
 
 // OAuth 2.0 Token Exchange (RFC 8693) between clients of a realm, following
-// Keycloak's "standard token exchange": a confidential client with
+// the "standard token exchange": a confidential client with
 // standard.token.exchange.enabled exchanges an access token issued to a user
 // for it (the client must be in the token's audience) for a new token,
 // possibly narrowed to some audiences and scopes.

@@ -121,8 +121,8 @@ var LanguageNames = map[string]string{
 
 const localeCookie = "GOCLOAK_LOCALE"
 
-// Locale picks the language of a page, following Keycloak: kc_locale,
-// ui_locales, the KEYCLOAK_LOCALE cookie, the user's locale attribute, then
+// Locale picks the language of a page: kc_locale,
+// ui_locales, the GOCLOAK_LOCALE cookie, the user's locale attribute, then
 // Accept-Language, among the realm's supported locales. kc_locale is
 // remembered in the cookie when w is given.
 func (h *Handler) Locale(w http.ResponseWriter, r *http.Request, realm *model.Realm, user *model.User) string {

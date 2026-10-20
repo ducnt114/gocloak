@@ -15,8 +15,8 @@ import (
 // service account use the protection API.
 const UMAProtectionRole = "uma_protection"
 
-// EnableAuthorization makes a client a resource server with Keycloak's
-// defaults: a default resource, the default (granting) policy and a
+// EnableAuthorization makes a client a resource server with the default
+// setup: a default resource, the default (granting) policy and a
 // permission applying it to the default resource type.
 func (s *Service) EnableAuthorization(ctx context.Context, st *store.Store, c *model.Client) error {
 	if _, err := st.GetResourceServer(ctx, c.ID); err == nil {

@@ -82,7 +82,7 @@ func TestClientScopesAndMappers(t *testing.T) {
 
 	// Mappers on the client: multivalued attribute, groups with full path,
 	// a renamed realm role and a hardcoded client role.
-	// Like Keycloak 26, free-form attributes need unmanaged attributes enabled.
+	// Free-form attributes need unmanaged attributes enabled.
 	var profile map[string]any
 	e.expect(e.do(nil, "GET", R+"/users/profile", admin, nil, nil), 200).json(&profile)
 	e.expect(e.do(nil, "PUT", R+"/users/"+aliceID, admin, map[string]any{"attributes": map[string][]string{"dept": {"eng"}}}, nil), 204)
@@ -187,7 +187,7 @@ func TestAuthorizeScopesAndAuthTime(t *testing.T) {
 			t.Fatalf("auth_time missing after browser login: %v", claims(t, tk))
 		}
 	}
-	// password grants carry no auth_time, as in Keycloak
+	// password grants carry no auth_time
 	pw, r := e.passwordGrant("demo", "web", "web-secret", "alice", "wonderland")
 	e.expect(r, 200)
 	if _, ok := claims(t, pw.AccessToken)["auth_time"]; ok {

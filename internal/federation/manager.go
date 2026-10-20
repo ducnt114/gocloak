@@ -193,7 +193,7 @@ func (m *Manager) ValidateUser(ctx context.Context, realm *model.Realm, u *model
 		return nil, err
 	}
 	if e == nil {
-		// removed from LDAP: Keycloak removes the imported user too
+		// removed from LDAP: the imported user is removed too
 		m.logger().Info("ldap user removed from the directory", "provider", p.cfg.Name, "username", u.Username)
 		return nil, m.Svc.Store.DeleteUser(ctx, realm.ID, u.ID)
 	}
@@ -399,7 +399,7 @@ func (m *Manager) UserUpdated(ctx context.Context, realm *model.Realm, old, u *m
 
 // UserDeleted implements service.UserFederation: the entry is removed from
 // a writable provider; otherwise only the local user is deleted (and comes
-// back on the next lookup), as in Keycloak.
+// back on the next lookup).
 func (m *Manager) UserDeleted(ctx context.Context, realm *model.Realm, u *model.User) error {
 	p, err := m.providerOf(ctx, u)
 	if errors.Is(err, store.ErrNotFound) {
@@ -425,7 +425,7 @@ func (m *Manager) UserDeleted(ctx context.Context, realm *model.Realm, u *model.
 
 // ---------------------------------------------------------------- synchronization
 
-// SyncResult is Keycloak's SynchronizationResult.
+// SyncResult is the synchronization result representation.
 type SyncResult struct {
 	Ignored bool   `json:"ignored"`
 	Added   int    `json:"added"`
@@ -627,7 +627,7 @@ func (m *Manager) periodicSync(ctx context.Context) {
 // ---------------------------------------------------------------- connection test
 
 // TestConnection checks a connection URL (and the bind credentials when
-// authenticate is set), returning Keycloak's error keys.
+// authenticate is set), returning the console's error keys.
 func TestConnection(cfg *Config, authenticate bool) error {
 	c, err := dialOnly(cfg, cfg.ConnectionURL)
 	if err != nil {

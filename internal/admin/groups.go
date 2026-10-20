@@ -67,7 +67,7 @@ func (h *Handler) listGroups(w http.ResponseWriter, r *http.Request, p *principa
 	if err != nil {
 		return err
 	}
-	depth := 100 // Keycloak returns the full tree unless briefRepresentation paging is used
+	depth := 100 // the full tree, unless briefRepresentation paging is used
 	if q.Get("briefRepresentation") == "true" || q.Has("first") || q.Has("max") {
 		depth = 0
 	}
@@ -150,7 +150,7 @@ func (h *Handler) createGroupUnder(w http.ResponseWriter, r *http.Request, realm
 		return badRequest("Group name is missing")
 	}
 	ctx := r.Context()
-	// Keycloak moves an existing group when its id is posted.
+	// Posting an existing group's id moves that group.
 	if rep.ID != nil && *rep.ID != "" {
 		g, err := h.Svc.Store.GetGroup(ctx, realm.ID, *rep.ID)
 		if err == nil {

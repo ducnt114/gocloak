@@ -14,7 +14,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/store"
 )
 
-// linkedAccountRep is Keycloak's LinkedAccountRepresentation.
+// linkedAccountRep is the LinkedAccountRepresentation.
 type linkedAccountRep struct {
 	Connected      bool   `json:"connected"`
 	Social         bool   `json:"social"`

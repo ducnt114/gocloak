@@ -433,7 +433,7 @@ func (h *Handler) setIdentityCookie(w http.ResponseWriter, r *http.Request, real
 		maxAge = int(time.Until(exp).Seconds())
 	}
 	h.setCookie(w, r, realm, identityCookie, tok, maxAge)
-	// readable by the login status iframe of keycloak-js applications
+	// readable by the login status iframe of the JavaScript adapter
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: realm.Name + "/" + user.ID + "/" + us.ID, Path: h.cookiePath(realm),
 		MaxAge: maxAge, Secure: strings.HasPrefix(h.URLs.Base(r), "https://"), SameSite: http.SameSiteLaxMode})
 	return nil
@@ -454,7 +454,7 @@ func (h *Handler) ssoSession(r *http.Request, realm *model.Realm) (*model.UserSe
 
 // ---------------------------------------------------------------- logout
 
-// logout implements RP-initiated logout, and Keycloak's legacy back-channel
+// logout implements RP-initiated logout, and the legacy back-channel
 // logout (POST with refresh_token and client credentials).
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -484,7 +484,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 		hintSession = claims.String("sid")
 		if hintSession != "" {
 			// without the SSO cookie (e.g. a broker's back-channel logout),
-			// the session of the hint is logged out, as Keycloak does
+			// the session of the hint is logged out
 			if s, err := h.Svc.Store.GetUserSession(ctx, hintSession); err != nil || s.UserID != claims.String("sub") {
 				hintSession = ""
 			}

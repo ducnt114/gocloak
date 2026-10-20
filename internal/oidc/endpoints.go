@@ -302,7 +302,7 @@ func verifyPKCE(ac *model.AuthCode, verifier string) error {
 	return nil
 }
 
-// errInvalidCredentials is Keycloak's response to a failed password grant.
+// errInvalidCredentials is the response to a failed password grant.
 func errInvalidCredentials() *oauthError {
 	return &oauthError{http.StatusUnauthorized, "invalid_grant", "Invalid user credentials"}
 }
@@ -550,7 +550,7 @@ func (h *Handler) userinfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !hasScope(vt.Claims.String("scope"), "openid") {
-		// Keycloak refuses userinfo for tokens issued without "openid".
+		// userinfo is refused for tokens issued without "openid".
 		w.Header().Set("WWW-Authenticate", `Bearer realm="`+realm.Name+`", error="insufficient_scope", error_description="Missing openid scope"`)
 		writeJSON(w, http.StatusForbidden, &oauthError{Code: "insufficient_scope", Description: "Missing openid scope"})
 		return

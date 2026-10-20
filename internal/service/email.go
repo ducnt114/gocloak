@@ -33,7 +33,7 @@ var ErrNoSMTP = errors.New("SMTP server not configured")
 
 // SendEmail sends an email with the realm's smtpServer settings (host,
 // port, from, fromDisplayName, replyTo, replyToDisplayName, envelopeFrom,
-// ssl, starttls, auth, user, password), as Keycloak's email sender does.
+// ssl, starttls, auth, user, password).
 func (s *Service) SendEmail(ctx context.Context, realm *model.Realm, e Email) error {
 	return SendWith(ctx, realm.Settings.SMTPServer, e)
 }
@@ -193,7 +193,7 @@ func emailLocale(realm *model.Realm, u *model.User) string {
 }
 
 // EmailMessage builds an email of the realm's email theme, in the user's
-// language. The body messages get Keycloak's arguments: {0} link, {1}
+// language. The body messages get these arguments: {0} link, {1}
 // lifespan in minutes, {2} realm name, {3} lifespan as text, {4} actions.
 func (s *Service) EmailMessage(realm *model.Realm, u *model.User, kind, link string, lifespan int, actions []string) (Email, error) {
 	return s.EmailMessageWith(realm, u, kind, link, func(th *theme.Theme, locale string) []any {

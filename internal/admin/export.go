@@ -25,7 +25,7 @@ var FullExport = ExportOptions{Clients: true, Groups: true, Users: true, Secrets
 
 const maskedSecret = "**********"
 
-// Export builds a Keycloak RealmRepresentation of a realm, the inverse of
+// Export builds a RealmRepresentation of a realm, the inverse of
 // Import: roles and composites are referenced by name, groups by path.
 func Export(ctx context.Context, svc *service.Service, realm *model.Realm, opts ExportOptions) (*RealmRep, error) {
 	st := svc.Store
@@ -311,8 +311,8 @@ func exportUsers(ctx context.Context, svc *service.Service, realm *model.Realm, 
 	return out, nil
 }
 
-// partialExport implements POST /admin/realms/{realm}/partial-export. Like
-// Keycloak it never includes users, and client secrets are masked.
+// partialExport implements POST /admin/realms/{realm}/partial-export. It
+// never includes users, and client secrets are masked.
 func (h *Handler) partialExport(w http.ResponseWriter, r *http.Request, p *principal) error {
 	realm, err := h.realmFor(r, p, permViewRealm)
 	if err != nil {
@@ -443,8 +443,8 @@ func componentToExport(c *model.Component) componentExport {
 		SubComponents: map[string][]componentExport{}, Config: c.Config}
 }
 
-// exportComponents exports key providers (with private keys, as Keycloak's
-// full export does) and the user profile.
+// exportComponents exports key providers (with private keys, as a full
+// export does) and the user profile.
 func exportComponents(ctx context.Context, st *store.Store, realm *model.Realm, rep *RealmRep) error {
 	comps, err := st.ListComponents(ctx, realm.ID, "")
 	if err != nil {
@@ -455,7 +455,7 @@ func exportComponents(ctx context.Context, st *store.Store, realm *model.Realm, 
 }
 
 // addComponentTree adds components to an export, sub components (LDAP
-// mappers) nested under their parent as Keycloak does.
+// mappers) nested under their parent.
 func addComponentTree(rep *RealmRep, comps []*model.Component, mask bool) {
 	byParent := map[string][]*model.Component{}
 	ids := map[string]bool{}

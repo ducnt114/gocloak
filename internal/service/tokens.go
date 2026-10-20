@@ -9,7 +9,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/store"
 )
 
-// Token types, as written in the "typ" claim by Keycloak.
+// Token types, as written in the "typ" claim.
 const (
 	TokenBearer  = "Bearer"
 	TokenID      = "ID"

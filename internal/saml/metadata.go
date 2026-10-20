@@ -17,8 +17,7 @@ type DescriptorKey struct {
 	Cert *x509.Certificate
 }
 
-// IdPDescriptor returns the metadata of a realm as a SAML identity provider,
-// laid out like Keycloak's.
+// IdPDescriptor returns the metadata of a realm as a SAML identity provider.
 func IdPDescriptor(entityID, endpoint string, keys []DescriptorKey) string {
 	e := html.EscapeString
 	var b strings.Builder

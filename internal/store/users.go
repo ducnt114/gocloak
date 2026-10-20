@@ -100,7 +100,7 @@ type UserQuery struct {
 }
 
 func (q UserQuery) where(realmID string) (string, []any) {
-	// Service account users are hidden from user listings, as in Keycloak.
+	// Service account users are hidden from user listings.
 	w := ` WHERE realm_id=? AND service_account_client_id=''`
 	args := []any{realmID}
 	if q.Search != "" {

@@ -59,7 +59,8 @@ func TestDynamicClientRegistration(t *testing.T) {
 		t.Fatalf("client id change: %d", r.status)
 	}
 
-	// Keycloak's own representation, with a user allowed to create clients
+	// the default provider takes a client representation, with a user allowed
+	// to create clients
 	var kc map[string]any
 	e.expect(e.do(nil, "POST", D+"/default", e.adminToken(), map[string]any{"clientId": "kc-app", "redirectUris": []string{"https://kc.example/*"}}, nil), 201).json(&kc)
 	if kc["clientId"] != "kc-app" || kc["registrationAccessToken"] == nil {

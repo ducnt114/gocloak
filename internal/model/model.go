@@ -1,6 +1,5 @@
-// Package model holds the core domain types of gocloak. They mirror the
-// entities Keycloak keeps in its database (realms, clients, users, roles,
-// groups, sessions...), trimmed down to the fields gocloak implements.
+// Package model holds the core domain types of gocloak (realms, clients,
+// users, roles, groups, sessions...), with the fields gocloak implements.
 package model
 
 import "time"
@@ -25,7 +24,7 @@ type Realm struct {
 }
 
 // RealmSettings holds realm configuration that does not need a column of
-// its own. It is stored as one JSON document; JSON names follow Keycloak's
+// its own. It is stored as one JSON document; JSON names follow the
 // RealmRepresentation so the import/export code can map them one to one.
 // Use DefaultRealmSettings for new realms: zero is a meaningful value for
 // several fields.
@@ -79,7 +78,7 @@ type RealmSettings struct {
 	SSOSessionMaxLifespanRememberMe int    `json:"ssoSessionMaxLifespanRememberMe"`
 	ActionTokenGeneratedByAdmin     int    `json:"actionTokenGeneratedByAdminLifespan"`
 	ActionTokenGeneratedByUser      int    `json:"actionTokenGeneratedByUserLifespan"`
-	// SMTPServer holds Keycloak's smtpServer settings (host, port, from, auth, user, password, ssl, starttls...).
+	// SMTPServer holds the smtpServer settings (host, port, from, auth, user, password, ssl, starttls...).
 	SMTPServer map[string]string `json:"smtpServer,omitempty"`
 
 	// OTP policy.
@@ -92,7 +91,7 @@ type RealmSettings struct {
 	OTPPolicyCodeReusable    bool     `json:"otpPolicyCodeReusable"`
 	OTPSupportedApplications []string `json:"otpSupportedApplications,omitempty"`
 
-	// WebAuthn policies (two-factor and passwordless), flat as in Keycloak.
+	// WebAuthn policies (two-factor and passwordless), flat in the realm JSON.
 	WebAuthnPolicyRpEntityName                                string   `json:"webAuthnPolicyRpEntityName"`
 	WebAuthnPolicySignatureAlgorithms                         []string `json:"webAuthnPolicySignatureAlgorithms"`
 	WebAuthnPolicyRpId                                        string   `json:"webAuthnPolicyRpId"`
@@ -156,7 +155,7 @@ func (s *RealmSettings) WebAuthn(passwordless bool) WebAuthnPolicy {
 		s.WebAuthnPolicyAvoidSameAuthenticatorRegister, s.WebAuthnPolicyAcceptableAaguids, s.WebAuthnPolicyExtraOrigins}
 }
 
-// DefaultRealmSettings returns Keycloak's defaults for a new realm.
+// DefaultRealmSettings returns the defaults for a new realm.
 func DefaultRealmSettings() RealmSettings {
 	d := RealmSettings{
 		SSLRequired:                  "external",
@@ -304,7 +303,7 @@ type User struct {
 	FirstName              string
 	LastName               string
 	Enabled                bool
-	CreatedTimestamp       int64 // millis, like Keycloak
+	CreatedTimestamp       int64 // millis
 	Attributes             map[string][]string
 	RequiredActions        []string
 	ServiceAccountClientID string // client UUID
@@ -320,8 +319,8 @@ const (
 )
 
 // Credential is a stored secret for a user (currently only passwords).
-// SecretData and CredentialData use the same JSON layout as Keycloak so that
-// realm exports can be imported without re-hashing.
+// SecretData and CredentialData use the JSON layout of realm exports, so
+// that exported credentials can be imported without re-hashing.
 type Credential struct {
 	ID             string
 	UserID         string
@@ -433,7 +432,7 @@ type ProtocolMapper struct {
 	OwnerID  string
 	Name     string
 	Protocol string
-	Type     string // Keycloak provider id, e.g. oidc-usermodel-attribute-mapper
+	Type     string // provider id, e.g. oidc-usermodel-attribute-mapper
 	Config   map[string]string
 }
 
@@ -443,7 +442,7 @@ type ClientScopeLink struct {
 	Default bool // default scope (always applied) vs optional (on request)
 }
 
-// Event is a login/user event (Keycloak's EventRepresentation).
+// Event is a login/user event (the EventRepresentation).
 type Event struct {
 	ID        string
 	RealmID   string
@@ -485,7 +484,7 @@ type LoginFailure struct {
 }
 
 // Component is a configurable provider instance, such as a key provider.
-// Config is multivalued, as in Keycloak.
+// Config is multivalued.
 type Component struct {
 	ID           string
 	RealmID      string

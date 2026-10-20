@@ -56,8 +56,8 @@ CREATE TABLE IF NOT EXISTS offline_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_offline_sessions_user ON offline_sessions (user_id);
 
--- Keycloak components (key providers now, user storage later). config is a
--- multivalued map, as in Keycloak: {"priority": ["100"], ...}.
+-- Components (key providers now, user storage later). config is a
+-- multivalued map: {"priority": ["100"], ...}.
 CREATE TABLE IF NOT EXISTS components (
     id            TEXT PRIMARY KEY,
     realm_id      TEXT NOT NULL REFERENCES realms(id) ON DELETE CASCADE,

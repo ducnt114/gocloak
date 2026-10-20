@@ -18,7 +18,7 @@ import (
 // KeyProviderType is the component type of key providers.
 const KeyProviderType = "org.gocloak.keys.KeyProvider"
 
-// Key provider ids, as in Keycloak.
+// Key provider ids.
 const (
 	KeyRSAGenerated   = "rsa-generated"
 	KeyRSAImported    = "rsa"
@@ -267,7 +267,7 @@ func storeAsymmetric(c *model.Component, k *jwt.Key) error {
 }
 
 // CreateDefaultKeys adds the key providers of a new realm: an RS256 key for
-// tokens and an HS512 key for refresh tokens and cookies, as in Keycloak.
+// tokens and an HS512 key for refresh tokens and cookies.
 func (s *Service) CreateDefaultKeys(ctx context.Context, st *store.Store, realm *model.Realm) error {
 	for _, def := range []struct{ name, provider, alg string }{
 		{"rsa-generated", KeyRSAGenerated, "RS256"},
@@ -344,8 +344,7 @@ func (s *Service) RealmKeys(ctx context.Context, realmID string) ([]*RealmKey, e
 }
 
 // SigningKey returns the active key with the highest priority for alg. When
-// the realm has none, a "fallback-<alg>" generated key provider is created,
-// as Keycloak does.
+// the realm has none, a "fallback-<alg>" generated key provider is created.
 func (s *Service) SigningKey(ctx context.Context, realm *model.Realm, alg string) (*jwt.Key, error) {
 	if alg == "" {
 		alg = realm.Settings.DefaultSignatureAlgorithm

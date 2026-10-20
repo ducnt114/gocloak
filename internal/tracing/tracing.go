@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-// Config of the exporter (Keycloak's --tracing-* options).
+// Config of the exporter (the --tracing-* options).
 type Config struct {
 	Endpoint    string  // OTLP/HTTP endpoint, e.g. http://localhost:4318 (/v1/traces is added)
 	ServiceName string  // service.name resource attribute

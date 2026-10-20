@@ -1,6 +1,6 @@
 // Package jwt implements the JWS and JWK features gocloak needs: signing
 // and verification with RS*, PS*, ES* and HS* algorithms, key generation
-// (RSA keys come with a self-signed certificate, as in Keycloak) and JWK
+// (RSA keys come with a self-signed certificate) and JWK
 // import/export.
 package jwt
 
@@ -451,8 +451,8 @@ func GenerateHMAC(alg string, size int) (*Key, error) {
 	return &Key{Alg: alg, Secret: secret}, nil
 }
 
-// SelfSignedCertificate issues a 10 year certificate for priv, like the
-// certificates Keycloak generates for its realm keys.
+// SelfSignedCertificate issues a 10 year certificate for priv, as used for
+// realm keys.
 func SelfSignedCertificate(priv crypto.Signer, commonName string) (*x509.Certificate, error) {
 	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 62))
 	if err != nil {
@@ -491,7 +491,7 @@ func EncodePrivateKey(priv crypto.Signer) (string, error) {
 }
 
 // ParsePrivateKey decodes a PEM (PKCS#8, PKCS#1 or SEC1) private key. The
-// PEM armor may be omitted, as Keycloak stores bare base64 keys.
+// PEM armor may be omitted: realm exports store bare base64 keys.
 func ParsePrivateKey(s string) (crypto.Signer, error) {
 	der, err := pemOrBase64(s)
 	if err != nil {
@@ -540,7 +540,7 @@ func pemOrBase64(s string) ([]byte, error) {
 }
 
 // PublicKeyBase64 returns the DER (SubjectPublicKeyInfo) public key in
-// standard base64, the format Keycloak publishes.
+// standard base64, the format published for realm keys.
 func PublicKeyBase64(pub crypto.PublicKey) string {
 	der, _ := x509.MarshalPKIXPublicKey(pub)
 	return base64.StdEncoding.EncodeToString(der)

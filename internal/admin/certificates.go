@@ -18,7 +18,7 @@ import (
 )
 
 // Client certificates (/clients/{id}/certificates/{attr}): the keys of
-// private_key_jwt clients, stored in client attributes as Keycloak does
+// private_key_jwt clients, stored in client attributes
 // (<attr>.certificate, <attr>.public.key, <attr>.private.key, <attr>.kid).
 
 type certificateRep struct {
@@ -43,7 +43,7 @@ func (h *Handler) getClientCertificate(w http.ResponseWriter, r *http.Request, p
 }
 
 // generateClientCertificate creates an RSA key pair with a self-signed
-// certificate; the private key is returned once and kept, as in Keycloak.
+// certificate; the private key is returned once and kept.
 func (h *Handler) generateClientCertificate(w http.ResponseWriter, r *http.Request, p *principal) error {
 	realm, err := h.realmFor(r, p, permManageClients)
 	if err != nil {

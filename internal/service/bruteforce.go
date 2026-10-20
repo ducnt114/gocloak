@@ -8,7 +8,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/store"
 )
 
-// LockStatus is the brute force state of a user (Keycloak's
+// LockStatus is the brute force state of a user (the
 // /attack-detection/brute-force/users/{id} response).
 type LockStatus struct {
 	NumFailures          int    `json:"numFailures"`
@@ -39,14 +39,14 @@ func (s *Service) LockStatus(ctx context.Context, realm *model.Realm, userID str
 }
 
 // TemporarilyLocked reports whether brute force detection currently blocks
-// logins of the user. While locked, Keycloak rejects even correct passwords.
+// logins of the user. While locked, even correct passwords are rejected.
 func (s *Service) TemporarilyLocked(ctx context.Context, realm *model.Realm, u *model.User) (bool, error) {
 	st, err := s.LockStatus(ctx, realm, u.ID)
 	return st.Disabled, err
 }
 
-// LoginFailed records a failed password check, following Keycloak's
-// DefaultBruteForceProtector: failures reset after maxDeltaTimeSeconds,
+// LoginFailed records a failed password check, following the default
+// brute force protector: failures reset after maxDeltaTimeSeconds,
 // quick successive failures wait minimumQuickLoginWaitSeconds, and every
 // failureFactor failures (MULTIPLE) or every failure past it (LINEAR) add
 // waitIncrementSeconds, up to maxFailureWaitSeconds. With permanentLockout

@@ -8,7 +8,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/store"
 )
 
-// Protocol mapper types (Keycloak provider ids) implemented by gocloak.
+// Protocol mapper types (provider ids) implemented by gocloak.
 const (
 	MapperUserProperty    = "oidc-usermodel-property-mapper"
 	MapperUserAttribute   = "oidc-usermodel-attribute-mapper"
@@ -51,8 +51,8 @@ type builtinScope struct {
 	scopeRoles        []string // realm roles mapped to the scope
 }
 
-// claimFlags returns the include-in-token flags Keycloak sets on its
-// built-in mappers: access, id, userinfo and introspection.
+// claimFlags returns the include-in-token flags of the built-in mappers:
+// access, id, userinfo and introspection.
 func claimFlags(access, id, userinfo bool) map[string]string {
 	b := func(v bool) string {
 		if v {
@@ -87,7 +87,7 @@ func attributeMapper(name, attr, claim, jsonType string) builtinMapper {
 		"user.attribute", attr, "claim.name", claim, "jsonType.label", jsonType)}
 }
 
-// builtinScopes mirrors the client scopes Keycloak 26 creates in every realm.
+// builtinScopes are the client scopes created in every realm.
 var builtinScopes = []builtinScope{
 	{
 		name: "profile", description: "OpenID Connect built-in scope: profile", isDefault: true, inTokenScope: true,
@@ -190,7 +190,7 @@ var samlRoleListScope = builtinScope{
 	},
 }
 
-// ProvisionClientScopes creates Keycloak's built-in client scopes in a realm,
+// ProvisionClientScopes creates the built-in client scopes in a realm,
 // registers them as realm default/optional scopes, and links the realm
 // defaults to every existing client.
 func (s *Service) ProvisionClientScopes(ctx context.Context, st *store.Store, realm *model.Realm) error {
@@ -254,7 +254,7 @@ func provisionScope(ctx context.Context, st *store.Store, realm *model.Realm, b 
 }
 
 // LinkDefaultScopes attaches the realm's default and optional client scopes
-// of the client's protocol to a client, as Keycloak does for every new client.
+// of the client's protocol to a client, as done for every new client.
 func (s *Service) LinkDefaultScopes(ctx context.Context, st *store.Store, c *model.Client) error {
 	links, err := st.ListRealmDefaultScopes(ctx, c.RealmID)
 	if err != nil {
@@ -311,7 +311,7 @@ func (s *Service) UpgradeRealms(ctx context.Context) error {
 	return nil
 }
 
-// serviceAccountMappers are the session note mappers Keycloak adds to a
+// serviceAccountMappers are the session note mappers added to a
 // client when service accounts are enabled.
 var serviceAccountMappers = []builtinMapper{
 	{"Client ID", MapperSessionNote, with(claimFlags(true, true, false), "user.session.note", "client_id", "claim.name", "client_id", "jsonType.label", "String")},

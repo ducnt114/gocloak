@@ -7,7 +7,7 @@ import (
 )
 
 // addSAMLRoleListScope gives realms created before SAML support the
-// "role_list" client scope Keycloak creates for SAML clients. It uses
+// "role_list" client scope created for SAML clients. It uses
 // explicit columns so that later schema changes do not break it.
 func addSAMLRoleListScope(ctx context.Context, tx *Store) error {
 	realms, err := queryList(ctx, tx, func(sc scanner) (string, error) {

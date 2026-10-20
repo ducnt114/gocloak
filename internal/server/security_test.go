@@ -143,7 +143,7 @@ func TestEvents(t *testing.T) {
 		t.Fatalf("events = %v", events)
 	}
 	if byType["REFRESH_TOKEN"] != nil {
-		t.Fatal("REFRESH_TOKEN is not stored by default, as in Keycloak")
+		t.Fatal("REFRESH_TOKEN is not stored by default")
 	}
 	d := login["details"].(map[string]any)
 	if login["userId"] != aliceID || login["clientId"] != "web" || d["grant_type"] != "password" || d["token_id"] == nil || d["refresh_token_type"] != "Refresh" {

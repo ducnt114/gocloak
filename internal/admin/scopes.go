@@ -13,7 +13,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/store"
 )
 
-// ClientScopeRep mirrors Keycloak's ClientScopeRepresentation.
+// ClientScopeRep mirrors the ClientScopeRepresentation.
 type ClientScopeRep struct {
 	ID              *string             `json:"id,omitempty"`
 	Name            *string             `json:"name,omitempty"`
@@ -23,7 +23,7 @@ type ClientScopeRep struct {
 	ProtocolMappers []ProtocolMapperRep `json:"protocolMappers,omitempty"`
 }
 
-// ProtocolMapperRep mirrors Keycloak's ProtocolMapperRepresentation.
+// ProtocolMapperRep mirrors the ProtocolMapperRepresentation.
 type ProtocolMapperRep struct {
 	ID             string `json:"id,omitempty"`
 	Name           string `json:"name"`

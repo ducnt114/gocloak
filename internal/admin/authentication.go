@@ -26,7 +26,7 @@ var (
 	flowChoices    = []string{model.Required, model.Alternative, model.Disabled, model.Conditional}
 )
 
-// providers lists the providers gocloak knows, with Keycloak's names.
+// providers lists the providers gocloak knows, with their standard names.
 var providers = map[string]providerInfo{
 	"auth-cookie":                         {"Cookie", "Validates the SSO cookie set by the auth server.", reqAltDisabled},
 	"auth-spnego":                         {"Kerberos", "Initiates the SPNEGO protocol. Most often used with Kerberos.", reqAltDisabled},
@@ -58,7 +58,7 @@ var providers = map[string]providerInfo{
 	"idp-username-password-form":          {"Username Password Form for identity provider reauthentication", "Validates a password from login form. Username may be already known from identity provider authentication", reqOnly},
 	"idp-add-organization-member":         {"Organization Member Onboard", "Adds a federated user as a member of an organization", reqAltDisabled},
 	"docker-http-basic-authenticator":     {"Docker Authenticator", "Uses HTTP Basic authentication to validate docker users, returning a docker error token on auth failure", reqOnly},
-	// the "saml ecp" flow of Keycloak realms (exports); ECP itself is not supported
+	// the "saml ecp" flow of realm exports; ECP itself is not supported
 	"http-basic-authenticator": {"HTTP Basic Authentication", "Validates username and password from Authorization HTTP header", reqAltDisabled},
 }
 
@@ -103,7 +103,7 @@ type execRep struct {
 	AuthenticatorFlow   bool   `json:"authenticatorFlow"`
 	Requirement         string `json:"requirement"`
 	Priority            int    `json:"priority"`
-	AutheticatorFlow    bool   `json:"autheticatorFlow"` // sic, as in Keycloak
+	AutheticatorFlow    bool   `json:"autheticatorFlow"` // sic: the representation's field name
 	FlowAlias           string `json:"flowAlias,omitempty"`
 	UserSetupAllowed    bool   `json:"userSetupAllowed"`
 }

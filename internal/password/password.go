@@ -1,6 +1,6 @@
-// Package password hashes and verifies passwords using the same algorithms
-// and storage layout as Keycloak (argon2 and pbkdf2-*), so credentials from a
-// Keycloak realm export can be imported and verified unchanged.
+// Package password hashes and verifies passwords with the algorithms
+// (argon2 and pbkdf2-*) and storage layout of the upstream export format, so
+// credentials from a realm export can be imported and verified unchanged.
 package password
 
 import (
@@ -41,7 +41,7 @@ type Hasher struct {
 	Iterations int
 }
 
-// Default mirrors Keycloak's default (argon2id, 5 iterations, 7 MiB).
+// Default is the default hasher (argon2id, 5 iterations, 7 MiB).
 var Default = Hasher{Algorithm: "argon2", Iterations: 5}
 
 const (
@@ -78,7 +78,7 @@ func (h Hasher) Hash(password string) (secretData, credentialData string, err er
 			return "", "", err
 		}
 		if cd.HashIterations <= 0 {
-			// Keycloak's defaults per algorithm (OWASP recommendations).
+			// defaults per algorithm (OWASP recommendations).
 			cd.HashIterations = map[string]int{"pbkdf2-sha512": 210000, "pbkdf2-sha256": 600000, "pbkdf2": 1300000}[h.Algorithm]
 		}
 		sum, err = pbkdf2.Key(hf, password, salt, cd.HashIterations, 64)

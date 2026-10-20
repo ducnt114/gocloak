@@ -119,7 +119,7 @@ func addCommon(fs *flag.FlagSet, dev bool) commonFlags {
 	}
 }
 
-// dbConfig builds the store configuration, accepting Keycloak's JDBC URLs.
+// dbConfig builds the store configuration, accepting JDBC URLs.
 func (c commonFlags) dbConfig() (store.Config, error) {
 	switch *c.db {
 	case store.SQLite, "":

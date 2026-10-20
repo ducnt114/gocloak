@@ -251,7 +251,7 @@ const (
 )
 
 // EncryptionOptions are the algorithms of an encrypted assertion; empty
-// fields take Keycloak's defaults (AES-128-CBC, RSA-OAEP-MGF1P with SHA-1).
+// fields take the defaults (AES-128-CBC, RSA-OAEP-MGF1P with SHA-1).
 type EncryptionOptions struct {
 	Algorithm    string
 	KeyAlgorithm string

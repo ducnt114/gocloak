@@ -1,5 +1,5 @@
 // Package oidc implements the OpenID Connect / OAuth 2.0 endpoints of a
-// realm under /realms/{realm}/..., following Keycloak's URL layout.
+// realm, all under /realms/{realm}/.
 package oidc
 
 import (
@@ -260,7 +260,7 @@ func (h *Handler) preflight(w http.ResponseWriter, r *http.Request) {
 
 // resolveURI makes a relative redirect URI absolute using the client's root
 // URL, or the server's base URL when the client has none. "${authBaseUrl}"
-// in the root URL stands for the server's base URL, as in Keycloak.
+// in the root URL stands for the server's base URL.
 func resolveURI(base string, c *model.Client, u string) string {
 	if !strings.HasPrefix(u, "/") {
 		return u
@@ -273,7 +273,7 @@ func resolveURI(base string, c *model.Client, u string) string {
 }
 
 // matchRedirectURI reports whether uri is allowed for client. Patterns may
-// end with '*' for a prefix match, like in Keycloak.
+// end with '*' for a prefix match.
 func matchRedirectURI(base string, c *model.Client, uri string) bool {
 	parsed, err := url.Parse(uri)
 	if err != nil || parsed.Scheme == "" || parsed.Fragment != "" {

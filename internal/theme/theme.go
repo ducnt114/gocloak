@@ -1,9 +1,9 @@
 // Package theme loads the login, email and account themes: Go html
-// templates, Keycloak style message bundles (messages/messages_<locale>.properties)
+// templates, message bundles (messages/messages_<locale>.properties)
 // and static resources.
 //
 // The built-in theme is embedded. A themes directory can add themes laid out
-// like Keycloak's:
+// like this:
 //
 //	<dir>/<name>/<type>/theme.properties   parent=<theme>, styles=css/a.css css/b.css
 //	<dir>/<name>/<type>/*.html             templates overriding pages of the parent
@@ -40,8 +40,8 @@ const (
 	Account = "account"
 )
 
-// Default is the name of the built-in theme. Keycloak's built-in names
-// map to it, so realms imported from Keycloak keep working.
+// Default is the name of the built-in theme. The other built-in names
+// (gocloak.v2, base) map to it, so realms naming them keep working.
 const Default = "gocloak"
 
 var builtinNames = map[string]bool{"": true, "gocloak": true, "gocloak.v2": true, "base": true}

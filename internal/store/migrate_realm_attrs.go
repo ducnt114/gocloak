@@ -14,7 +14,7 @@ var realmAttributeDefaults = map[string]string{
 }
 
 // addRealmAttributeDefaults gives existing realms the device flow, CIBA and
-// PAR attributes Keycloak creates realms with.
+// PAR attributes new realms are created with.
 func addRealmAttributeDefaults(ctx context.Context, tx *Store) error {
 	type row struct{ id, attrs string }
 	rows, err := queryList(ctx, tx, func(sc scanner) (row, error) {

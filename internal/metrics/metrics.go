@@ -1,7 +1,6 @@
-// Package metrics exposes gocloak's metrics in the Prometheus text format,
-// with Keycloak's metric names where Keycloak has them:
+// Package metrics exposes gocloak's metrics in the Prometheus text format:
 // http_server_requests_seconds (count, sum and max per method, outcome,
-// status and route) and keycloak_user_events_total, plus Go runtime and
+// status and route) and gocloak_user_events_total, plus Go runtime and
 // process metrics.
 package metrics
 
@@ -39,7 +38,7 @@ type summary struct {
 }
 
 // New returns an empty registry; with histograms, request durations are
-// also counted in buckets (Keycloak's --http-metrics-histograms-enabled).
+// also counted in buckets (--http-metrics-histograms-enabled).
 func New(histograms bool) *Registry {
 	r := &Registry{requests: map[requestKey]*summary{}, events: map[eventKey]float64{}, started: time.Now()}
 	if histograms {

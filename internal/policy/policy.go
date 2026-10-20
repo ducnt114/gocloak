@@ -1,4 +1,4 @@
-// Package policy parses and enforces Keycloak password policies, such as
+// Package policy parses and enforces password policies, such as
 // "length(8) and digits(1) and notUsername(undefined) and passwordHistory(3)".
 package policy
 
@@ -29,7 +29,7 @@ type Policy struct {
 	HashIterations  int
 }
 
-// Error is a policy violation, with Keycloak's message key and text.
+// Error is a policy violation, with its message key and text.
 type Error struct {
 	Key     string
 	Message string
@@ -39,7 +39,7 @@ type Error struct {
 func (e *Error) Error() string { return e.Message }
 
 // Parse parses a policy string. Unknown policies are rejected, so that a
-// policy written for Keycloak is never silently weakened.
+// policy imported from elsewhere is never silently weakened.
 func Parse(s string) (*Policy, error) {
 	p := &Policy{}
 	s = strings.TrimSpace(s)

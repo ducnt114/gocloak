@@ -19,7 +19,7 @@ type ConsentItem struct {
 }
 
 // ConsentItems returns what the user is asked to consent to for a client
-// and its applied client scopes, in Keycloak's terms.
+// and its applied client scopes.
 func ConsentItems(c *model.Client, scopes []*model.ClientScope) []ConsentItem {
 	var out []ConsentItem
 	for _, s := range scopes {

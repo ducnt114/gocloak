@@ -260,7 +260,7 @@ func TestPasswordGrantAndRoles(t *testing.T) {
 	_, r = e.passwordGrant("demo", "web", "web-secret", "alice@example.com", "wonderland")
 	e.expect(r, 200)
 	_, r = e.passwordGrant("demo", "web", "web-secret", "alice", "nope")
-	e.expect(r, 401) // invalid_grant, as in Keycloak
+	e.expect(r, 401) // invalid_grant
 	_, r = e.passwordGrant("demo", "web", "bad", "alice", "wonderland")
 	e.expect(r, 401)
 

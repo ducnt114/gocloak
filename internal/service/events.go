@@ -7,7 +7,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/model"
 )
 
-// DefaultEventTypes are the event types Keycloak stores when a realm does
+// DefaultEventTypes are the event types stored when a realm does
 // not configure enabledEventTypes.
 var DefaultEventTypes = []string{
 	"LOGIN", "LOGIN_ERROR", "REGISTER", "REGISTER_ERROR", "LOGOUT", "LOGOUT_ERROR", "CODE_TO_TOKEN", "CODE_TO_TOKEN_ERROR",
@@ -37,7 +37,7 @@ type EventListener interface {
 	OnAdminEvent(realm *model.Realm, e *model.AdminEvent)
 }
 
-// logListener is Keycloak's "jboss-logging" listener: successes at debug
+// logListener is the "jboss-logging" listener: successes at debug
 // level, errors as warnings.
 type logListener struct{ log *slog.Logger }
 

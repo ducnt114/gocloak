@@ -1,6 +1,6 @@
-// Package admin implements a Keycloak compatible admin REST API under
-// /admin/realms. Requests are authorized with bearer tokens issued by
-// gocloak itself, using the same roles Keycloak uses: the master realm
+// Package admin implements the admin REST API under /admin/realms.
+// Requests are authorized with bearer tokens issued by gocloak itself,
+// using the standard admin roles: the master realm
 // "admin" role grants access to every realm, and the realm-management
 // client roles (realm-admin, manage-users, view-clients, ...) grant access
 // to their own realm.
@@ -47,13 +47,13 @@ func (h *Handler) ThemeNames(typ string) []string {
 	return h.Themes.Names(typ)
 }
 
-// httpError is an error with an HTTP status, rendered as Keycloak does.
+// httpError is an error with an HTTP status, rendered as an error JSON body.
 type httpError struct {
 	status int
 	msg    string
-	key    string // Keycloak message key, e.g. invalidPasswordMinLengthMessage
-	// plain renders {"error": msg} even for 400s, as some Keycloak
-	// endpoints (authentication management) do.
+	key    string // message key, e.g. invalidPasswordMinLengthMessage
+	// plain renders {"error": msg} even for 400s, as some endpoints
+	// (authentication management) do.
 	plain bool
 }
 
@@ -136,7 +136,7 @@ func (p *principal) require(target *model.Realm, perm string) error {
 	return nil
 }
 
-// checkGrantable prevents privilege escalation: as in Keycloak, an admin
+// checkGrantable prevents privilege escalation: an admin
 // may only hand out admin roles (realm-management client roles, the master
 // admin roles, or composites containing them) that they hold themselves.
 func (h *Handler) checkGrantable(ctx context.Context, p *principal, realm *model.Realm, roles []*model.Role) error {
@@ -387,7 +387,7 @@ func (h *Handler) targetRealm(r *http.Request) (*model.Realm, error) {
 }
 
 // realmFor loads the target realm and checks perm on it. A caller without
-// any access gets 404-like 403s, as in Keycloak.
+// any access gets 404-like 403s.
 func (h *Handler) realmFor(r *http.Request, p *principal, perm string) (*model.Realm, error) {
 	realm, err := h.targetRealm(r)
 	if err != nil {

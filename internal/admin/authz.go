@@ -524,7 +524,7 @@ func (h *Handler) exportSettings(ctx context.Context, ac *authzCtx) map[string]a
 		return service.PolicyConfigList(out)
 	}
 	policies := []map[string]any{}
-	// policies first, then permissions, as Keycloak exports them
+	// policies first, then permissions, as in realm exports
 	ordered := slices.Clone(d.Policies)
 	sort.SliceStable(ordered, func(i, j int) bool { return !authz.IsPermission(ordered[i]) && authz.IsPermission(ordered[j]) })
 	for _, p := range ordered {
@@ -954,7 +954,7 @@ func (h *Handler) buildResource(ctx context.Context, tx *store.Store, ac *authzC
 	for _, n := range names {
 		s := ac.data.ScopeByName(n)
 		if s == nil {
-			// unknown scopes are created, as in Keycloak
+			// unknown scopes are created
 			s = &model.AuthzScope{ID: service.NewID(), ResourceServerID: ac.client.ID, Name: n}
 			if err := tx.CreateAuthzScope(ctx, s); err != nil {
 				return err

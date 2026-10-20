@@ -10,8 +10,8 @@ import (
 	"github.com/ducnt114/gocloak/internal/service"
 )
 
-// The *Rep types mirror Keycloak's JSON representations. Pointer fields let
-// PUT requests update only the attributes that are present, as Keycloak does.
+// The *Rep types mirror the JSON representations. Pointer fields let PUT
+// requests update only the attributes that are present.
 
 type RealmRep struct {
 	ID                     *string  `json:"id,omitempty"`
@@ -27,11 +27,11 @@ type RealmRep struct {
 	RegistrationAllowed    *bool    `json:"registrationAllowed,omitempty"`
 	Attributes             strMap   `json:"attributes,omitempty"`
 	DefaultRole            *RoleRep `json:"defaultRole,omitempty"`
-	// Kept in attributes, shown at the top level too (as Keycloak does).
+	// Kept in attributes, shown at the top level too.
 	OAuth2DeviceCodeLifespan    *int `json:"oauth2DeviceCodeLifespan,omitempty"`
 	OAuth2DevicePollingInterval *int `json:"oauth2DevicePollingInterval,omitempty"`
 
-	// Settings flatten into the realm JSON, as in Keycloak. PUT requests
+	// Settings flatten into the realm JSON. PUT requests
 	// apply them by decoding the body onto the stored settings, so absent
 	// keys keep their value.
 	model.RealmSettings
@@ -205,8 +205,8 @@ type ClientMappingsRep struct {
 	Mappings []RoleRep `json:"mappings"`
 }
 
-// NewRealmRep returns a realm representation pre-filled with Keycloak's
-// default settings; decode a realm JSON into it so absent keys keep them.
+// NewRealmRep returns a realm representation pre-filled with the default
+// settings; decode a realm JSON into it so absent keys keep them.
 func NewRealmRep() RealmRep {
 	return RealmRep{RealmSettings: model.DefaultRealmSettings()}
 }
@@ -291,13 +291,13 @@ func clientToRep(c *model.Client) ClientRep {
 	}
 }
 
-// newClient returns a client with Keycloak's defaults for a created client.
+// newClient returns a client with the defaults for a created client.
 func newClient(realmID string) *model.Client {
 	return &model.Client{RealmID: realmID, Enabled: true, StandardFlowEnabled: true, FullScopeAllowed: true,
 		Protocol: "openid-connect", Attributes: map[string]string{}}
 }
 
-// newClientFromRep builds a client being created. Like Keycloak, a client
+// newClientFromRep builds a client being created. A client
 // created without webOrigins gets the origins of its http(s) redirect URIs.
 func newClientFromRep(realmID string, rep *ClientRep) *model.Client {
 	c := newClient(realmID)
@@ -357,7 +357,7 @@ func applyClientRep(c *model.Client, rep *ClientRep) {
 	if rep.AuthenticationFlowBindingOverrides != nil {
 		c.FlowOverrides = rep.AuthenticationFlowBindingOverrides
 	}
-	// like Keycloak, the given attributes are merged and empty values
+	// the given attributes are merged and empty values
 	// remove an attribute
 	if rep.Attributes != nil {
 		if c.Attributes == nil {

@@ -442,7 +442,7 @@ func groupPathOf(ctx context.Context, st *store.Store, realmID string, g *model.
 // ---------------------------------------------------------------- mapper sync
 
 // SyncMapper synchronizes the groups or roles of a group / role mapper:
-// fedToKeycloak imports them, keycloakToFed writes local ones to LDAP.
+// fedToGocloak imports them, gocloakToFed writes local ones to LDAP.
 func (m *Manager) SyncMapper(ctx context.Context, realm *model.Realm, providerComp, mapperComp *model.Component, direction string) (*SyncResult, error) {
 	p, err := m.loadProvider(ctx, providerComp)
 	if err != nil {
@@ -532,7 +532,7 @@ func (m *Manager) SyncMapper(ctx context.Context, realm *model.Realm, providerCo
 	} else {
 		res.Status = fmt.Sprintf("%d imported groups, %d updated groups, %d removed groups", res.Added, res.Updated, res.Removed)
 	}
-	// Keycloak reads memberships from LDAP; imported users get them now
+	// memberships are read from LDAP; imported users get them now
 	users, err := st.ListFederatedUsers(ctx, realm.ID, p.cfg.ID)
 	if err != nil {
 		return nil, err

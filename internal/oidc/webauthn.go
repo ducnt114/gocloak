@@ -16,7 +16,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/service"
 )
 
-// webauthnCredentialData is the credentialData JSON Keycloak stores for
+// webauthnCredentialData is the credentialData JSON stored for
 // webauthn and webauthn-passwordless credentials.
 type webauthnCredentialData struct {
 	AAGUID                     string   `json:"aaguid"`

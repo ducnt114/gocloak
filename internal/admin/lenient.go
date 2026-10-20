@@ -6,9 +6,9 @@ import (
 	"strconv"
 )
 
-// Keycloak's JSON binding (Jackson) is lenient: a single value is accepted
-// where a list is expected, and numbers or booleans where strings are. The
-// admin console relies on it, so these types accept the same input.
+// The admin console relies on lenient JSON binding: a single value where a
+// list is expected, and numbers or booleans where strings are. These types
+// accept that input.
 
 // strMap is a map of strings accepting scalar values.
 type strMap map[string]string

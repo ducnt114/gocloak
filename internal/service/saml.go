@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rsa"
-	"crypto/sha1" //nolint:gosec // Keycloak's artifact binding identifier
+	"crypto/sha1" //nolint:gosec // artifact binding identifier
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
@@ -16,7 +16,7 @@ import (
 // ProtocolSAML is the protocol of SAML clients, client scopes and mappers.
 const ProtocolSAML = "saml"
 
-// SAML client attributes, as named by Keycloak.
+// SAML client attributes.
 const (
 	SAMLServerSignature      = "saml.server.signature"
 	SAMLAssertionSignature   = "saml.assertion.signature"
@@ -70,13 +70,13 @@ func init() {
 		SAMLMapperGroups, SAMLMapperHardcodedRole, SAMLMapperRoleName, SAMLMapperSessionNote, SAMLMapperAudience,
 		SAMLMapperAudienceResolv, SAMLMapperNameID,
 		// organizations are not supported: their mappers (in the scopes of
-		// Keycloak 26 realm exports) are accepted and add nothing
+		// upstream realm exports) are accepted and add nothing
 		"saml-organization-membership-mapper", "oidc-organization-membership-mapper"} {
 		MapperTypes[t] = true
 	}
 }
 
-// samlDefaults are the attributes Keycloak gives a new SAML client.
+// samlDefaults are the attributes of a new SAML client.
 var samlDefaults = map[string]string{
 	"saml.allow.ecp.flow":  "false",
 	SAMLAuthnStatement:     "true",
@@ -89,10 +89,10 @@ var samlDefaults = map[string]string{
 	SAMLCanonicalization:   "http://www.w3.org/2001/10/xml-exc-c14n#",
 }
 
-// SetupSAMLClient applies Keycloak's defaults to a SAML client being
+// SetupSAMLClient applies the defaults to a SAML client being
 // created: missing attributes, the artifact binding identifier and, when
 // clients must sign their requests but no certificate was given, a
-// generated key pair (as Keycloak does, so that the console can export it).
+// generated key pair (so that the console can export it).
 func SetupSAMLClient(c *model.Client) error {
 	if c.Attributes == nil {
 		c.Attributes = map[string]string{}
@@ -119,7 +119,7 @@ func SetupSAMLClient(c *model.Client) error {
 }
 
 // ParseCertificates parses a client certificate attribute: base64 DER (as
-// Keycloak stores it) or PEM, possibly several separated by commas.
+// the console stores it) or PEM, possibly several separated by commas.
 func ParseCertificates(attr string) []*x509.Certificate {
 	var out []*x509.Certificate
 	rest := []byte(attr)

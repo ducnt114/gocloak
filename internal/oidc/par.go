@@ -32,7 +32,7 @@ const (
 )
 
 // errInvalidRequestObject is any unusable request object or request URI;
-// Keycloak answers them with its "Invalid Request" error page.
+// they are answered with the "Invalid Request" error page.
 var errInvalidRequestObject = errors.New("invalid request object")
 
 // parLifespan is the realm's parRequestUriLifespan (seconds).

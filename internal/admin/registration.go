@@ -19,7 +19,7 @@ import (
 
 // Dynamic client registration (OpenID Connect Dynamic Client Registration,
 // RFC 7591 / 7592) at /realms/{realm}/clients-registrations/openid-connect,
-// and Keycloak's own variant taking client representations at .../default.
+// and a variant taking client representations at .../default.
 // Clients register anonymously, with an initial access token or with a
 // user's access token, under the realm's client registration policies; each
 // registered client gets a registration access token to manage itself.
@@ -384,7 +384,7 @@ type clientMetadata struct {
 	RegistrationAccessToken     string          `json:"registration_access_token,omitempty"`
 }
 
-// listMap1 accepts a single string for a list, as Keycloak's Jackson does.
+// listMap1 accepts a single string for a list.
 type listMap1 []string
 
 func (l *listMap1) UnmarshalJSON(b []byte) error {
@@ -420,8 +420,7 @@ func boolAttr(c *model.Client, k string, v *bool) {
 	}
 }
 
-// applyMetadata turns client metadata into the client, as Keycloak's
-// description converter does.
+// applyMetadata turns client metadata into the client.
 func applyMetadata(c *model.Client, md *clientMetadata) error {
 	for _, u := range md.RedirectURIs {
 		p, err := url.Parse(u)

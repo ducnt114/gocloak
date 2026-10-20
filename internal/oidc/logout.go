@@ -16,7 +16,7 @@ import (
 // OpenID Connect front-channel and back-channel logout of the clients of a
 // session (OIDC Front-Channel Logout 1.0, Back-Channel Logout 1.0).
 
-// Client attributes of OIDC client logout, as named by Keycloak.
+// Client attributes of OIDC client logout.
 const (
 	attrFrontchannelURL      = "frontchannel.logout.url"
 	attrFrontchannelSession  = "frontchannel.logout.session.required"

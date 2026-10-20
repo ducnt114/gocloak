@@ -1,4 +1,4 @@
-// Package authz evaluates Keycloak authorization services policies: the
+// Package authz evaluates authorization services policies: the
 // permissions (resource and scope based) of a resource server, their
 // policies (role, user, group, client, client scope, time, regex,
 // aggregated and the default JavaScript policy), decision strategies,
@@ -35,9 +35,9 @@ const (
 	Disabled   = "DISABLED"
 )
 
-// DefaultPolicyCode is the code of the "Default Policy" Keycloak creates: a
-// JavaScript policy that grants. Other JavaScript policies are not
-// supported and deny.
+// DefaultPolicyCode is the code of the "Default Policy" created with a
+// resource server: a JavaScript policy that grants. Other JavaScript
+// policies are not supported and deny.
 const DefaultPolicyCode = "// by default, grants any permission associated with this policy\n$evaluation.grant();\n"
 
 // Data is a resource server with everything it holds.

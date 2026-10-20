@@ -1,4 +1,4 @@
-// Package saml implements the SAML 2.0 messages of Keycloak's SAML identity
+// Package saml implements the SAML 2.0 messages of the SAML identity
 // provider: reading requests from the HTTP-Redirect and HTTP-POST bindings,
 // verifying and creating XML and query string signatures, building
 // responses, assertions and logout messages, and encrypting assertions.
@@ -86,7 +86,7 @@ func invalidf(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, args...))
 }
 
-// NewID returns a message id in Keycloak's format.
+// NewID returns a message id ("ID_" and a UUID).
 func NewID() string { return "ID_" + uuid.NewString() }
 
 // Instant formats a time as SAML does (UTC, millisecond precision).
@@ -423,8 +423,8 @@ func (q *Request) VerifySignature(certs []*x509.Certificate) error {
 }
 
 // VerifyElement validates the enveloped signature of el and returns the
-// signed element. Like Keycloak, certificate validity dates are not
-// enforced: the configured certificate is trusted as a key.
+// signed element. Certificate validity dates are not enforced: the
+// configured certificate is trusted as a key.
 func VerifyElement(el *etree.Element, certs []*x509.Certificate) (*etree.Element, error) {
 	var lastErr error = invalidf("no certificate")
 	for _, c := range certs {
@@ -451,7 +451,7 @@ type Signer struct {
 	Canonical string // canonicalization method URI
 }
 
-// SignatureAlgorithm maps Keycloak's saml.signature.algorithm names to
+// SignatureAlgorithm maps the saml.signature.algorithm names to
 // signature method URIs (RSA_SHA256 by default).
 func SignatureAlgorithm(name string) string {
 	switch name {

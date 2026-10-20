@@ -13,7 +13,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/service"
 )
 
-// Action token types, as in Keycloak.
+// Action token types.
 const (
 	tokenVerifyEmail      = "verify-email"
 	tokenResetCredentials = "reset-credentials"

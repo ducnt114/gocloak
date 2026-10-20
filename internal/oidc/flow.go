@@ -12,7 +12,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/store"
 )
 
-// This file implements Keycloak's authentication flow processing: a flow is
+// This file implements authentication flow processing: a flow is
 // a tree of executions (authenticators and sub flows) with requirements.
 //
 //   - REQUIRED and CONDITIONAL executions all have to succeed, in order; when

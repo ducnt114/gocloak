@@ -17,7 +17,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/store"
 )
 
-// Client authenticator types, as in Keycloak.
+// Client authenticator types.
 const (
 	AuthClientSecret    = "client-secret"
 	AuthClientSecretJWT = "client-secret-jwt"
@@ -166,7 +166,7 @@ func (h *Handler) authenticateAssertion(r *http.Request, realm *model.Realm) (*m
 }
 
 // clientKey finds the public key that verifies a client's assertion: from
-// its JWKS URL, inline JWKS, or uploaded certificate (Keycloak attributes).
+// its JWKS URL, inline JWKS, or uploaded certificate (client attributes).
 func (h *Handler) clientKey(ctx context.Context, c *model.Client, header jwt.Header) (*jwt.Key, error) {
 	attrs := c.Attributes
 	pick := func(keys []jwt.JWK) (*jwt.Key, error) {

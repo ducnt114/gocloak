@@ -18,7 +18,7 @@ import (
 )
 
 // OpenID Connect Client-Initiated Backchannel Authentication (CIBA), poll
-// and ping modes, with Keycloak's HTTP authentication channel: the request
+// and ping modes, with an HTTP authentication channel: the request
 // is posted to the configured channel URI with a bearer token, and the
 // authentication device answers on /ext/ciba/auth/callback with that token.
 

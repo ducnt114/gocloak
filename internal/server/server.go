@@ -46,7 +46,7 @@ type Config struct {
 	// client IP on the protocol and admin endpoints (0 disables limiting).
 	RateLimit float64
 	RateBurst int
-	// AdminConsoleDir holds the jars of Keycloak's admin console (see
+	// AdminConsoleDir holds the jars of the upstream admin console (see
 	// 'gocloak download-admin-console'); without them /admin explains how
 	// to install it.
 	AdminConsoleDir string
@@ -165,14 +165,14 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 }
 
 // resourceVersion is the path segment versioning static resources: it
-// changes at every start, as in Keycloak, so that browsers fetch new files
+// changes at every start, so that browsers fetch new files
 // after an upgrade (any value is served).
 func resourceVersion(version string) string {
 	sum := sha256.Sum256([]byte(version + "|" + time.Now().String()))
 	return hex.EncodeToString(sum[:])[:5]
 }
 
-// ManagementHandler serves the management interface (Keycloak's port 9000):
+// ManagementHandler serves the management interface (port 9000 by default):
 // health checks, and the metrics when they are enabled.
 func (s *Server) ManagementHandler() http.Handler {
 	mux := http.NewServeMux()
@@ -210,7 +210,7 @@ func (s *Server) ImportFile(ctx context.Context, path string) error {
 	}
 	var reps []admin.RealmRep
 	for _, raw := range raws {
-		rep := admin.NewRealmRep() // absent settings keep Keycloak's defaults
+		rep := admin.NewRealmRep() // absent settings keep their defaults
 		if err := json.Unmarshal(raw, &rep); err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}

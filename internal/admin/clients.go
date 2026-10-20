@@ -66,8 +66,8 @@ func clientRepWithScopes(ctx context.Context, st *store.Store, c *model.Client) 
 }
 
 // applyClientScopes replaces the client's default and/or optional scopes
-// when the representation lists them; unknown scope names are ignored, as
-// in Keycloak. With mappers, the representation's protocol mappers replace
+// when the representation lists them; unknown scope names are ignored.
+// With mappers, the representation's protocol mappers replace
 // the client's own.
 func applyClientScopes(ctx context.Context, tx *store.Store, c *model.Client, rep *ClientRep, mappers bool) error {
 	for _, kind := range []struct {

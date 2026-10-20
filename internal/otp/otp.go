@@ -1,5 +1,5 @@
 // Package otp implements TOTP (RFC 6238) and HOTP (RFC 4226) one-time
-// passwords the way Keycloak stores and checks them.
+// passwords, and how OTP credentials are stored and checked.
 package otp
 
 import (
@@ -46,7 +46,7 @@ type SecretData struct {
 
 const secretChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
 
-// GenerateSecret returns a 20 character secret. Like Keycloak, the HMAC
+// GenerateSecret returns a 20 character secret. The HMAC
 // key is the secret's bytes and authenticator apps get its base32 form.
 func GenerateSecret() string {
 	b := make([]byte, 20)

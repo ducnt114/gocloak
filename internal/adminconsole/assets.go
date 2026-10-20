@@ -1,7 +1,7 @@
-// Package adminconsole serves Keycloak's admin console (the
+// Package adminconsole serves the upstream admin console (the
 // keycloak-admin-ui React application, Apache License 2.0) against
 // gocloak's admin API. The console's files are not part of gocloak: they are
-// read from the keycloak-admin-ui and keycloak-themes jars, which
+// read from the upstream admin UI and themes jars, which
 // Download fetches from Maven Central.
 package adminconsole
 
@@ -25,7 +25,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/i18n"
 )
 
-// Version is the Keycloak release whose admin console gocloak targets.
+// Version is the upstream release whose admin console gocloak targets.
 const Version = "26.0.7"
 
 // Jars are the Maven artifacts holding the console.
@@ -121,7 +121,7 @@ func (a *Assets) readManifest() error {
 }
 
 // Messages returns the console's message bundle for a locale: the base
-// admin theme overridden by keycloak.v2, falling back to English.
+// admin theme overridden by the console's own theme, falling back to English.
 func (a *Assets) Messages(locale string) map[string]string {
 	out := map[string]string{}
 	read := func(fsys fs.FS, loc string) {

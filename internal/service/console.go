@@ -11,8 +11,7 @@ import (
 // AdminConsoleClient is the public client the admin console logs in with.
 const AdminConsoleClient = "security-admin-console"
 
-// createConsoleClient adds the security-admin-console client of a realm,
-// as Keycloak does.
+// createConsoleClient adds the security-admin-console client of a realm.
 func (s *Service) createConsoleClient(ctx context.Context, st *store.Store, r *model.Realm, linkScopes bool) error {
 	c := &model.Client{ID: NewID(), RealmID: r.ID, ClientID: AdminConsoleClient, Name: "${client_security-admin-console}",
 		Enabled: true, PublicClient: true, StandardFlowEnabled: true, FullScopeAllowed: true, Protocol: "openid-connect",

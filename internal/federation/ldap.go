@@ -151,8 +151,8 @@ func (cfg *Config) uuidFilter(id string) string {
 	return eq(cfg.UUIDAttr, id)
 }
 
-// entryUUID reads the UUID of an entry; AD's objectGUID is formatted as
-// Keycloak does.
+// entryUUID reads the UUID of an entry; AD's objectGUID is formatted as a
+// UUID string.
 func (cfg *Config) entryUUID(e *ldap.Entry) string {
 	if strings.EqualFold(cfg.UUIDAttr, "objectGUID") {
 		if b := e.GetRawAttributeValue(cfg.UUIDAttr); len(b) == 16 {

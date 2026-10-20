@@ -1,5 +1,5 @@
-// Package federation implements user federation with LDAP, as Keycloak's
-// "ldap" user storage provider: users are looked up in the directory and
+// Package federation implements user federation with LDAP, as the "ldap"
+// user storage provider: users are looked up in the directory and
 // imported, passwords are checked with an LDAP bind, and in WRITABLE mode
 // changes are written back. The provider and its mappers are components.
 package federation
@@ -14,7 +14,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/store"
 )
 
-// Component types and provider ids, as in Keycloak.
+// Component types and provider ids.
 const (
 	ProviderType = "org.gocloak.storage.UserStorageProvider"
 	MapperType   = "org.gocloak.storage.ldap.mappers.LDAPStorageMapper"
@@ -152,8 +152,7 @@ func (c *Config) ActiveDirectory() bool { return c.Vendor == "ad" }
 // Writable reports whether changes are written to LDAP.
 func (c *Config) Writable() bool { return c.EditMode == Writable }
 
-// ValidateConfig checks a provider configuration as Keycloak does when it
-// is saved.
+// ValidateConfig checks a provider configuration when it is saved.
 func ValidateConfig(c *model.Component) string {
 	switch c.Get("editMode") {
 	case ReadOnly, Writable, Unsynced:
@@ -171,7 +170,7 @@ func ValidateConfig(c *model.Component) string {
 	return ""
 }
 
-// PrepareProvider fills the defaults Keycloak adds to a new provider.
+// PrepareProvider fills the defaults of a new provider.
 func PrepareProvider(c *model.Component) {
 	if c.Get("krbPrincipalAttribute") == "" {
 		attr := "krb5PrincipalName"
@@ -182,7 +181,7 @@ func PrepareProvider(c *model.Component) {
 	}
 }
 
-// DefaultMappers are the mappers Keycloak creates with a new provider.
+// DefaultMappers are the mappers created with a new provider.
 func DefaultMappers(c *model.Component) []*model.Component {
 	cfg := ParseConfig(c)
 	readOnly := strconv.FormatBool(cfg.EditMode != Writable)
@@ -229,8 +228,8 @@ var MapperProviders = map[string]bool{
 	"msad-lds-user-account-control-mapper": true, "kerberos-principal-attribute-mapper": true,
 }
 
-// ValidateMapper checks an LDAP mapper as Keycloak does when it is saved,
-// filling defaults. plain marks errors Keycloak renders as {"error": ...}.
+// ValidateMapper checks an LDAP mapper when it is saved, filling defaults.
+// plain marks errors rendered as {"error": ...}.
 func ValidateMapper(ctx context.Context, st *store.Store, realm *model.Realm, c *model.Component) (msg string, plain bool) {
 	missing := func(key, label string) bool {
 		if strings.TrimSpace(c.Get(key)) == "" {

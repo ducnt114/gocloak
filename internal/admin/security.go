@@ -22,7 +22,7 @@ import (
 
 // ---------------------------------------------------------------- components
 
-// ComponentRep mirrors Keycloak's ComponentRepresentation.
+// ComponentRep mirrors the ComponentRepresentation.
 type ComponentRep struct {
 	ID           string              `json:"id,omitempty"`
 	Name         string              `json:"name"`
@@ -182,7 +182,7 @@ func (h *Handler) updateComponent(w http.ResponseWriter, r *http.Request, p *pri
 	}
 	if c.ProviderType != service.KeyProviderType {
 		if rep.Config != nil && c.ProviderType == federation.ProviderType {
-			// a provider update replaces its config, as in Keycloak
+			// a provider update replaces its config
 			c.Config = rep.Config
 		}
 		if err := h.prepareFederationComponent(r.Context(), realm, &c, prev); err != nil {
@@ -510,8 +510,8 @@ func adminEventFor(r *http.Request, p *principal, body []byte, location string) 
 
 var actionPath = regexp.MustCompile(`(reset-password|logout|logout-all|push-revocation|client-secret|send-verify-email|execute-actions-email|partial-export|partialImport|test)$`)
 
-// resourceType maps an admin path (relative to the realm) to Keycloak's
-// admin event resource types.
+// resourceType maps an admin path (relative to the realm) to an admin
+// event resource type.
 func resourceType(path string) string {
 	seg := strings.Split(path, "/")
 	has := func(s string) bool {
@@ -743,7 +743,7 @@ func (h *Handler) revokeConsent(w http.ResponseWriter, r *http.Request, p *princ
 var registrationPolicyProviders = map[string]bool{"trusted-hosts": true, "consent-required": true, "scope": true,
 	"max-clients": true, "allowed-protocol-mappers": true, "allowed-client-templates": true}
 
-// policyError renders a password policy violation as Keycloak does.
+// policyError renders a password policy violation as an HTTP error.
 func policyError(err error) (*httpError, bool) {
 	var pe *policy.Error
 	if errors.As(err, &pe) {

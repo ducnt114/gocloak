@@ -15,8 +15,8 @@ var registrationMapperTypes = []string{"oidc-usermodel-attribute-mapper", "oidc-
 	"saml-user-property-mapper", "oidc-sha256-pairwise-sub-mapper", "saml-role-list-mapper", "oidc-address-mapper",
 	"saml-user-attribute-mapper"}
 
-// DefaultRegistrationPolicies are the client registration policies Keycloak
-// gives new realms, for anonymous and authenticated registrations.
+// DefaultRegistrationPolicies are the client registration policies of new
+// realms, for anonymous and authenticated registrations.
 func DefaultRegistrationPolicies(realmID string) []*model.Component {
 	mk := func(sub, name, provider string, cfg map[string][]string) *model.Component {
 		if cfg == nil {

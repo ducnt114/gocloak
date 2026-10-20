@@ -40,7 +40,7 @@ func (h *Handler) convertClientDescription(w http.ResponseWriter, r *http.Reques
 	return ok(w, rep)
 }
 
-// samlClientFromMetadata is Keycloak's saml2-entity-descriptor converter.
+// samlClientFromMetadata is the saml2-entity-descriptor converter.
 func samlClientFromMetadata(md *saml.SPMetadata) map[string]any {
 	attrs := map[string]string{
 		service.SAMLServerSignature:     "true",
@@ -151,7 +151,7 @@ func adapterJSON(base string, realm *model.Realm, c *model.Client) string {
 	return b.String()
 }
 
-// samlSPDescriptor is the metadata of a SAML client as Keycloak describes it.
+// samlSPDescriptor is the SP metadata describing a SAML client.
 func samlSPDescriptor(c *model.Client) string {
 	e := html.EscapeString
 	a := c.Attributes

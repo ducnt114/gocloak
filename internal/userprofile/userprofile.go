@@ -1,6 +1,6 @@
-// Package userprofile implements Keycloak's declarative user profile: the
+// Package userprofile implements the declarative user profile: the
 // attributes a realm's users have, who may view and edit them, which are
-// required, and how they are validated. Error messages use Keycloak's keys
+// required, and how they are validated. Error messages use the standard keys
 // (error-invalid-email, error-user-attribute-required, ...).
 package userprofile
 
@@ -33,7 +33,7 @@ const (
 	UnmanagedAdminEdit = "ADMIN_EDIT"
 )
 
-// Config is UPConfig, the JSON stored by Keycloak and served at
+// Config is UPConfig, the JSON stored for a realm and served at
 // /admin/realms/{realm}/users/profile.
 type Config struct {
 	Attributes               []Attribute `json:"attributes"`
@@ -80,8 +80,8 @@ type Group struct {
 	Annotations        map[string]any `json:"annotations,omitempty"`
 }
 
-// FieldError is a validation error, in the shape of Keycloak's admin API
-// error response.
+// FieldError is a validation error, in the shape of the admin API error
+// response.
 type FieldError struct {
 	Field        string `json:"field"`
 	ErrorMessage string `json:"errorMessage"`
@@ -111,7 +111,7 @@ func both() *Permissions {
 	return &Permissions{View: []string{"admin", "user"}, Edit: []string{"admin", "user"}}
 }
 
-// Default returns Keycloak's default profile. The master realm requires
+// Default returns the default profile. The master realm requires
 // nothing; other realms require email, first and last name from users.
 func Default(master bool) *Config {
 	req := &Required{Roles: []string{"user"}}
@@ -291,7 +291,7 @@ func sortedKeys(m map[string]map[string]any) []string {
 	for k := range m {
 		keys = append(keys, k)
 	}
-	// Keycloak reports length errors before format errors.
+	// length errors are reported before format errors
 	slices.SortFunc(keys, func(a, b string) int {
 		if a == "length" {
 			return -1
@@ -398,7 +398,7 @@ func validatePattern(field string, values []string, cfg map[string]any) *FieldEr
 
 const personNameProhibited = `<>&"$%!#?§;*~/\|^=[]{}()`
 
-// usernameProhibited mirrors Keycloak's UsernameProhibitedCharactersValidator.
+// usernameProhibited mirrors the UsernameProhibitedCharactersValidator.
 const usernameProhibited = `<>&"'$%!#?§;*~/\|^=[]{}()`
 
 func prohibited(chars, msg string) validator {
@@ -415,7 +415,7 @@ func prohibited(chars, msg string) validator {
 }
 
 // validateNotHomograph rejects usernames mixing scripts that could imitate
-// another username (a simplified form of Keycloak's IDN homograph check).
+// another username (a simplified IDN homograph check).
 func validateNotHomograph(field string, values []string, _ map[string]any) *FieldError {
 	for _, v := range values {
 		latin, other := false, false

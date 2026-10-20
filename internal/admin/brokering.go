@@ -27,7 +27,7 @@ func init() {
 	implied[permViewIdPs] = []string{permManageIdPs}
 }
 
-// IdentityProviderRep is Keycloak's IdentityProviderRepresentation.
+// IdentityProviderRep is the IdentityProviderRepresentation.
 type IdentityProviderRep struct {
 	Alias                       *string `json:"alias,omitempty"`
 	DisplayName                 *string `json:"displayName,omitempty"`
@@ -46,7 +46,7 @@ type IdentityProviderRep struct {
 	Config                      strMap  `json:"config"`
 }
 
-// IdPMapperRep is Keycloak's IdentityProviderMapperRepresentation.
+// IdPMapperRep is the IdentityProviderMapperRepresentation.
 type IdPMapperRep struct {
 	ID                     string `json:"id,omitempty"`
 	Name                   string `json:"name"`
@@ -55,7 +55,7 @@ type IdPMapperRep struct {
 	Config                 strMap `json:"config"`
 }
 
-// FederatedIdentityRep is Keycloak's FederatedIdentityRepresentation.
+// FederatedIdentityRep is the FederatedIdentityRepresentation.
 type FederatedIdentityRep struct {
 	IdentityProvider string `json:"identityProvider"`
 	UserID           string `json:"userId"`
@@ -123,7 +123,7 @@ func applyIdPRep(p *model.IdentityProvider, rep *IdentityProviderRep) {
 			p.Config[k] = v
 		}
 		if v, ok := rep.Config["hideOnLoginPage"]; ok && rep.HideOnLogin == nil {
-			p.HideOnLogin = v == "true" // before Keycloak 26 this was a config entry
+			p.HideOnLogin = v == "true" // older exports keep this as a config entry
 		}
 		p.GUIOrder = p.Config["guiOrder"]
 	}
@@ -132,7 +132,7 @@ func applyIdPRep(p *model.IdentityProvider, rep *IdentityProviderRep) {
 	}
 }
 
-// presetDefaults are the config defaults Keycloak gives new providers.
+// presetDefaults are the config defaults of new providers.
 func presetDefaults(p *model.IdentityProvider) {
 	def := func(k, v string) {
 		if _, ok := p.Config[k]; !ok {
@@ -155,7 +155,7 @@ func localHost(host string) bool {
 	return ip != nil && (ip.IsLoopback() || ip.IsPrivate())
 }
 
-// validateIdP checks a provider as Keycloak does: known type, and https
+// validateIdP checks a provider: known type, and https
 // endpoints unless the realm allows otherwise.
 func validateIdP(realm *model.Realm, p *model.IdentityProvider) error {
 	if strings.TrimSpace(p.Alias) == "" {
@@ -199,7 +199,7 @@ func (h *Handler) listIdPs(w http.ResponseWriter, r *http.Request, p *principal)
 	if err != nil {
 		return err
 	}
-	// as in Keycloak: "abc" matches a prefix, "*abc*" a substring
+	// "abc" matches a prefix, "*abc*" a substring
 	search := strings.ToLower(r.URL.Query().Get("search"))
 	infix := strings.HasPrefix(search, "*")
 	search = strings.Trim(search, "*")

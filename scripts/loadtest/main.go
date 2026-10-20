@@ -1,6 +1,6 @@
-// loadtest drives load against gocloak (or Keycloak) and reports the
-// latency of each request kind, or runs a round-robin load balancer in front
-// of several nodes.
+// loadtest drives load against gocloak (or the upstream server) and reports
+// the latency of each request kind, or runs a round-robin load balancer in
+// front of several nodes.
 //
 //	go run ./scripts/loadtest -url http://localhost:8080 -setup -scenarios token,refresh,login -c 16 -d 60s
 //	go run ./scripts/loadtest -lb :8080 -backends http://localhost:8081,http://localhost:8082

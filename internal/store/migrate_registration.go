@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// addRegistrationPolicies gives existing realms Keycloak's default client
+// addRegistrationPolicies gives existing realms the default client
 // registration policies (explicit columns, see addSAMLRoleListScope).
 func addRegistrationPolicies(ctx context.Context, tx *Store) error {
 	const typ = "org.gocloak.services.clientregistration.policy.ClientRegistrationPolicy"

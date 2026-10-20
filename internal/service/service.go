@@ -24,7 +24,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/theme"
 )
 
-// Well known names, identical to Keycloak's.
+// Well known names.
 const (
 	MasterRealm           = "master"
 	RealmManagementClient = "realm-management"
@@ -39,7 +39,7 @@ const (
 	ActionUpdatePassword  = "UPDATE_PASSWORD"
 )
 
-// realm-management client roles and the composites Keycloak builds from them.
+// realm-management client roles and the composites built from them.
 var (
 	managementRoles = []string{
 		"view-realm", "manage-realm", "view-users", "manage-users", "query-users", "query-groups",
@@ -79,7 +79,7 @@ type Service struct {
 	// Federation is the user storage (LDAP) behind the local users.
 	Federation UserFederation
 	// CIBAChannelURI is where backchannel authentication requests are sent
-	// for users to authenticate on their device (Keycloak's
+	// for users to authenticate on their device (the
 	// ciba-http-auth-channel).
 	CIBAChannelURI string
 	// EventObserver sees every user event (metrics).
@@ -104,7 +104,7 @@ func (s *Service) logger() *slog.Logger {
 	return s.Log
 }
 
-// NewID returns a random UUID, the id format Keycloak uses.
+// NewID returns a random UUID, the id format gocloak uses.
 func NewID() string { return uuid.NewString() }
 
 // RandomToken returns n random bytes, base64url encoded.
@@ -120,7 +120,7 @@ func (s *Service) nowMillis() int64 { return s.Now().UnixMilli() }
 
 // ---------------------------------------------------------------- realms
 
-// NewRealm returns a realm populated with Keycloak's default settings.
+// NewRealm returns a realm populated with the default settings.
 func NewRealm(name string) *model.Realm {
 	return &model.Realm{
 		ID:                    NewID(),
@@ -136,9 +136,9 @@ func NewRealm(name string) *model.Realm {
 	}
 }
 
-// CreateRealm stores r and provisions everything Keycloak creates with a new
+// CreateRealm stores r and provisions everything created with a new
 // realm: signing key, default roles and the built-in clients.
-// RealmAttributeDefaults are the attributes Keycloak 26 gives new realms
+// RealmAttributeDefaults are the attributes new realms get
 // (device flow, CIBA and PAR settings).
 var RealmAttributeDefaults = map[string]string{
 	"cibaBackchannelTokenDeliveryMode": "poll", "cibaExpiresIn": "120", "cibaAuthRequestedUserHint": "login_hint",
@@ -577,14 +577,14 @@ func (s *Service) setTemporary(ctx context.Context, st *store.Store, u *model.Us
 
 // CheckPassword verifies pw against the user's stored password. A correct
 // password stored with other hashing parameters than the realm's policy is
-// re-hashed, as Keycloak does.
+// re-hashed.
 func (s *Service) CheckPassword(ctx context.Context, u *model.User, pw string) (bool, error) {
 	creds, err := s.Store.ListCredentials(ctx, u.ID)
 	if err != nil {
 		return false, err
 	}
 	if u.FederationLink != "" && s.Federation != nil {
-		// a password stored locally (UNSYNCED mode) wins, as in Keycloak
+		// a password stored locally (UNSYNCED mode) wins
 		local := false
 		for _, c := range creds {
 			local = local || c.Type == model.CredentialPassword

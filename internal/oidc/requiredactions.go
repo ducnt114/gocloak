@@ -51,7 +51,7 @@ func (h *Handler) addRequiredAction(fc *flowContext, alias string) error {
 // pendingActions computes the required actions of the login: the user's
 // own, plus those triggered by the realm (incomplete profile, unverified
 // email, application initiated kc_action), ordered by provider priority.
-// Disabled providers are ignored, as in Keycloak.
+// Disabled providers are ignored.
 func (h *Handler) pendingActions(fc *flowContext) ([]string, error) {
 	providers, err := h.Svc.Store.ListRequiredActions(fc.ctx(), fc.realm.ID)
 	if err != nil {
@@ -127,7 +127,7 @@ func (h *Handler) processRequiredActions(fc *flowContext, posted string) {
 		var err error
 		switch {
 		case ra == nil:
-			res = resSuccess // not implemented: skip it, as Keycloak does for unknown providers
+			res = resSuccess // not implemented: skip it
 		case posted == next && fc.r.Method == http.MethodPost:
 			posted = ""
 			res, err = ra.action(fc)

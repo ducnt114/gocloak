@@ -48,7 +48,7 @@ func (tc *tokenContext) samlAttributes(ctx context.Context) ([]saml.Attribute, [
 		}
 	}
 	u := tc.user
-	// like Keycloak, only one role list mapper applies: the client's own
+	// only one role list mapper applies: the client's own
 	// (its mappers come first) over the one of the role_list scope
 	roleList := ""
 	for _, m := range tc.mappers {

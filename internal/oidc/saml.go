@@ -20,7 +20,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/store"
 )
 
-// This file implements Keycloak's SAML 2.0 identity provider: the
+// This file implements the SAML 2.0 identity provider: the
 // /protocol/saml endpoint (AuthnRequest, LogoutRequest and LogoutResponse
 // over the HTTP-Redirect and HTTP-POST bindings), IdP initiated login
 // (/protocol/saml/clients/{name}) and the IdP metadata descriptor.
@@ -38,7 +38,7 @@ const (
 	bindingRedirect = "redirect"
 )
 
-// samlUserActionLifespan is Keycloak's default accessCodeLifespanUserAction,
+// samlUserActionLifespan is the default accessCodeLifespanUserAction,
 // the validity of the subject confirmation.
 const samlUserActionLifespan = 300 * time.Second
 
@@ -368,8 +368,8 @@ func samlNameIDFormat(c *model.Client, requested string) string {
 	return configured
 }
 
-// samlNameID returns the NameID of the user for a format, as Keycloak
-// computes it (a NameID mapper for the format takes precedence).
+// samlNameID returns the NameID of the user for a format (a NameID mapper
+// for the format takes precedence).
 func samlNameID(tc *tokenContext, format string) string {
 	u := tc.user
 	for _, m := range tc.mappers {
@@ -387,8 +387,8 @@ func samlNameID(tc *tokenContext, format string) string {
 	case saml.NameIDTransient:
 		return "G-" + service.NewID()
 	case saml.NameIDPersistent:
-		// Keycloak reads the persistent id from a user attribute, and
-		// otherwise generates one
+		// the persistent id is read from a user attribute, and
+		// otherwise generated
 		for _, k := range []string{"saml.persistent.name.id.for." + tc.client.ClientID, "saml.persistent.name.id.for.*"} {
 			if v := u.Attributes[k]; len(v) > 0 && v[0] != "" {
 				return v[0]
@@ -437,7 +437,7 @@ func (h *Handler) samlLoginResponse(w http.ResponseWriter, r *http.Request, real
 	}
 	issuer := h.URLs.Issuer(r, realm.Name)
 	acs := params["redirect_uri"]
-	// Keycloak's validity window starts two seconds before the issue instant
+	// the validity window starts two seconds before the issue instant
 	start := now.Add(-2 * time.Second)
 	lifespan := time.Duration(realm.AccessCodeLifespan) * time.Second
 	if n, err := strconv.Atoi(client.Attributes[service.SAMLAssertionLifespan]); err == nil && n > 0 {

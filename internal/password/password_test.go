@@ -25,8 +25,8 @@ func TestHashVerify(t *testing.T) {
 	}
 }
 
-// A credential in the layout of a Keycloak realm export.
-func TestVerifyKeycloakExport(t *testing.T) {
+// A credential in the layout of an upstream realm export.
+func TestVerifyExportedHashes(t *testing.T) {
 	salt := []byte("0123456789abcdef")
 	sum, _ := pbkdf2.Key(sha256.New, "admin", salt, 27500, 32)
 	sd := fmt.Sprintf(`{"value":%q,"salt":%q,"additionalParameters":{}}`,

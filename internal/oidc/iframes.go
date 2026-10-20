@@ -4,9 +4,9 @@ import (
 	"net/http"
 )
 
-// Pages keycloak-js loads in iframes: the third-party cookie check and the
-// login status iframe, which compares the KEYCLOAK_SESSION cookie with the
-// application's session.
+// Pages the JavaScript adapter loads in iframes: the third-party cookie
+// check and the login status iframe, which compares the GOCLOAK_SESSION
+// cookie with the application's session.
 
 const step1Page = `<!doctype html>
 <html><head><meta charset="utf-8"></head><body><script type="module">

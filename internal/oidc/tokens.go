@@ -43,7 +43,7 @@ type tokenResponse struct {
 	accessJTI, refreshJTI, refreshTyp string // for events
 }
 
-// eventDetails adds the token ids Keycloak records in login events.
+// eventDetails adds the token ids recorded in login events.
 func (t *tokenResponse) eventDetails(ev *eventInfo) {
 	ev.details["token_id"] = t.accessJTI
 	ev.details["refresh_token_id"] = t.refreshJTI
@@ -275,8 +275,8 @@ func dpopProof(r *http.Request) *dpop.Proof {
 	return p
 }
 
-// offlineSession returns the offline copy of an SSO session (same id, as
-// in Keycloak), creating it or attaching client to it.
+// offlineSession returns the offline copy of an SSO session (same id),
+// creating it or attaching client to it.
 func (h *Handler) offlineSession(ctx context.Context, us *model.UserSession, client *model.Client) (*model.UserSession, error) {
 	off, err := h.Svc.Store.GetSession(ctx, us.ID, true)
 	switch {

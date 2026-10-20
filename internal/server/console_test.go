@@ -16,7 +16,7 @@ import (
 	"testing"
 )
 
-// fakeConsoleJars writes minimal keycloak-admin-ui and keycloak-themes jars.
+// fakeConsoleJars writes minimal upstream admin UI and themes jars.
 func fakeConsoleJars(t *testing.T) string {
 	dir := t.TempDir()
 	write := func(name string, files map[string]string) {
@@ -127,7 +127,7 @@ func TestAdminConsoleAPI(t *testing.T) {
 	e := newEnv(t)
 	admin, aliceID := e.setupDemo()
 
-	// keycloak-js iframes and the session cookie
+	// JavaScript adapter iframes and the session cookie
 	tk, browser := e.consoleLogin("master", "admin", "admin")
 	u, _ := url.Parse(e.srv.URL + "/realms/master/")
 	var session string
@@ -189,7 +189,7 @@ func TestAdminConsoleAPI(t *testing.T) {
 	has := func(list []map[string]any, client, role string) bool {
 		return slices.ContainsFunc(list, func(m map[string]any) bool { return m["client"] == client && m["role"] == role })
 	}
-	// as in Keycloak, only direct mappings are excluded from the available roles
+	// only direct mappings are excluded from the available roles
 	if !has(effective, "account", "view-profile") || !has(available, "account", "view-groups") {
 		t.Fatalf("available %v\neffective %v", available, effective)
 	}

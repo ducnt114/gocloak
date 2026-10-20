@@ -12,7 +12,7 @@ import (
 	"github.com/ducnt114/gocloak/internal/userprofile"
 )
 
-// Import creates a realm from a Keycloak RealmRepresentation, including the
+// Import creates a realm from a RealmRepresentation, including the
 // nested roles, clients, groups and users of a realm export. Built-in
 // entities (account, admin-cli, realm-management, default roles...) that
 // already exist are updated rather than duplicated.
@@ -270,7 +270,7 @@ func importUser(ctx context.Context, svc *service.Service, tx *store.Store, real
 				return nil, err
 			}
 		case cr.SecretData != "" && cr.CredentialData != "":
-			// Pre-hashed credential from a Keycloak export.
+			// Pre-hashed credential from a realm export.
 			created := cr.CreatedDate
 			if created == 0 {
 				created = svc.Now().UnixMilli()

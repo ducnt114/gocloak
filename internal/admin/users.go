@@ -14,7 +14,7 @@ import (
 func (h *Handler) loadUser(r *http.Request, realm *model.Realm) (*model.User, error) {
 	u, err := h.Svc.Store.GetUser(r.Context(), realm.ID, r.PathValue("id"))
 	if errors.Is(err, store.ErrNotFound) && r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/users/"+r.PathValue("id")) {
-		// Keycloak finds users by id in any realm: the admin console reads
+		// users are found by id in any realm: the admin console reads
 		// the logged in admin through the realm being administered.
 		if p, perr := h.authenticate(r); perr == nil && p.user.ID == r.PathValue("id") {
 			return p.user, nil
@@ -55,7 +55,7 @@ func usersToRep(users []*model.User) []UserRep {
 }
 
 // withLockStatus reports users locked by brute force detection as
-// disabled, as Keycloak does.
+// disabled.
 func (h *Handler) withLockStatus(r *http.Request, realm *model.Realm, reps []UserRep) ([]UserRep, error) {
 	if !realm.Settings.BruteForceProtected {
 		return reps, nil
@@ -72,7 +72,7 @@ func (h *Handler) withLockStatus(r *http.Request, realm *model.Realm, reps []Use
 	return reps, nil
 }
 
-// briefUsers drops attributes, as Keycloak's briefRepresentation does.
+// briefUsers drops attributes, for briefRepresentation.
 func briefUsers(reps []UserRep) []UserRep {
 	for i := range reps {
 		reps[i].Attributes = nil
@@ -124,7 +124,7 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request, p *principa
 		return err
 	}
 	if rep.Username == nil || *rep.Username == "" {
-		// Keycloak falls back to the email when it is used as username.
+		// Fall back to the email when it is used as username.
 		if rep.Email == nil || *rep.Email == "" {
 			return badRequest("User name is missing")
 		}
@@ -259,7 +259,7 @@ func (h *Handler) resetPassword(w http.ResponseWriter, r *http.Request, p *princ
 	if rep.Value == "" {
 		return badRequest("Password must not be empty")
 	}
-	temporary := rep.Temporary == nil || *rep.Temporary // Keycloak's default is temporary
+	temporary := rep.Temporary == nil || *rep.Temporary // temporary by default
 	err = h.withTx(r.Context(), func(tx *store.Store) error {
 		return h.Svc.SetPassword(r.Context(), tx, u, rep.Value, temporary)
 	})

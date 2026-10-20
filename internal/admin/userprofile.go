@@ -92,7 +92,7 @@ func (h *Handler) getUserProfileMetadata(w http.ResponseWriter, r *http.Request,
 	return ok(w, metadataFor(cfg, userprofile.ContextAdmin))
 }
 
-// profileErrors renders validation errors as Keycloak does: one error as
+// profileErrors renders validation errors: one error as
 // an object, several as {"errors": [...]}.
 type profileErrors struct{ errs userprofile.Errors }
 
@@ -115,7 +115,7 @@ func (h *Handler) applyProfilePolicy(r *http.Request, realm *model.Realm, u *mod
 		return err
 	}
 	if prev != nil && !strings.EqualFold(strings.TrimSpace(u.Username), prev.Username) && !realm.Settings.EditUsernameAllowed {
-		// as in Keycloak, admins too may only rename users when the realm allows it
+		// admins too may only rename users when the realm allows it
 		return &profileErrors{userprofile.Errors{{Field: "username", ErrorMessage: "error-user-attribute-read-only", Params: []any{"username"}}}}
 	}
 	attrs := map[string][]string{}
@@ -152,7 +152,7 @@ func (h *Handler) visibleAttributes(r *http.Request, realm *model.Realm, reps []
 		federated := reps[i].FederationLink != nil
 		for k := range reps[i].Attributes {
 			if federated && federatedAttributes[k] {
-				continue // shown for users of a user storage provider, as in Keycloak
+				continue // shown for users of a user storage provider
 			}
 			if !cfg.CanView(k, userprofile.ContextAdmin) {
 				delete(reps[i].Attributes, k)
