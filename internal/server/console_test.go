@@ -32,7 +32,9 @@ func fakeConsoleJars(t *testing.T) string {
 	write("keycloak-admin-ui-26.0.7.jar", map[string]string{
 		"theme/keycloak.v2/admin/resources/.vite/manifest.json":   `{"src/main.tsx": {"file": "assets/main-1.js", "css": ["assets/main-1.css"], "isEntry": true}}`,
 		"theme/keycloak.v2/admin/resources/assets/main-1.js":      `console.log("console")`,
-		"theme/keycloak.v2/admin/messages/messages_en.properties": "realmSettings=Realm settings\n",
+		"theme/keycloak.v2/admin/resources/assets/types-1.js":     `const t="org.keycloak.keys.KeyProvider",d="fedToKeycloak",c="keycloak__form",l="[KEYCLOAK]",u="https://www.keycloak.org/docs";`,
+		"theme/keycloak.v2/admin/resources/logo.svg":              `<svg>upstream</svg>`,
+		"theme/keycloak.v2/admin/messages/messages_en.properties": "realmSettings=Realm settings\nkeycloakToFedSyncMessage=Sync Keycloak roles\n",
 	})
 	write("keycloak-themes-26.0.7.jar", map[string]string{
 		"theme/keycloak/common/resources/vendor/react/react.production.min.js": "react",
@@ -80,6 +82,14 @@ func TestAdminConsolePages(t *testing.T) {
 	if r := e.expect(e.do(nil, "GET", res, "", nil, nil), 200); string(r.body) != `console.log("console")` {
 		t.Fatalf("asset: %s", r.body)
 	}
+	// the console speaks gocloak's names and shows gocloak's logo
+	types := e.expect(e.do(nil, "GET", strings.Replace(res, "main-1.js", "types-1.js", 1), "", nil, nil), 200)
+	if want := `const t="org.gocloak.keys.KeyProvider",d="fedToGocloak",c="gocloak__form",l="[GOCLOAK]",u="https://www.keycloak.org/docs";`; string(types.body) != want {
+		t.Fatalf("rebranded asset:\n%s\nwant\n%s", types.body, want)
+	}
+	if logo := e.expect(e.do(nil, "GET", strings.Replace(res, "assets/main-1.js", "logo.svg", 1), "", nil, nil), 200); !strings.Contains(string(logo.body), "gocloak") {
+		t.Fatalf("logo: %s", logo.body)
+	}
 	vendor := regexp1(`"react":"([^"]+)"`, body)
 	e.expect(e.do(nil, "GET", vendor, "", nil, nil), 200)
 	var msgs []map[string]string
@@ -88,7 +98,8 @@ func TestAdminConsolePages(t *testing.T) {
 	for _, m := range msgs {
 		keys[m["key"]] = m["value"]
 	}
-	if keys["cancel"] != "Cancel" || keys["realmSettings"] != "Realm settings" || keys["locale_vi"] != "Tiếng Việt" {
+	if keys["cancel"] != "Cancel" || keys["realmSettings"] != "Realm settings" || keys["locale_vi"] != "Tiếng Việt" ||
+		keys["gocloakToFedSyncMessage"] != "Sync gocloak roles" {
 		t.Fatalf("translations: %v", msgs)
 	}
 	var cfg map[string]any
@@ -121,12 +132,12 @@ func TestAdminConsoleAPI(t *testing.T) {
 	u, _ := url.Parse(e.srv.URL + "/realms/master/")
 	var session string
 	for _, c := range browser.Jar.Cookies(u) {
-		if c.Name == "KEYCLOAK_SESSION" {
+		if c.Name == "GOCLOAK_SESSION" {
 			session = c.Value
 		}
 	}
 	if !strings.HasPrefix(session, "master/") || !strings.HasSuffix(session, "/"+claims(t, tk.AccessToken).String("sid")) {
-		t.Fatalf("KEYCLOAK_SESSION cookie: %q", session)
+		t.Fatalf("GOCLOAK_SESSION cookie: %q", session)
 	}
 	for _, p := range []string{"3p-cookies/step1.html", "3p-cookies/step2.html", "login-status-iframe.html"} {
 		e.expect(e.do(nil, "GET", "/realms/master/protocol/openid-connect/"+p, "", nil, nil), 200)
@@ -150,8 +161,8 @@ func TestAdminConsoleAPI(t *testing.T) {
 		t.Fatalf("serverinfo keys: %v", info)
 	}
 	ct := info["componentTypes"].(map[string]any)
-	if len(ct["org.keycloak.storage.UserStorageProvider"].([]any)) != 1 {
-		t.Fatalf("storage providers: %v", ct["org.keycloak.storage.UserStorageProvider"])
+	if len(ct["org.gocloak.storage.UserStorageProvider"].([]any)) != 1 {
+		t.Fatalf("storage providers: %v", ct["org.gocloak.storage.UserStorageProvider"])
 	}
 
 	// ui-ext

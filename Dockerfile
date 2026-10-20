@@ -4,7 +4,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /gocloak ./cmd/gocloak && mkdir /data
-# Keycloak's admin console (Apache License 2.0), from Maven Central.
+# The admin console (Apache License 2.0), from Maven Central.
 # Build with --build-arg ADMIN_CONSOLE=false to leave it out.
 ARG ADMIN_CONSOLE=true
 RUN mkdir -p /admin-console && if [ "$ADMIN_CONSOLE" = "true" ]; then /gocloak download-admin-console --dir /admin-console; fi

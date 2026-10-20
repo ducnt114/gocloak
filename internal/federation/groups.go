@@ -467,7 +467,7 @@ func (m *Manager) SyncMapper(ctx context.Context, realm *model.Realm, providerCo
 	}
 	res := &SyncResult{}
 	st := m.Svc.Store
-	if direction == "keycloakToFed" {
+	if direction == "gocloakToFed" {
 		if err := m.syncToLDAP(ctx, realm, g, c, groups, res); err != nil {
 			return nil, err
 		}
@@ -528,7 +528,7 @@ func (m *Manager) SyncMapper(ctx context.Context, realm *model.Realm, providerCo
 		return nil, err
 	}
 	if g.roles {
-		res.Status = fmt.Sprintf("%d imported roles, %d roles already exists in Keycloak", res.Added, res.Updated)
+		res.Status = fmt.Sprintf("%d imported roles, %d roles already exists in gocloak", res.Added, res.Updated)
 	} else {
 		res.Status = fmt.Sprintf("%d imported groups, %d updated groups, %d removed groups", res.Added, res.Updated, res.Removed)
 	}

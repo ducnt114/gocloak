@@ -289,7 +289,7 @@ func TestKeyProviders(t *testing.T) {
 		t.Fatalf("refresh token alg = %s", h.Alg)
 	}
 	var comps []map[string]any
-	e.expect(e.do(nil, "GET", R+"/components?type=org.keycloak.keys.KeyProvider", admin, nil, nil), 200).json(&comps)
+	e.expect(e.do(nil, "GET", R+"/components?type=org.gocloak.keys.KeyProvider", admin, nil, nil), 200).json(&comps)
 	for _, c := range comps {
 		cfg := c["config"].(map[string]any)
 		if cfg["privateKey"] != nil || cfg["secret"] != nil {
@@ -299,7 +299,7 @@ func TestKeyProviders(t *testing.T) {
 
 	// An ES256 key and a client asking for ES256 access tokens.
 	e.expect(e.do(nil, "POST", R+"/components", admin, map[string]any{"name": "ec", "providerId": "ecdsa-generated",
-		"providerType": "org.keycloak.keys.KeyProvider", "config": map[string][]string{"priority": {"100"}, "ecdsaEllipticCurveKey": {"P-256"}}}, nil), 201)
+		"providerType": "org.gocloak.keys.KeyProvider", "config": map[string][]string{"priority": {"100"}, "ecdsaEllipticCurveKey": {"P-256"}}}, nil), 201)
 	web := clientUUID(e, admin, "web")
 	e.expect(e.do(nil, "PUT", R+"/clients/"+web, admin, map[string]any{"attributes": map[string]string{"access.token.signed.response.alg": "ES256"}}, nil), 204)
 	tok2, _ := e.passwordGrant("demo", "web", "web-secret", "alice", "wonderland")
@@ -333,7 +333,7 @@ func TestKeyProviders(t *testing.T) {
 	// Rotation: a higher priority RSA key takes over, the old one still verifies.
 	e.expect(e.do(nil, "PUT", R+"/clients/"+web, admin, map[string]any{"attributes": map[string]string{"access.token.signed.response.alg": ""}}, nil), 204)
 	e.expect(e.do(nil, "POST", R+"/components", admin, map[string]any{"name": "rsa-new", "providerId": "rsa-generated",
-		"providerType": "org.keycloak.keys.KeyProvider", "config": map[string][]string{"priority": {"200"}}}, nil), 201)
+		"providerType": "org.gocloak.keys.KeyProvider", "config": map[string][]string{"priority": {"200"}}}, nil), 201)
 	tok3, _ := e.passwordGrant("demo", "web", "web-secret", "alice", "wonderland")
 	if h, _, _ := jwt.Parse(tok3.AccessToken); h.Kid == active["RS256"] {
 		t.Fatal("rotation did not change the signing key")

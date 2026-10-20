@@ -72,7 +72,7 @@ func TestDynamicClientRegistration(t *testing.T) {
 
 	// anonymous registration once the host is trusted, with the anonymous policies applied
 	var comps []map[string]any
-	e.expect(e.do(nil, "GET", "/admin/realms/demo/components?type=org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy", admin, nil, nil), 200).json(&comps)
+	e.expect(e.do(nil, "GET", "/admin/realms/demo/components?type=org.gocloak.services.clientregistration.policy.ClientRegistrationPolicy", admin, nil, nil), 200).json(&comps)
 	for _, c := range comps {
 		if c["providerId"] == "trusted-hosts" {
 			c["config"] = map[string][]string{"trusted-hosts": {"127.0.0.1", "*.example"}, "host-sending-registration-request-must-match": {"true"},

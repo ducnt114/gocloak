@@ -8,7 +8,7 @@ import (
 )
 
 // RegistrationPolicyType is the component type of client registration policies.
-const RegistrationPolicyType = "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy"
+const RegistrationPolicyType = "org.gocloak.services.clientregistration.policy.ClientRegistrationPolicy"
 
 // registrationMapperTypes are the protocol mappers registered clients may use.
 var registrationMapperTypes = []string{"oidc-usermodel-attribute-mapper", "oidc-usermodel-property-mapper", "oidc-full-name-mapper",

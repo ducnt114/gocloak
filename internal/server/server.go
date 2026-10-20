@@ -136,7 +136,7 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 			cfg.Log.Warn("admin console not available", "dir", cfg.AdminConsoleDir, "err", err)
 		} else {
 			console.Assets = assets
-			cfg.Log.Info("admin console enabled", "keycloak", assets.Version)
+			cfg.Log.Info("admin console enabled", "version", assets.Version)
 		}
 	}
 	console.Register(mux)
@@ -329,7 +329,7 @@ func (s *Server) welcome(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprint(w, `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>gocloak</title>
 <style>body{font:15px/1.6 system-ui,sans-serif;max-width:640px;margin:48px auto;padding:0 16px;color:#151515;background:#fff}code{background:#f0f0f0;padding:1px 4px;border-radius:3px}@media (prefers-color-scheme:dark){body{color:#e0e0e0;background:#1b1d21}code{background:#2c2f33}}</style></head>
-<body><h1>gocloak</h1><p>Identity and access management server, compatible with Keycloak's OpenID Connect and admin REST APIs.</p>
+<body><h1>gocloak</h1><p>Identity and access management server: OpenID Connect, SAML 2.0 and an admin REST API.</p>
 <ul><li>Discovery: <code>/realms/{realm}/.well-known/openid-configuration</code></li><li>Admin API: <code>/admin/realms</code></li><li>Health: <code>/health</code></li></ul></body></html>`)
 }
 

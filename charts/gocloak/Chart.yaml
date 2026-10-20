@@ -1,6 +1,6 @@
 apiVersion: v2
 name: gocloak
-description: Keycloak-compatible identity and access management server written in Go
+description: Identity and access management server written in Go
 type: application
 # The release workflow sets both versions from the git tag.
 version: 0.1.0
@@ -8,4 +8,4 @@ appVersion: "0.1.0"
 home: https://github.com/ducnt114/gocloak
 sources:
   - https://github.com/ducnt114/gocloak
-keywords: [keycloak, oidc, oauth2, saml, sso, iam]
+keywords: [oidc, oauth2, saml, sso, iam]

@@ -258,6 +258,7 @@ var goMigrations = []migration{
 	{version: 17, name: "0017_lightweight_access_tokens", fn: enableLightweightTokens},
 	{version: 19, name: "0019_realm_attribute_defaults", fn: addRealmAttributeDefaults},
 	{version: 22, name: "0022_client_registration_policies", fn: addRegistrationPolicies},
+	{version: 25, name: "0025_rename_upstream_names", fn: renameUpstreamNames},
 }
 
 func loadMigrations() ([]migration, error) {

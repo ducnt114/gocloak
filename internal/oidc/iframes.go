@@ -16,8 +16,8 @@ async function hasStorageAccess() {
   try { await document.requestStorageAccess(); return true; } catch (e) { return false; }
 }
 if (await hasStorageAccess()) {
-  document.cookie = "KEYCLOAK_3P_COOKIE_SAMESITE=supported; Max-Age=60; SameSite=None; Secure";
-  document.cookie = "KEYCLOAK_3P_COOKIE=supported; Max-Age=60";
+  document.cookie = "GOCLOAK_3P_COOKIE_SAMESITE=supported; Max-Age=60; SameSite=None; Secure";
+  document.cookie = "GOCLOAK_3P_COOKIE=supported; Max-Age=60";
   window.location = "step2.html";
 } else {
   window.parent.postMessage("unsupported", "*");
@@ -26,10 +26,10 @@ if (await hasStorageAccess()) {
 
 const step2Page = `<!doctype html>
 <html><head><meta charset="utf-8"></head><body><script type="module">
-const supported = document.cookie.includes("KEYCLOAK_3P_COOKIE");
+const supported = document.cookie.includes("GOCLOAK_3P_COOKIE");
 if (supported) {
-  document.cookie = "KEYCLOAK_3P_COOKIE_SAMESITE=; Max-Age=0";
-  document.cookie = "KEYCLOAK_3P_COOKIE=; Max-Age=0";
+  document.cookie = "GOCLOAK_3P_COOKIE_SAMESITE=; Max-Age=0";
+  document.cookie = "GOCLOAK_3P_COOKIE=; Max-Age=0";
 }
 window.parent.postMessage(supported ? "supported" : "unsupported", "*");
 </script></body></html>`
@@ -46,7 +46,7 @@ async function hasStorageAccess() {
 function sessionCookie() {
   for (const c of document.cookie.split(";")) {
     const [k, v] = c.split("=").map((x) => x.trim());
-    if (k === "KEYCLOAK_SESSION") return v.startsWith('"') && v.endsWith('"') ? v.slice(1, -1) : v;
+    if (k === "GOCLOAK_SESSION") return v.startsWith('"') && v.endsWith('"') ? v.slice(1, -1) : v;
   }
   return null;
 }

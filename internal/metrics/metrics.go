@@ -191,9 +191,9 @@ func (r *Registry) Write(w io.Writer) {
 		fmt.Fprintf(w, "http_server_requests_seconds_max%s %s\n",
 			labels("method", k.method, "outcome", k.outcome, "status", k.status, "uri", k.uri), num(r.requests[k].max))
 	}
-	fmt.Fprint(w, "# HELP keycloak_user_events_total Keycloak user events\n# TYPE keycloak_user_events_total counter\n")
+	fmt.Fprint(w, "# HELP gocloak_user_events_total gocloak user events\n# TYPE gocloak_user_events_total counter\n")
 	for _, k := range evKeys {
-		fmt.Fprintf(w, "keycloak_user_events_total%s %s\n",
+		fmt.Fprintf(w, "gocloak_user_events_total%s %s\n",
 			labels("client_id", k.client, "error", k.err, "event", k.event, "idp", k.idp, "realm", k.realm), num(r.events[k]))
 	}
 	r.mu.Unlock()

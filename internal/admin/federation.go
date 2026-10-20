@@ -191,7 +191,7 @@ func (h *Handler) syncMapper(w http.ResponseWriter, r *http.Request, p *principa
 		return notFound("Could not find mapper")
 	}
 	direction := r.URL.Query().Get("direction")
-	if direction != "fedToKeycloak" && direction != "keycloakToFed" {
+	if direction != "fedToGocloak" && direction != "gocloakToFed" {
 		return badRequest("Unknown direction: " + direction)
 	}
 	res, err := h.Fed.SyncMapper(r.Context(), realm, parent, m, direction)

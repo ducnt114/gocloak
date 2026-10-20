@@ -1,9 +1,10 @@
 """Builds internal/admin/serverinfo.json, the catalog behind GET /admin/serverinfo,
-from the serverinfo of a Keycloak server, keeping only what gocloak supports.
+from the serverinfo of a Keycloak server, keeping only what gocloak supports and
+renaming Keycloak's names to gocloak's (org.gocloak.keys.KeyProvider...).
 
 usage: python3 serverinfo.py KEYCLOAK_URL  (admin/admin on the master realm)
 """
-import json, sys, os
+import json, os, re, sys
 sys.path.insert(0, os.path.dirname(__file__))
 from tokens import call, admin_token
 
@@ -68,6 +69,26 @@ out["socialProviders"] = [p for p in info["socialProviders"] if p["id"] in IDPS]
 out["passwordPolicies"] = [p for p in info["passwordPolicies"] if p["id"] in POLICIES]
 lp = out["providers"]["login-protocol"]["providers"]
 out["providers"]["login-protocol"]["providers"] = {k: v for k, v in lp.items() if k in ("openid-connect", "saml")}
+# the server's local database path is not part of the catalog
+jpa = out["providers"].get("connectionsJpa", {}).get("providers", {}).get("quarkus", {}).get("operationalInfo")
+if jpa and "databaseUrl" in jpa:
+    jpa["databaseUrl"] = "jdbc:h2:file:data/gocloak"
+
+def rebrand(text):
+    """gocloak's names for Keycloak's, with the rule of internal/adminconsole.Rebrand."""
+    def repl(m):
+        w = m.group(0)
+        if len(w) != 8:
+            return w  # a link to the upstream documentation or repository
+        if w == w.upper():
+            return "GOCLOAK"
+        i = m.start()
+        if w[0].isupper() and i > 0 and (text[i - 1].isalnum() or text[i - 1] in "_$"):
+            return "Gocloak"
+        return "gocloak"
+    return re.sub(r"(?i)www\.keycloak\.org|github\.com/keycloak(?:/[\w.-]+)?|keycloak", repl, text)
+
 path = os.path.join(os.path.dirname(__file__), "..", "..", "internal", "admin", "serverinfo.json")
-json.dump(out, open(path, "w"), indent=1, sort_keys=True, ensure_ascii=False)
+with open(path, "w") as f:
+    f.write(rebrand(json.dumps(out, indent=1, sort_keys=True, ensure_ascii=False)))
 print("wrote", path, os.path.getsize(path))

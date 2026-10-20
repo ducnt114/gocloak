@@ -854,7 +854,7 @@ func (s *Service) Bootstrap(ctx context.Context, adminUser, adminPassword string
 			return err
 		}
 		master := NewRealm(MasterRealm)
-		master.DisplayName = "Keycloak"
+		master.DisplayName = "gocloak"
 		if err := s.CreateRealm(ctx, tx, master); err != nil {
 			return err
 		}

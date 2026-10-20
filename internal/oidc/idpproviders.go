@@ -42,9 +42,9 @@ type IdPType struct {
 
 // IdPTypes are the supported provider types, by provider id.
 var IdPTypes = map[string]*IdPType{
-	"oidc":          {ID: "oidc", Name: "OpenID Connect v1.0", OIDC: true, scope: "openid", profile: oidcProfile},
-	"keycloak-oidc": {ID: "keycloak-oidc", Name: "Keycloak OpenID Connect", OIDC: true, scope: "openid", profile: oidcProfile},
-	"oauth2":        {ID: "oauth2", Name: "OAuth v2", profile: oauth2Profile},
+	"oidc":         {ID: "oidc", Name: "OpenID Connect v1.0", OIDC: true, scope: "openid", profile: oidcProfile},
+	"gocloak-oidc": {ID: "gocloak-oidc", Name: "gocloak OpenID Connect", OIDC: true, scope: "openid", profile: oidcProfile},
+	"oauth2":       {ID: "oauth2", Name: "OAuth v2", profile: oauth2Profile},
 	"google": {ID: "google", Name: "Google", Social: true, OIDC: true,
 		authURL: "https://accounts.google.com/o/oauth2/v2/auth", tokenURL: "https://oauth2.googleapis.com/token",
 		userInfoURL: "https://openidconnect.googleapis.com/v1/userinfo", issuer: "https://accounts.google.com",

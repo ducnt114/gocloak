@@ -7,6 +7,7 @@ package adminconsole
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -141,12 +142,27 @@ func (a *Assets) Messages(locale string) map[string]string {
 		read(a.base, loc)
 		read(a.admin, loc)
 	}
-	return out
+	branded := make(map[string]string, len(out))
+	for k, v := range out {
+		branded[Rebrand(k)] = Rebrand(v)
+	}
+	return branded
 }
 
-// resource serves a file of a jar directory.
+// resource serves a file of a jar directory, rebranded (see Rebrand).
 func serveFS(w http.ResponseWriter, r *http.Request, fsys fs.FS, name string) {
 	name = path.Clean("/" + name)[1:]
+	if b, ok, err := rebrandFile(fmt.Sprintf("%p/%s", fsys, name), name, func() ([]byte, error) {
+		return fs.ReadFile(fsys, name)
+	}); ok || err != nil {
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Cache-Control", "public, max-age=2592000")
+		http.ServeContent(w, r, name, time.Time{}, bytes.NewReader(b))
+		return
+	}
 	f, err := fsys.Open(name)
 	if err != nil {
 		http.NotFound(w, r)

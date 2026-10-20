@@ -9,7 +9,7 @@ import (
 // addRegistrationPolicies gives existing realms Keycloak's default client
 // registration policies (explicit columns, see addSAMLRoleListScope).
 func addRegistrationPolicies(ctx context.Context, tx *Store) error {
-	const typ = "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy"
+	const typ = "org.gocloak.services.clientregistration.policy.ClientRegistrationPolicy"
 	realms, err := queryList(ctx, tx, func(sc scanner) (string, error) {
 		var id string
 		err := sc.Scan(&id)

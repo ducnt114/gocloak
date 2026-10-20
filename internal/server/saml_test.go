@@ -424,11 +424,11 @@ func TestSAMLDescriptorAndInstallation(t *testing.T) {
 	if !strings.Contains(string(r.body), `entityID="urn:sp"`) || !strings.Contains(string(r.body), `Location="https://sp/acs"`) {
 		t.Fatalf("SP descriptor: %s", r.body)
 	}
-	r = e.expect(e.do(nil, "GET", "/admin/realms/demo/clients/"+clientUUID(e, admin, "web")+"/installation/providers/keycloak-oidc-keycloak-json", admin, nil, nil), 200)
+	r = e.expect(e.do(nil, "GET", "/admin/realms/demo/clients/"+clientUUID(e, admin, "web")+"/installation/providers/gocloak-oidc-gocloak-json", admin, nil, nil), 200)
 	var kj map[string]any
 	r.json(&kj)
 	if kj["resource"] != "web" || kj["realm"] != "demo" {
-		t.Fatalf("keycloak.json: %s", r.body)
+		t.Fatalf("adapter configuration: %s", r.body)
 	}
 	// OIDC clients keep their OIDC scopes
 	e.expect(e.do(nil, "GET", "/admin/realms/demo/clients/"+clientUUID(e, admin, "web"), admin, nil, nil), 200).json(&rep)

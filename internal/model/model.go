@@ -197,7 +197,7 @@ func DefaultRealmSettings() RealmSettings {
 		{&d.WebAuthnPolicyPasswordlessRpEntityName, &d.WebAuthnPolicyPasswordlessSignatureAlgorithms, &d.WebAuthnPolicyPasswordlessAcceptableAaguids, &d.WebAuthnPolicyPasswordlessExtraOrigins,
 			&d.WebAuthnPolicyPasswordlessAttestationConveyancePreference, &d.WebAuthnPolicyPasswordlessAuthenticatorAttachment, &d.WebAuthnPolicyPasswordlessRequireResidentKey, &d.WebAuthnPolicyPasswordlessUserVerificationRequirement},
 	} {
-		*p.name = "keycloak"
+		*p.name = "gocloak"
 		*p.algs = []string{"ES256", "RS256"}
 		*p.aaguids, *p.origins = []string{}, []string{}
 		*p.attestation, *p.attachment, *p.resident, *p.verification = "not specified", "not specified", "not specified", "not specified"
@@ -572,7 +572,7 @@ type IdentityProvider struct {
 	RealmID                   string
 	Alias                     string
 	DisplayName               string
-	ProviderID                string // oidc, keycloak-oidc, oauth2, google, github, microsoft, gitlab, facebook
+	ProviderID                string // oidc, gocloak-oidc, oauth2, google, github, microsoft, gitlab, facebook
 	Enabled                   bool
 	TrustEmail                bool
 	StoreToken                bool

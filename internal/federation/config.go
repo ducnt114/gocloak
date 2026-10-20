@@ -16,8 +16,8 @@ import (
 
 // Component types and provider ids, as in Keycloak.
 const (
-	ProviderType = "org.keycloak.storage.UserStorageProvider"
-	MapperType   = "org.keycloak.storage.ldap.mappers.LDAPStorageMapper"
+	ProviderType = "org.gocloak.storage.UserStorageProvider"
+	MapperType   = "org.gocloak.storage.ldap.mappers.LDAPStorageMapper"
 	ProviderLDAP = "ldap"
 
 	// Attributes of imported users.

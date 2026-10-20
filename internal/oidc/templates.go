@@ -119,7 +119,7 @@ var LanguageNames = map[string]string{
 	"nl": "Nederlands", "pl": "Polski", "cs": "Čeština", "th": "ไทย", "id": "Bahasa Indonesia",
 }
 
-const localeCookie = "KEYCLOAK_LOCALE"
+const localeCookie = "GOCLOAK_LOCALE"
 
 // Locale picks the language of a page, following Keycloak: kc_locale,
 // ui_locales, the KEYCLOAK_LOCALE cookie, the user's locale attribute, then

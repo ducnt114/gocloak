@@ -7,7 +7,7 @@ project_name: gocloak
 before:
   hooks:
     - go mod download
-    # Keycloak's admin console (Apache License 2.0) for the images
+    # the admin console (Apache License 2.0) for the images
     - go run ./cmd/gocloak download-admin-console --dir build/admin-console
     # the data volume, writable by the image's nonroot user
     - mkdir -p build/data
@@ -50,7 +50,7 @@ dockers_v2:
       - build/data
     labels:
       org.opencontainers.image.title: gocloak
-      org.opencontainers.image.description: Keycloak-compatible identity and access management server written in Go
+      org.opencontainers.image.description: Identity and access management server written in Go
       org.opencontainers.image.source: https://github.com/ducnt114/gocloak
       org.opencontainers.image.version: "{{ .Version }}"
       org.opencontainers.image.revision: "{{ .FullCommit }}"

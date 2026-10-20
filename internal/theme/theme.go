@@ -42,9 +42,9 @@ const (
 
 // Default is the name of the built-in theme. Keycloak's built-in names
 // map to it, so realms imported from Keycloak keep working.
-const Default = "keycloak"
+const Default = "gocloak"
 
-var builtinNames = map[string]bool{"": true, "keycloak": true, "keycloak.v2": true, "base": true, "gocloak": true}
+var builtinNames = map[string]bool{"": true, "gocloak": true, "gocloak.v2": true, "base": true}
 
 // Manager loads themes, with caching unless disabled (development).
 type Manager struct {

@@ -523,7 +523,7 @@ func TestRememberMe(t *testing.T) {
 		r := e.do(browser, "POST", formAction(t, page.body), "", nil, form)
 		codeOf(t, r)
 		for _, c := range (&http.Response{Header: r.header}).Cookies() {
-			if c.Name == "KEYCLOAK_IDENTITY" {
+			if c.Name == "GOCLOAK_IDENTITY" {
 				return c
 			}
 		}
@@ -547,7 +547,7 @@ func TestAuthenticationExportImport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rep.AuthenticationFlows) < 8 || len(rep.RequiredActions) != 11 || len(rep.Components["org.keycloak.keys.KeyProvider"]) != 2 {
+	if len(rep.AuthenticationFlows) < 8 || len(rep.RequiredActions) != 11 || len(rep.Components["org.gocloak.keys.KeyProvider"]) != 2 {
 		t.Fatalf("export: %d flows, %d actions, components %v", len(rep.AuthenticationFlows), len(rep.RequiredActions), rep.Components)
 	}
 	// Keys are part of the export: tokens survive a migration.

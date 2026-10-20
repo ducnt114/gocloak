@@ -50,7 +50,7 @@ func envDefault(def string, names ...string) string {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `gocloak - Keycloak compatible identity server written in Go
+	fmt.Fprint(os.Stderr, `gocloak - identity and access management server written in Go
 
 Usage:
   gocloak start-dev [flags]        start in development mode
@@ -60,7 +60,7 @@ Usage:
                                    export a realm (or --dir for all realms) and exit
   gocloak bootstrap-admin          create or reset a master realm admin and exit
   gocloak download-admin-console --dir <dir>
-                                   download Keycloak's admin console (from Maven Central)
+                                   download the admin console (from Maven Central)
   gocloak version
 
 Run 'gocloak <command> -h' for the flags of a command.
@@ -131,7 +131,7 @@ func (c commonFlags) dbConfig() (store.Config, error) {
 	case store.Postgres:
 		raw := *c.dbURL
 		if raw == "" {
-			raw = "postgres://localhost:5432/keycloak"
+			raw = "postgres://localhost:5432/gocloak"
 		}
 		raw = strings.TrimPrefix(raw, "jdbc:")
 		if strings.HasPrefix(raw, "postgresql://") {
@@ -186,7 +186,7 @@ func start(args []string, dev bool) error {
 	themeCache := fs.Bool("theme-cache", !dev, "cache themes (disable while developing a theme)")
 	rateLimit := fs.Float64("rate-limit", atof(envDefault("100", "GOCLOAK_RATE_LIMIT")), "requests per second allowed per client IP on /realms and /admin, 0 to disable (env GOCLOAK_RATE_LIMIT)")
 	cibaURI := fs.String("ciba-auth-channel-uri", envDefault(env("KC_SPI_CIBA_AUTH_CHANNEL_CIBA_HTTP_AUTH_CHANNEL_HTTP_AUTHENTICATION_CHANNEL_URI"), "GOCLOAK_CIBA_AUTH_CHANNEL_URI"),
-		"URL the CIBA authentication requests are posted to (env GOCLOAK_CIBA_AUTH_CHANNEL_URI or Keycloak's KC_SPI_CIBA_AUTH_CHANNEL_CIBA_HTTP_AUTH_CHANNEL_HTTP_AUTHENTICATION_CHANNEL_URI)")
+		"URL the CIBA authentication requests are posted to (env GOCLOAK_CIBA_AUTH_CHANNEL_URI or KC_SPI_CIBA_AUTH_CHANNEL_CIBA_HTTP_AUTH_CHANNEL_HTTP_AUTHENTICATION_CHANNEL_URI)")
 	mgmtPort := fs.Int("http-management-port", atoi(envDefault("9000", "KC_HTTP_MANAGEMENT_PORT")), "port of the management interface: health checks and metrics (env KC_HTTP_MANAGEMENT_PORT)")
 	healthOn := fs.Bool("health-enabled", envDefault("false", "KC_HEALTH_ENABLED") == "true", "serve health checks on the management port (env KC_HEALTH_ENABLED)")
 	metricsOn := fs.Bool("metrics-enabled", envDefault("false", "KC_METRICS_ENABLED") == "true", "collect metrics, served on the management port at /metrics (env KC_METRICS_ENABLED)")
@@ -231,8 +231,8 @@ func start(args []string, dev bool) error {
 		DB: dbCfg, Hostname: *hostname, ProxyHeaders: *proxy != "", ImportDir: *importDir, Log: log, CIBAChannelURI: *cibaURI,
 		RateLimit: *rateLimit, RateBurst: *rateBurst, ThemesDir: *themesDir, NoThemeCache: !*themeCache,
 		AdminConsoleDir: *consoleDir, Version: version, MetricsEnabled: *metricsOn, MetricsHistograms: *histograms, Tracing: tracingCfg,
-		AdminUser:     env("KC_BOOTSTRAP_ADMIN_USERNAME", "KEYCLOAK_ADMIN"),
-		AdminPassword: env("KC_BOOTSTRAP_ADMIN_PASSWORD", "KEYCLOAK_ADMIN_PASSWORD"),
+		AdminUser:     env("KC_BOOTSTRAP_ADMIN_USERNAME", "GOCLOAK_ADMIN"),
+		AdminPassword: env("KC_BOOTSTRAP_ADMIN_PASSWORD", "GOCLOAK_ADMIN_PASSWORD"),
 	})
 	if err != nil {
 		return err
@@ -301,7 +301,7 @@ func importCmd(args []string) error {
 	}
 	ctx := context.Background()
 	srv, err := server.New(ctx, server.Config{DB: dbCfg, Log: common.logger(),
-		AdminUser: env("KC_BOOTSTRAP_ADMIN_USERNAME", "KEYCLOAK_ADMIN"), AdminPassword: env("KC_BOOTSTRAP_ADMIN_PASSWORD", "KEYCLOAK_ADMIN_PASSWORD")})
+		AdminUser: env("KC_BOOTSTRAP_ADMIN_USERNAME", "GOCLOAK_ADMIN"), AdminPassword: env("KC_BOOTSTRAP_ADMIN_PASSWORD", "GOCLOAK_ADMIN_PASSWORD")})
 	if err != nil {
 		return err
 	}
@@ -417,7 +417,7 @@ func atof(s string) float64 {
 func downloadConsole(args []string) error {
 	fs := flag.NewFlagSet("download-admin-console", flag.ExitOnError)
 	dir := fs.String("dir", envDefault("admin-console", "GOCLOAK_ADMIN_CONSOLE_DIR"), "directory to download the jars to")
-	ver := fs.String("version", adminconsole.Version, "Keycloak version of the admin console")
+	ver := fs.String("version", adminconsole.Version, "version of the admin console")
 	fs.Parse(args)
 	err := adminconsole.Download(context.Background(), *dir, *ver, func(f string, a ...any) { fmt.Printf(f+"\n", a...) })
 	if err == nil {

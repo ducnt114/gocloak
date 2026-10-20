@@ -70,7 +70,7 @@ func TestMigrateFreshAndV0Database(t *testing.T) {
 	if r.Settings.FailureFactor != 30 || r.Settings.OfflineSessionIdleTimeout != 2592000 {
 		t.Fatalf("defaults not applied to old realm: %+v", r.Settings)
 	}
-	comps, err := st.ListComponents(ctx, "r1", "org.keycloak.keys.KeyProvider")
+	comps, err := st.ListComponents(ctx, "r1", "org.gocloak.keys.KeyProvider")
 	if err != nil {
 		t.Fatal(err)
 	}

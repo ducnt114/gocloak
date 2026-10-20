@@ -112,8 +112,8 @@ func (h *Handler) clientInstallation(w http.ResponseWriter, r *http.Request, p *
 	}
 	var out string
 	switch r.PathValue("provider") {
-	case "keycloak-oidc-keycloak-json":
-		out = keycloakJSON(h.URLs.Base(r), realm, c)
+	case "gocloak-oidc-gocloak-json":
+		out = adapterJSON(h.URLs.Base(r), realm, c)
 	case "saml-sp-descriptor":
 		if c.Protocol != service.ProtocolSAML {
 			return notFound("Unknown Provider")
@@ -127,7 +127,7 @@ func (h *Handler) clientInstallation(w http.ResponseWriter, r *http.Request, p *
 	return err
 }
 
-func keycloakJSON(base string, realm *model.Realm, c *model.Client) string {
+func adapterJSON(base string, realm *model.Realm, c *model.Client) string {
 	var b strings.Builder
 	q := func(s string) string { v, _ := json.Marshal(s); return string(v) }
 	b.WriteString("{\n")

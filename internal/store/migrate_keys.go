@@ -79,7 +79,7 @@ func migrateRealmKeys(ctx context.Context, tx *Store) error {
 			active = "true"
 		}
 		c := &model.Component{ID: uuid.NewString(), RealmID: k.realmID, Name: "rsa-generated", ProviderID: "rsa-generated",
-			ProviderType: "org.keycloak.keys.KeyProvider", ParentID: k.realmID, Config: map[string][]string{
+			ProviderType: "org.gocloak.keys.KeyProvider", ParentID: k.realmID, Config: map[string][]string{
 				// later keys win, as they did before
 				"priority": {itoa(100 + i)}, "algorithm": {"RS256"}, "keySize": {"2048"},
 				"active": {active}, "enabled": {"true"}, "privateKey": {k.pem}, "certificate": {jwt.EncodeCertificate(cert)},
@@ -94,7 +94,7 @@ func migrateRealmKeys(ctx context.Context, tx *Store) error {
 			return err
 		}
 		c := &model.Component{ID: uuid.NewString(), RealmID: id, Name: "hmac-generated-hs512", ProviderID: "hmac-generated",
-			ProviderType: "org.keycloak.keys.KeyProvider", ParentID: id, Config: map[string][]string{
+			ProviderType: "org.gocloak.keys.KeyProvider", ParentID: id, Config: map[string][]string{
 				"priority": {"100"}, "algorithm": {"HS512"}, "secretSize": {"64"}, "active": {"true"}, "enabled": {"true"},
 				"secret": {base64.RawURLEncoding.EncodeToString(secret)}, "kid": {uuid.NewString()},
 			}}

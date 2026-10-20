@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	identityCookie    = "KEYCLOAK_IDENTITY"
-	sessionCookie     = "KEYCLOAK_SESSION"
+	identityCookie    = "GOCLOAK_IDENTITY"
+	sessionCookie     = "GOCLOAK_SESSION"
 	authSessionCookie = "AUTH_SESSION_ID"
 	authSessionTTL    = 30 * time.Minute
 )

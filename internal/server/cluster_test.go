@@ -78,7 +78,7 @@ func TestCluster(t *testing.T) {
 	e.expect(e.do(nil, "GET", "/admin/realms/demo/keys", admin, nil, nil), 200).json(&keys)
 	oldKid := keys.Active["RS256"]
 	e.expect(e.do(nil, "POST", "/admin/realms/demo/components", admin, map[string]any{"name": "rotated", "providerId": "rsa-generated",
-		"providerType": "org.keycloak.keys.KeyProvider", "config": map[string][]string{"priority": {"500"}}}, nil), 201)
+		"providerType": "org.gocloak.keys.KeyProvider", "config": map[string][]string{"priority": {"500"}}}, nil), 201)
 	deadline := time.Now().Add(5 * time.Second)
 	for i := 0; ; i++ {
 		fresh := map[string]bool{}

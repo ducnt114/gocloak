@@ -72,7 +72,7 @@ func (h *Handler) serverInfo(w http.ResponseWriter, r *http.Request, p *principa
 		"freePercentage": free * 100 / max(mem.Sys, 1)}
 	themes := map[string]any{}
 	for _, typ := range []string{"login", "account", "email", "admin", "welcome"} {
-		names := []string{"keycloak.v2"}
+		names := []string{"gocloak.v2"}
 		if typ != "admin" && typ != "welcome" {
 			names = append(names, h.ThemeNames(typ)...)
 		}

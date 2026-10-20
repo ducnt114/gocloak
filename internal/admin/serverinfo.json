@@ -494,11 +494,11 @@
  "clientInstallations": {
   "openid-connect": [
    {
-    "displayType": "Keycloak OIDC JSON",
+    "displayType": "gocloak OIDC JSON",
     "downloadOnly": false,
-    "filename": "keycloak.json",
-    "helpText": "keycloak.json file used by the Keycloak OIDC client adapter to configure clients.  This must be saved to a keycloak.json file and put in your WEB-INF directory of your WAR file.  You may also want to tweak this file after you download it.",
-    "id": "keycloak-oidc-keycloak-json",
+    "filename": "gocloak.json",
+    "helpText": "gocloak.json file used by the gocloak OIDC client adapter to configure clients.  This must be saved to a gocloak.json file and put in your WEB-INF directory of your WAR file.  You may also want to tweak this file after you download it.",
+    "id": "gocloak-oidc-gocloak-json",
     "mediaType": "application/json",
     "protocol": "openid-connect"
    }
@@ -516,7 +516,7 @@
   ]
  },
  "componentTypes": {
-  "org.keycloak.authentication.Authenticator": [
+  "org.gocloak.authentication.Authenticator": [
    {
     "helpText": "Authenticator will always successfully authenticate. Useful for example in the conditional flows to be used after satisfying the previous conditions",
     "id": "allow-access-authenticator",
@@ -705,12 +705,12 @@
     "properties": []
    },
    {
-    "helpText": "Detect if there is existing Keycloak account with same email like identity provider. If no, create new user",
+    "helpText": "Detect if there is existing gocloak account with same email like identity provider. If no, create new user",
     "id": "idp-create-user-if-unique",
     "metadata": {},
     "properties": [
      {
-      "helpText": "If this option is true and new user is successfully imported from Identity Provider to Keycloak (there is no duplicated email or username detected in Keycloak DB), then this user is required to update his password",
+      "helpText": "If this option is true and new user is successfully imported from Identity Provider to gocloak (there is no duplicated email or username detected in gocloak DB), then this user is required to update his password",
       "label": "Require Password Update After Registration",
       "name": "require.password.update.after.registration",
       "readOnly": false,
@@ -721,13 +721,13 @@
     ]
    },
    {
-    "helpText": "Detect if there is an existing Keycloak account with same email like identity provider. If no, throw an error.",
+    "helpText": "Detect if there is an existing gocloak account with same email like identity provider. If no, throw an error.",
     "id": "idp-detect-existing-broker-user",
     "metadata": {},
     "properties": []
    },
    {
-    "helpText": "Email verification of existing Keycloak user, that wants to link his user account with identity provider",
+    "helpText": "Email verification of existing gocloak user, that wants to link his user account with identity provider",
     "id": "idp-email-verification",
     "metadata": {},
     "properties": []
@@ -813,7 +813,7 @@
     "properties": []
    }
   ],
-  "org.keycloak.authentication.ClientAuthenticator": [
+  "org.gocloak.authentication.ClientAuthenticator": [
    {
     "helpText": "Validates client based on signed JWT issued by client and signed with the Client private key",
     "id": "client-jwt",
@@ -833,7 +833,7 @@
     "properties": []
    }
   ],
-  "org.keycloak.authentication.FormAction": [
+  "org.gocloak.authentication.FormAction": [
    {
     "helpText": "Validates that password matches password confirmation field.  It also will store password in user's credential store.",
     "id": "registration-password-action",
@@ -982,7 +982,7 @@
     "properties": []
    }
   ],
-  "org.keycloak.authentication.FormAuthenticator": [
+  "org.gocloak.authentication.FormAuthenticator": [
    {
     "helpText": "This is the controller for the registration page",
     "id": "registration-page-form",
@@ -990,10 +990,10 @@
     "properties": []
    }
   ],
-  "org.keycloak.broker.provider.IdentityProvider": [
+  "org.gocloak.broker.provider.IdentityProvider": [
    {
     "helpText": "",
-    "id": "keycloak-oidc",
+    "id": "gocloak-oidc",
     "metadata": {},
     "properties": []
    },
@@ -1004,7 +1004,7 @@
     "properties": []
    }
   ],
-  "org.keycloak.broker.provider.IdentityProviderMapper": [
+  "org.gocloak.broker.provider.IdentityProviderMapper": [
    {
     "helpText": "Import user profile information if it exists in Social provider JSON data into the specified user attribute.",
     "id": "facebook-user-attribute-mapper",
@@ -1156,8 +1156,8 @@
     ]
    },
    {
-    "helpText": "Looks for an external role in a keycloak access token.  If external role exists, grant the user the specified realm or client role.",
-    "id": "keycloak-oidc-role-to-role-idp-mapper",
+    "helpText": "Looks for an external role in a gocloak access token.  If external role exists, grant the user the specified realm or client role.",
+    "id": "gocloak-oidc-role-to-role-idp-mapper",
     "metadata": {},
     "properties": [
      {
@@ -1757,7 +1757,7 @@
     ]
    }
   ],
-  "org.keycloak.broker.social.SocialIdentityProvider": [
+  "org.gocloak.broker.social.SocialIdentityProvider": [
    {
     "helpText": "",
     "id": "facebook",
@@ -1820,7 +1820,7 @@
       "type": "String"
      },
      {
-      "helpText": "Set 'hd' query parameter when logging in with Google. Google will list accounts only for this domain. Keycloak validates that the returned identity token has a claim for this domain. When '*' is entered, any hosted account can be used. Comma ',' separated list of domains is supported.",
+      "helpText": "Set 'hd' query parameter when logging in with Google. Google will list accounts only for this domain. gocloak validates that the returned identity token has a claim for this domain. When '*' is entered, any hosted account can be used. Comma ',' separated list of domains is supported.",
       "label": "Hosted Domain",
       "name": "hostedDomain",
       "readOnly": false,
@@ -1865,7 +1865,7 @@
     ]
    }
   ],
-  "org.keycloak.keys.KeyProvider": [
+  "org.gocloak.keys.KeyProvider": [
    {
     "helpText": "Generates ECDSA keys",
     "id": "ecdsa-generated",
@@ -2133,7 +2133,7 @@
     ]
    }
   ],
-  "org.keycloak.protocol.ProtocolMapper": [
+  "org.gocloak.protocol.ProtocolMapper": [
    {
     "helpText": "Maps the achieved LoA (Level of Authentication) to the 'acr' claim of the token",
     "id": "oidc-acr-mapper",
@@ -3676,7 +3676,7 @@
     ]
    }
   ],
-  "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy": [
+  "org.gocloak.services.clientregistration.policy.ClientRegistrationPolicy": [
    {
     "helpText": "When present, it allows to specify whitelist of client scopes, which will be allowed in representation of registered (or updated) client",
     "id": "allowed-client-templates",
@@ -3829,7 +3829,7 @@
     ]
    }
   ],
-  "org.keycloak.storage.UserStorageProvider": [
+  "org.gocloak.storage.UserStorageProvider": [
    {
     "helpText": "",
     "id": "ldap",
@@ -4125,13 +4125,13 @@
     ]
    }
   ],
-  "org.keycloak.storage.ldap.mappers.LDAPStorageMapper": [
+  "org.gocloak.storage.ldap.mappers.LDAPStorageMapper": [
    {
-    "helpText": "Used to map single attribute which contains a certificate from LDAP user to attribute of UserModel in Keycloak DB",
+    "helpText": "Used to map single attribute which contains a certificate from LDAP user to attribute of UserModel in gocloak DB",
     "id": "certificate-ldap-mapper",
     "metadata": {
-     "fedToKeycloakSyncSupported": false,
-     "keycloakToFedSyncSupported": false
+     "fedToGocloakSyncSupported": false,
+     "gocloakToFedSyncSupported": false
     },
     "properties": [
      {
@@ -4154,7 +4154,7 @@
      },
      {
       "defaultValue": "false",
-      "helpText": "Read-only attribute is imported from LDAP to UserModel, but it's not saved back to LDAP when user is updated in Keycloak.",
+      "helpText": "Read-only attribute is imported from LDAP to UserModel, but it's not saved back to LDAP when user is updated in gocloak.",
       "label": "Read Only",
       "name": "read.only",
       "readOnly": false,
@@ -4164,7 +4164,7 @@
      },
      {
       "defaultValue": "false",
-      "helpText": "If on, then during reading of the LDAP attribute value will always used instead of the value from Keycloak DB",
+      "helpText": "If on, then during reading of the LDAP attribute value will always used instead of the value from gocloak DB",
       "label": "Always Read Value From LDAP",
       "name": "always.read.value.from.ldap",
       "readOnly": false,
@@ -4184,7 +4184,7 @@
      },
      {
       "defaultValue": "",
-      "helpText": "If there is no value in Keycloak DB and attribute is mandatory in LDAP, this value will be propagated to LDAP",
+      "helpText": "If there is no value in gocloak DB and attribute is mandatory in LDAP, this value will be propagated to LDAP",
       "label": "Attribute default value",
       "name": "attribute.default.value",
       "readOnly": false,
@@ -4224,11 +4224,11 @@
     ]
    },
    {
-    "helpText": "Used to map full-name of user from single attribute in LDAP (usually 'cn' attribute) to firstName and lastName attributes of UserModel in Keycloak DB",
+    "helpText": "Used to map full-name of user from single attribute in LDAP (usually 'cn' attribute) to firstName and lastName attributes of UserModel in gocloak DB",
     "id": "full-name-ldap-mapper",
     "metadata": {
-     "fedToKeycloakSyncSupported": false,
-     "keycloakToFedSyncSupported": false
+     "fedToGocloakSyncSupported": false,
+     "gocloakToFedSyncSupported": false
     },
     "properties": [
      {
@@ -4243,7 +4243,7 @@
      },
      {
       "defaultValue": "false",
-      "helpText": "For Read-only is data imported from LDAP to Keycloak DB, but it's not saved back to LDAP when user is updated in Keycloak.",
+      "helpText": "For Read-only is data imported from LDAP to gocloak DB, but it's not saved back to LDAP when user is updated in gocloak.",
       "label": "Read Only",
       "name": "read.only",
       "readOnly": false,
@@ -4253,7 +4253,7 @@
      },
      {
       "defaultValue": "true",
-      "helpText": "For Write-only is data propagated to LDAP when user is created or updated in Keycloak. But this mapper is not used to propagate data from LDAP back into Keycloak. This setting is useful if you configured separate firstName and lastName attribute mappers and you want to use those to read attribute from LDAP into Keycloak",
+      "helpText": "For Write-only is data propagated to LDAP when user is created or updated in gocloak. But this mapper is not used to propagate data from LDAP back into gocloak. This setting is useful if you configured separate firstName and lastName attribute mappers and you want to use those to read attribute from LDAP into gocloak",
       "label": "Write Only",
       "name": "write.only",
       "readOnly": false,
@@ -4264,13 +4264,13 @@
     ]
    },
    {
-    "helpText": "Used to map group mappings of groups from some LDAP DN to Keycloak group mappings",
+    "helpText": "Used to map group mappings of groups from some LDAP DN to gocloak group mappings",
     "id": "group-ldap-mapper",
     "metadata": {
-     "fedToKeycloakSyncMessage": "sync-ldap-groups-to-keycloak",
-     "fedToKeycloakSyncSupported": true,
-     "keycloakToFedSyncMessage": "sync-keycloak-groups-to-ldap",
-     "keycloakToFedSyncSupported": true
+     "fedToGocloakSyncMessage": "sync-ldap-groups-to-gocloak",
+     "fedToGocloakSyncSupported": true,
+     "gocloakToFedSyncMessage": "sync-gocloak-groups-to-ldap",
+     "gocloakToFedSyncSupported": true
     },
     "properties": [
      {
@@ -4304,7 +4304,7 @@
      },
      {
       "defaultValue": "true",
-      "helpText": "Flag whether group inheritance from LDAP should be propagated to Keycloak. If false, then all LDAP groups will be mapped as flat top-level groups in Keycloak. Otherwise group inheritance is preserved into Keycloak, but the group sync might fail if LDAP structure contains recursions or multiple parent groups per child groups",
+      "helpText": "Flag whether group inheritance from LDAP should be propagated to gocloak. If false, then all LDAP groups will be mapped as flat top-level groups in gocloak. Otherwise group inheritance is preserved into gocloak, but the group sync might fail if LDAP structure contains recursions or multiple parent groups per child groups",
       "label": "Preserve Group Inheritance",
       "name": "preserve.group.inheritance",
       "readOnly": false,
@@ -4367,7 +4367,7 @@
      },
      {
       "defaultValue": "LDAP_ONLY",
-      "helpText": "LDAP_ONLY means that all group mappings of users are retrieved from LDAP and saved into LDAP. READ_ONLY is Read-only LDAP mode where group mappings are retrieved from both LDAP and DB and merged together. New group joins are not saved to LDAP but to DB. IMPORT is Read-only LDAP mode where group mappings are retrieved from LDAP just at the time when user is imported from LDAP and then they are saved to local keycloak DB.",
+      "helpText": "LDAP_ONLY means that all group mappings of users are retrieved from LDAP and saved into LDAP. READ_ONLY is Read-only LDAP mode where group mappings are retrieved from both LDAP and DB and merged together. New group joins are not saved to LDAP but to DB. IMPORT is Read-only LDAP mode where group mappings are retrieved from LDAP just at the time when user is imported from LDAP and then they are saved to local gocloak DB.",
       "label": "Mode",
       "name": "mode",
       "options": [
@@ -4405,7 +4405,7 @@
       "type": "String"
      },
      {
-      "helpText": "List of names of attributes divided by comma. This points to the list of attributes on LDAP group, which will be mapped as attributes of Group in Keycloak. Leave this empty if no additional group attributes are required to be mapped in Keycloak. ",
+      "helpText": "List of names of attributes divided by comma. This points to the list of attributes on LDAP group, which will be mapped as attributes of Group in gocloak. Leave this empty if no additional group attributes are required to be mapped in gocloak. ",
       "label": "Mapped Group Attributes",
       "name": "mapped.group.attributes",
       "readOnly": false,
@@ -4415,7 +4415,7 @@
      },
      {
       "defaultValue": "false",
-      "helpText": "If this flag is true, then during sync of groups from LDAP to Keycloak, we will keep just those Keycloak groups, which still exists in LDAP. Rest will be deleted",
+      "helpText": "If this flag is true, then during sync of groups from LDAP to gocloak, we will keep just those gocloak groups, which still exists in LDAP. Rest will be deleted",
       "label": "Drop non-existing groups during sync",
       "name": "drop.non.existing.groups.during.sync",
       "readOnly": false,
@@ -4425,7 +4425,7 @@
      },
      {
       "defaultValue": "/",
-      "helpText": "Keycloak group path the LDAP groups are added to. For example if value '/Applications/App1' is used, then LDAP groups will be available in Keycloak under group 'App1', which is child of top level group 'Applications'. The default value is '/' so LDAP groups will be mapped to the Keycloak groups at the top level. The configured group path must already exists in the Keycloak when creating this mapper.",
+      "helpText": "gocloak group path the LDAP groups are added to. For example if value '/Applications/App1' is used, then LDAP groups will be available in gocloak under group 'App1', which is child of top level group 'Applications'. The default value is '/' so LDAP groups will be mapped to the gocloak groups at the top level. The configured group path must already exists in the gocloak when creating this mapper.",
       "label": "Groups Path",
       "name": "groups.path",
       "readOnly": false,
@@ -4436,11 +4436,11 @@
     ]
    },
    {
-    "helpText": "This mapper is supported just if syncRegistrations is enabled. When new user is registered in Keycloak, he will be written to the LDAP with the hardcoded value of some specified attribute.",
+    "helpText": "This mapper is supported just if syncRegistrations is enabled. When new user is registered in gocloak, he will be written to the LDAP with the hardcoded value of some specified attribute.",
     "id": "hardcoded-ldap-attribute-mapper",
     "metadata": {
-     "fedToKeycloakSyncSupported": false,
-     "keycloakToFedSyncSupported": false
+     "fedToGocloakSyncSupported": false,
+     "gocloakToFedSyncSupported": false
     },
     "properties": [
      {
@@ -4467,8 +4467,8 @@
     "helpText": "When user is imported from LDAP, he will be automatically added into this configured group.",
     "id": "hardcoded-ldap-group-mapper",
     "metadata": {
-     "fedToKeycloakSyncSupported": false,
-     "keycloakToFedSyncSupported": false
+     "fedToGocloakSyncSupported": false,
+     "gocloakToFedSyncSupported": false
     },
     "properties": [
      {
@@ -4486,8 +4486,8 @@
     "helpText": "When user is imported from LDAP, he will be automatically added into this configured role.",
     "id": "hardcoded-ldap-role-mapper",
     "metadata": {
-     "fedToKeycloakSyncSupported": false,
-     "keycloakToFedSyncSupported": false
+     "fedToGocloakSyncSupported": false,
+     "gocloakToFedSyncSupported": false
     },
     "properties": [
      {
@@ -4505,17 +4505,17 @@
     "helpText": "This mapper will update Kerberos principal attribute in the DB when the attribute changes in LDAP.",
     "id": "kerberos-principal-attribute-mapper",
     "metadata": {
-     "fedToKeycloakSyncSupported": false,
-     "keycloakToFedSyncSupported": false
+     "fedToGocloakSyncSupported": false,
+     "gocloakToFedSyncSupported": false
     },
     "properties": []
    },
    {
-    "helpText": "Mapper specific to MSAD LDS. It's able to integrate the MSAD LDS user account state into Keycloak account state (account enabled, password is expired etc). It's using msDS-UserAccountDisabled and pwdLastSet MSAD attributes for that. For example if pwdLastSet is 0, the Keycloak user is required to update password, if msDS-UserAccountDisabled is 'TRUE' the Keycloak user is disabled as well etc. Mapper is also able to handle exception code from LDAP user authentication.",
+    "helpText": "Mapper specific to MSAD LDS. It's able to integrate the MSAD LDS user account state into gocloak account state (account enabled, password is expired etc). It's using msDS-UserAccountDisabled and pwdLastSet MSAD attributes for that. For example if pwdLastSet is 0, the gocloak user is required to update password, if msDS-UserAccountDisabled is 'TRUE' the gocloak user is disabled as well etc. Mapper is also able to handle exception code from LDAP user authentication.",
     "id": "msad-lds-user-account-control-mapper",
     "metadata": {
-     "fedToKeycloakSyncSupported": false,
-     "keycloakToFedSyncSupported": false
+     "fedToGocloakSyncSupported": false,
+     "gocloakToFedSyncSupported": false
     },
     "properties": [
      {
@@ -4531,11 +4531,11 @@
     ]
    },
    {
-    "helpText": "Mapper specific to MSAD. It's able to integrate the MSAD user account state into Keycloak account state (account enabled, password is expired etc). It's using userAccountControl and pwdLastSet MSAD attributes for that. For example if pwdLastSet is 0, the Keycloak user is required to update password, if userAccountControl is 514 (disabled account) the Keycloak user is disabled as well etc. Mapper is also able to handle exception code from LDAP user authentication.",
+    "helpText": "Mapper specific to MSAD. It's able to integrate the MSAD user account state into gocloak account state (account enabled, password is expired etc). It's using userAccountControl and pwdLastSet MSAD attributes for that. For example if pwdLastSet is 0, the gocloak user is required to update password, if userAccountControl is 514 (disabled account) the gocloak user is disabled as well etc. Mapper is also able to handle exception code from LDAP user authentication.",
     "id": "msad-user-account-control-mapper",
     "metadata": {
-     "fedToKeycloakSyncSupported": false,
-     "keycloakToFedSyncSupported": false
+     "fedToGocloakSyncSupported": false,
+     "gocloakToFedSyncSupported": false
     },
     "properties": [
      {
@@ -4561,13 +4561,13 @@
     ]
    },
    {
-    "helpText": "Used to map role mappings of roles from some LDAP DN to Keycloak role mappings of either realm roles or client roles of particular client",
+    "helpText": "Used to map role mappings of roles from some LDAP DN to gocloak role mappings of either realm roles or client roles of particular client",
     "id": "role-ldap-mapper",
     "metadata": {
-     "fedToKeycloakSyncMessage": "sync-ldap-roles-to-keycloak",
-     "fedToKeycloakSyncSupported": true,
-     "keycloakToFedSyncMessage": "sync-keycloak-roles-to-ldap",
-     "keycloakToFedSyncSupported": true
+     "fedToGocloakSyncMessage": "sync-ldap-roles-to-gocloak",
+     "fedToGocloakSyncSupported": true,
+     "gocloakToFedSyncMessage": "sync-gocloak-roles-to-ldap",
+     "gocloakToFedSyncSupported": true
     },
     "properties": [
      {
@@ -4644,7 +4644,7 @@
      },
      {
       "defaultValue": "LDAP_ONLY",
-      "helpText": "LDAP_ONLY means that all role mappings are retrieved from LDAP and saved into LDAP. READ_ONLY is Read-only LDAP mode where role mappings are retrieved from both LDAP and DB and merged together. New role grants are not saved to LDAP but to DB. IMPORT is Read-only LDAP mode where role mappings are retrieved from LDAP just at the time when user is imported from LDAP and then they are saved to local keycloak DB.",
+      "helpText": "LDAP_ONLY means that all role mappings are retrieved from LDAP and saved into LDAP. READ_ONLY is Read-only LDAP mode where role mappings are retrieved from both LDAP and DB and merged together. New role grants are not saved to LDAP but to DB. IMPORT is Read-only LDAP mode where role mappings are retrieved from LDAP just at the time when user is imported from LDAP and then they are saved to local gocloak DB.",
       "label": "Mode",
       "name": "mode",
       "options": [
@@ -4683,7 +4683,7 @@
      },
      {
       "defaultValue": "true",
-      "helpText": "If true, then LDAP role mappings will be mapped to realm role mappings in Keycloak. Otherwise it will be mapped to client role mappings",
+      "helpText": "If true, then LDAP role mappings will be mapped to realm role mappings in gocloak. Otherwise it will be mapped to client role mappings",
       "label": "Use Realm Roles Mapping",
       "name": "use.realm.roles.mapping",
       "readOnly": false,
@@ -4703,11 +4703,11 @@
     ]
    },
    {
-    "helpText": "Used to map single attribute from LDAP user to attribute of UserModel in Keycloak DB",
+    "helpText": "Used to map single attribute from LDAP user to attribute of UserModel in gocloak DB",
     "id": "user-attribute-ldap-mapper",
     "metadata": {
-     "fedToKeycloakSyncSupported": false,
-     "keycloakToFedSyncSupported": false
+     "fedToGocloakSyncSupported": false,
+     "gocloakToFedSyncSupported": false
     },
     "properties": [
      {
@@ -4730,7 +4730,7 @@
      },
      {
       "defaultValue": "false",
-      "helpText": "Read-only attribute is imported from LDAP to UserModel, but it's not saved back to LDAP when user is updated in Keycloak.",
+      "helpText": "Read-only attribute is imported from LDAP to UserModel, but it's not saved back to LDAP when user is updated in gocloak.",
       "label": "Read Only",
       "name": "read.only",
       "readOnly": false,
@@ -4740,7 +4740,7 @@
      },
      {
       "defaultValue": "false",
-      "helpText": "If on, then during reading of the LDAP attribute value will always used instead of the value from Keycloak DB",
+      "helpText": "If on, then during reading of the LDAP attribute value will always used instead of the value from gocloak DB",
       "label": "Always Read Value From LDAP",
       "name": "always.read.value.from.ldap",
       "readOnly": false,
@@ -4760,7 +4760,7 @@
      },
      {
       "defaultValue": "",
-      "helpText": "If there is no value in Keycloak DB and attribute is mandatory in LDAP, this value will be propagated to LDAP",
+      "helpText": "If there is no value in gocloak DB and attribute is mandatory in LDAP, this value will be propagated to LDAP",
       "label": "Attribute default value",
       "name": "attribute.default.value",
       "readOnly": false,
@@ -4791,7 +4791,7 @@
     ]
    }
   ],
-  "org.keycloak.userprofile.UserProfileProvider": [
+  "org.gocloak.userprofile.UserProfileProvider": [
    {
     "id": "declarative-user-profile",
     "metadata": {},
@@ -4806,7 +4806,7 @@
     ]
    }
   ],
-  "org.keycloak.validate.Validator": [
+  "org.gocloak.validate.Validator": [
    {
     "helpText": "Validator to check Double number format and optionally min and max values",
     "id": "double",
@@ -5541,8 +5541,8 @@
   },
   {
    "groupName": "User-defined",
-   "id": "keycloak-oidc",
-   "name": "Keycloak OpenID Connect"
+   "id": "gocloak-oidc",
+   "name": "gocloak OpenID Connect"
   },
   {
    "groupName": "Social",
@@ -7609,7 +7609,7 @@
   "client-description-converter": {
    "internal": true,
    "providers": {
-    "keycloak": {
+    "gocloak": {
      "order": 0
     },
     "openid-connect": {
@@ -7632,22 +7632,22 @@
     "docker-v2-variable-override": {
      "order": 0
     },
-    "keycloak-oidc-jboss-subsystem": {
+    "gocloak-oidc-jboss-subsystem": {
      "order": 0
     },
-    "keycloak-oidc-jboss-subsystem-cli": {
+    "gocloak-oidc-jboss-subsystem-cli": {
      "order": 0
     },
-    "keycloak-oidc-keycloak-json": {
+    "gocloak-oidc-gocloak-json": {
      "order": 0
     },
-    "keycloak-saml": {
+    "gocloak-saml": {
      "order": 0
     },
-    "keycloak-saml-subsystem": {
+    "gocloak-saml-subsystem": {
      "order": 0
     },
-    "keycloak-saml-subsystem-cli": {
+    "gocloak-saml-subsystem-cli": {
      "order": 0
     },
     "mod-auth-mellon": {
@@ -7938,7 +7938,7 @@
      "operationalInfo": {
       "databaseDriver": "H2 JDBC Driver 2.3.230 (2024-07-15)",
       "databaseProduct": "H2 2.3.230 (2024-07-15)",
-      "databaseUrl": "jdbc:h2:file:/tmp/claude-1000/-home-duc-workspace-gocloak/fa75184a-17b1-557a-8787-53fe65181d42/scratchpad/kc/keycloak-26.0.7/bin/../data/h2/keycloakdb",
+      "databaseUrl": "jdbc:h2:file:data/gocloak",
       "databaseUser": "SA"
      },
      "order": 100
@@ -8003,16 +8003,16 @@
   "credential": {
    "internal": true,
    "providers": {
-    "keycloak-otp": {
+    "gocloak-otp": {
      "order": 0
     },
-    "keycloak-password": {
+    "gocloak-password": {
      "order": 0
     },
-    "keycloak-webauthn": {
+    "gocloak-webauthn": {
      "order": 0
     },
-    "keycloak-webauthn-passwordless": {
+    "gocloak-webauthn-passwordless": {
      "order": 0
     }
    }
@@ -8209,7 +8209,7 @@
     "instagram-user-attribute-mapper": {
      "order": 0
     },
-    "keycloak-oidc-role-to-role-idp-mapper": {
+    "gocloak-oidc-role-to-role-idp-mapper": {
      "order": 0
     },
     "linkedin-user-attribute-mapper": {
@@ -8285,7 +8285,7 @@
   "identity_provider": {
    "internal": true,
    "providers": {
-    "keycloak-oidc": {
+    "gocloak-oidc": {
      "order": 0
     },
     "oidc": {

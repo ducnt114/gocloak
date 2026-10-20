@@ -15,7 +15,7 @@ const (
 	ldapAdmin  = "cn=admin,dc=example,dc=org"
 	peopleDN   = "ou=people,dc=example,dc=org"
 	groupsDN   = "ou=groups,dc=example,dc=org"
-	ldapMapper = "org.keycloak.storage.ldap.mappers.LDAPStorageMapper"
+	ldapMapper = "org.gocloak.storage.ldap.mappers.LDAPStorageMapper"
 )
 
 // seedDirectory starts a directory with three users and three groups
@@ -53,7 +53,7 @@ func (e *env) addLDAP(admin string, d directory, extra map[string]string) string
 		cfg[k] = []string{v}
 	}
 	return idFromLocation(e.t, e.expect(e.do(nil, "POST", "/admin/realms/demo/components", admin, map[string]any{
-		"name": "ldap", "providerId": "ldap", "providerType": "org.keycloak.storage.UserStorageProvider", "parentId": realm["id"], "config": cfg,
+		"name": "ldap", "providerId": "ldap", "providerType": "org.gocloak.storage.UserStorageProvider", "parentId": realm["id"], "config": cfg,
 	}, nil), 201))
 }
 
@@ -264,7 +264,7 @@ func TestLDAPGroupAndRoleMappers(t *testing.T) {
 	gm := mapper("groups", "group-ldap-mapper", map[string][]string{"groups.dn": {groupsDN}, "mode": {"LDAP_ONLY"},
 		"membership.attribute.type": {"DN"}, "preserve.group.inheritance": {"true"}})
 	var res map[string]any
-	e.expect(e.do(nil, "POST", "/admin/realms/demo/user-storage/"+cid+"/mappers/"+gm+"/sync?direction=fedToKeycloak", admin, nil, nil), 200).json(&res)
+	e.expect(e.do(nil, "POST", "/admin/realms/demo/user-storage/"+cid+"/mappers/"+gm+"/sync?direction=fedToGocloak", admin, nil, nil), 200).json(&res)
 	if res["added"] != 3.0 || res["status"] != "3 imported groups, 0 updated groups, 0 removed groups" {
 		t.Fatalf("group sync: %v", res)
 	}
@@ -304,7 +304,7 @@ func TestLDAPGroupAndRoleMappers(t *testing.T) {
 
 	// keycloakToFed creates LDAP groups for local ones
 	e.expect(e.do(nil, "POST", "/admin/realms/demo/groups", admin, map[string]any{"name": "ops"}, nil), 201)
-	e.expect(e.do(nil, "POST", "/admin/realms/demo/user-storage/"+cid+"/mappers/"+gm+"/sync?direction=keycloakToFed", admin, nil, nil), 200).json(&res)
+	e.expect(e.do(nil, "POST", "/admin/realms/demo/user-storage/"+cid+"/mappers/"+gm+"/sync?direction=gocloakToFed", admin, nil, nil), 200).json(&res)
 	if d.Get("cn=ops,"+groupsDN) == nil {
 		t.Fatalf("group not created in LDAP: %v", res)
 	}
@@ -330,7 +330,7 @@ func TestLDAPPeriodicSyncAndExport(t *testing.T) {
 	// a realm export keeps the provider, its mappers and the user links
 	var exp map[string]any
 	e.expect(e.do(nil, "POST", "/admin/realms/demo/partial-export", admin, nil, nil), 200).json(&exp)
-	storage := exp["components"].(map[string]any)["org.keycloak.storage.UserStorageProvider"].([]any)[0].(map[string]any)
+	storage := exp["components"].(map[string]any)["org.gocloak.storage.UserStorageProvider"].([]any)[0].(map[string]any)
 	if storage["id"] != cid || len(storage["subComponents"].(map[string]any)[ldapMapper].([]any)) != 7 ||
 		strs(storage["config"].(map[string]any)["bindCredential"])[0] != "**********" {
 		t.Fatalf("exported provider: %v", storage)

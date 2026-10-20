@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="gocloak">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00a7d8"/>
+      <stop offset="1" stop-color="#0066cc"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#g)"/>
+  <path d="M64 24 30 38v24c0 22 14 36 34 44 20-8 34-22 34-44V38Z" fill="#fff" fill-opacity=".95"/>
+  <circle cx="64" cy="58" r="11" fill="#0077c8"/>
+  <path d="M59 66h10l3 22H56Z" fill="#0077c8"/>
+</svg>

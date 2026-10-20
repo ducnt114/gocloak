@@ -57,7 +57,7 @@ func TestCustomTheme(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write("acme/login/theme.properties", "parent=keycloak\nstyles=css/acme.css\n")
+	write("acme/login/theme.properties", "parent=gocloak\nstyles=css/acme.css\n")
 	write("acme/login/messages/messages_en.properties", "doLogIn=Let me in\nloginAccountTitle=Welcome to {0}\n")
 	write("acme/login/resources/css/acme.css", "body{background:hotpink}")
 	write("acme/login/login-otp.html", `{{template "header" .}}<p id="acme-otp">ACME OTP</p>{{template "footer" .}}`)

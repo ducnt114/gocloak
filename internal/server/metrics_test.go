@@ -29,8 +29,8 @@ func TestManagementInterface(t *testing.T) {
 	out := string(b)
 	for _, want := range []string{
 		`http_server_requests_seconds_count{method="POST",outcome="SUCCESS",status="200",uri="/realms/{realm}/protocol/openid-connect/token"} `,
-		`keycloak_user_events_total{client_id="web",error="",event="login",idp="",realm="demo"} 1`,
-		`keycloak_user_events_total{client_id="web",error="invalid_user_credentials",event="login_error",idp="",realm="demo"} 1`,
+		`gocloak_user_events_total{client_id="web",error="",event="login",idp="",realm="demo"} 1`,
+		`gocloak_user_events_total{client_id="web",error="invalid_user_credentials",event="login_error",idp="",realm="demo"} 1`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %s", want)

@@ -33,8 +33,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	// one pattern for /admin/{realm}/console/...: more specific ones would
 	// conflict with /admin/realms/{realm}
 	mux.HandleFunc("GET /admin/{realm}/{rest...}", h.consolePath)
-	mux.HandleFunc("GET /resources/{version}/admin/keycloak.v2/{path...}", h.adminResource)
-	mux.HandleFunc("GET /resources/{version}/common/keycloak/{path...}", h.commonResource)
+	mux.HandleFunc("GET /resources/{version}/admin/gocloak.v2/{path...}", h.adminResource)
+	mux.HandleFunc("GET /resources/{version}/common/gocloak/{path...}", h.commonResource)
 	mux.HandleFunc("GET /resources/{realm}/admin/{locale}", h.translations)
 }
 
@@ -71,15 +71,15 @@ var indexTmpl = template.Must(template.New("index").Parse(`<!doctype html>
     <base href="{{.ResourceURL}}/">
     <link rel="icon" type="image/svg+xml" href="{{.ResourceURL}}/favicon.svg">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="The gocloak Administration Console, Keycloak's admin console served by gocloak.">
+    <meta name="description" content="The gocloak Administration Console.">
     <title>gocloak Administration Console</title>
     <style>
       body { margin: 0; }
       body, #app { height: 100%; }
       .container { padding: 0; margin: 0; width: 100%; }
-      .keycloak__loading-container { height: 100vh; width: 100%; color: #151515; background-color: #fff; display: flex;
+      .gocloak__loading-container { height: 100vh; width: 100%; color: #151515; background-color: #fff; display: flex;
         align-items: center; justify-content: center; flex-direction: column; margin: 0; }
-      @media (prefers-color-scheme: dark) { .keycloak__loading-container { color: #e0e0e0; background-color: #1b1d21; } }
+      @media (prefers-color-scheme: dark) { .gocloak__loading-container { color: #e0e0e0; background-color: #1b1d21; } }
       #loading-text { z-index: 1000; font-size: 20px; font-weight: 600; padding-top: 32px; }
     </style>
     <script type="importmap">{{.ImportMap}}</script>
@@ -92,7 +92,7 @@ var indexTmpl = template.Must(template.New("index").Parse(`<!doctype html>
   <body>
     <div id="app">
       <main class="container">
-        <div class="keycloak__loading-container">
+        <div class="gocloak__loading-container">
           <div><p id="loading-text">Loading the Administration Console</p></div>
         </div>
       </main>
@@ -134,15 +134,15 @@ func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<!doctype html><html><head><meta charset="utf-8"><title>Admin console not installed</title></head>
 <body style="font-family:system-ui,sans-serif;max-width:640px;margin:48px auto;padding:0 16px">
 <h1>The admin console is not installed</h1>
-<p>gocloak serves Keycloak's admin console, which is not part of the gocloak binary. Download it with</p>
+<p>The admin console is not part of the gocloak binary. Download it with</p>
 <pre>gocloak download-admin-console --dir admin-console</pre>
 <p>and start gocloak with <code>--admin-console-dir admin-console</code>. The admin REST API works without it.</p>
 </body></html>`))
 		return
 	}
 	base := h.URLs.Base(r)
-	resourceURL := "/resources/" + h.ResourceVersion + "/admin/keycloak.v2"
-	commonURL := "/resources/" + h.ResourceVersion + "/common/keycloak"
+	resourceURL := "/resources/" + h.ResourceVersion + "/admin/gocloak.v2"
+	commonURL := "/resources/" + h.ResourceVersion + "/common/gocloak"
 	imports, _ := json.Marshal(map[string]any{"imports": map[string]string{
 		"react":             commonURL + "/vendor/react/react.production.min.js",
 		"react/jsx-runtime": commonURL + "/vendor/react/react-jsx-runtime.production.min.js",
@@ -186,7 +186,12 @@ func (h *Handler) adminResource(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	serveFS(w, r, h.Assets.admin, "resources/"+r.PathValue("path"))
+	name := "resources/" + r.PathValue("path")
+	if logo, ok := brandFiles[name]; ok {
+		serveFS(w, r, brandFS, logo)
+		return
+	}
+	serveFS(w, r, h.Assets.admin, name)
 }
 
 func (h *Handler) commonResource(w http.ResponseWriter, r *http.Request) {

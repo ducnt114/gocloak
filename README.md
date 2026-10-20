@@ -120,11 +120,11 @@ Main options (flag / environment variable):
 | `--import-dir` | `GOCLOAK_IMPORT_DIR` | none |
 | `--rate-limit`, `--rate-burst` | `GOCLOAK_RATE_LIMIT`, `GOCLOAK_RATE_BURST` | 100 requests/s per client IP, burst 200 (`0` disables); behind a proxy use `--proxy-headers` so the client IP is used |
 | `--log-level`, `--log-console-output` | `KC_LOG_LEVEL`, `KC_LOG_CONSOLE_OUTPUT` | `info` (`debug` in dev mode), `default` (or `json`) |
-| `--health-enabled`, `--metrics-enabled`, `--http-management-port` | `KC_HEALTH_ENABLED`, `KC_METRICS_ENABLED`, `KC_HTTP_MANAGEMENT_PORT` | off, off, `9000`: health checks and Prometheus metrics (`/metrics`, Keycloak's `http_server_requests_seconds` and `keycloak_user_events_total`) on the management port; `--http-metrics-histograms-enabled` adds buckets. `/health` stays on the main port too |
+| `--health-enabled`, `--metrics-enabled`, `--http-management-port` | `KC_HEALTH_ENABLED`, `KC_METRICS_ENABLED`, `KC_HTTP_MANAGEMENT_PORT` | off, off, `9000`: health checks and Prometheus metrics (`/metrics`: `http_server_requests_seconds` and `gocloak_user_events_total`) on the management port; `--http-metrics-histograms-enabled` adds buckets. `/health` stays on the main port too |
 | `--tracing-enabled`, `--tracing-endpoint`, `--tracing-service-name`, `--tracing-sampler-ratio`, `--tracing-resource-attributes` | `KC_TRACING_*` | off, `http://localhost:4318`, `gocloak`, `1.0`: a span per request exported with OTLP over HTTP (protobuf), continuing W3C `traceparent` |
 | `--ciba-auth-channel-uri` | `GOCLOAK_CIBA_AUTH_CHANNEL_URI` | none: where CIBA authentication requests are posted |
 | `--themes-dir`, `--theme-cache` | `GOCLOAK_THEMES_DIR` | no custom themes; cache off in dev mode |
-| — | `KC_BOOTSTRAP_ADMIN_USERNAME` / `KC_BOOTSTRAP_ADMIN_PASSWORD` (or legacy `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD`) | admin created with the master realm on first start |
+| — | `KC_BOOTSTRAP_ADMIN_USERNAME` / `KC_BOOTSTRAP_ADMIN_PASSWORD` (or `GOCLOAK_ADMIN` / `GOCLOAK_ADMIN_PASSWORD`) | admin created with the master realm on first start |
 
 ## What is implemented
 
@@ -134,7 +134,7 @@ Main options (flag / environment variable):
 - Authorization code flow with login page, PKCE (`plain`, `S256`, and enforcement via the
   `pkce.code.challenge.method` client attribute), `response_mode` query / fragment / form_post,
   `prompt=none|login`, `max_age`, `login_hint`, `iss` in the response
-- SSO across clients through a signed `KEYCLOAK_IDENTITY` cookie
+- SSO across clients through a signed `GOCLOAK_IDENTITY` cookie
 - Grants: `authorization_code`, `password`, `client_credentials` (service accounts), `refresh_token`
 - Client authentication: `client_secret_basic`, `client_secret_post`, `client_secret_jwt` and
   `private_key_jwt` (client JWKS URL, inline JWKS or certificate, replay protection); public and
@@ -193,7 +193,7 @@ Main options (flag / environment variable):
 
 **Identity brokering** (`/realms/{realm}/broker/{alias}/...`)
 
-- Identity providers: generic OpenID Connect (`oidc`, `keycloak-oidc`) and OAuth 2.0 (`oauth2`),
+- Identity providers: generic OpenID Connect (`oidc`, `gocloak-oidc`) and OAuth 2.0 (`oauth2`),
   and the Google, GitHub (and Enterprise), Microsoft, GitLab, Facebook and Apple presets; client
   authentication `client_secret_post` / `basic` / `jwt` and `private_key_jwt`, PKCE, ID token
   validation with the provider's JWKS or a configured key, userinfo, stored tokens
@@ -271,7 +271,7 @@ Main options (flag / environment variable):
   `resources/` served under `/resources/<theme>/<type>/`), per realm `loginTheme`, `emailTheme`
   and `accountTheme`
 - Internationalization with Keycloak's message keys: English and Vietnamese built in, locale from
-  `kc_locale`, `ui_locales`, the `KEYCLOAK_LOCALE` cookie, the user's `locale` attribute or
+  `kc_locale`, `ui_locales`, the `GOCLOAK_LOCALE` cookie, the user's `locale` attribute or
   `Accept-Language`, a language selector on login pages, emails in the user's language
 - Account console at `/realms/{realm}/account`: personal info (user profile), account security
   (password, OTP, security keys and passkeys through application initiated actions), device
@@ -297,7 +297,7 @@ Main options (flag / environment variable):
   sessions, brute force users, flows, required actions, available / effective roles, realm and
   user profile update), translations under `/resources/{realm}/admin/{locale}`, the
   `security-admin-console` client of every realm, and the keycloak-js iframes (third-party
-  cookie check, login status iframe with the `KEYCLOAK_SESSION` cookie)
+  cookie check, login status iframe with the `GOCLOAK_SESSION` cookie)
 - Realms, users (credentials, role mappings, groups, sessions), clients, roles, groups, client
   scopes, identity providers, user federation, authentication flows, events and realm settings
   are managed from the console
@@ -320,7 +320,7 @@ Main options (flag / environment variable):
 - Clients: search, CRUD, client secret get / regenerate, service account user, user sessions,
   client roles, protocol mappers, default / optional client scopes, scope mappings,
   `evaluate-scopes` (example access token, ID token, userinfo, applied mappers), certificates,
-  installation providers (`keycloak-oidc-keycloak-json`, `saml-sp-descriptor`) and
+  installation providers (`gocloak-oidc-gocloak-json`, `saml-sp-descriptor`) and
   `client-description-converter`
 - Client scopes: CRUD, protocol mappers, scope mappings, realm default / optional scopes
 - Roles: realm and client roles CRUD, composites, users in role, `roles-by-id`

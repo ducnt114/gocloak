@@ -16,7 +16,7 @@ import (
 )
 
 // KeyProviderType is the component type of key providers.
-const KeyProviderType = "org.keycloak.keys.KeyProvider"
+const KeyProviderType = "org.gocloak.keys.KeyProvider"
 
 // Key provider ids, as in Keycloak.
 const (

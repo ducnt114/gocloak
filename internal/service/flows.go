@@ -104,7 +104,7 @@ var builtinFlows = []flowDef{
 		{authenticator: "client-secret-jwt", requirement: model.Alternative},
 		{authenticator: "client-x509", requirement: model.Alternative},
 	}},
-	{"first broker login", "Actions taken after first broker login with identity provider account, which is not yet linked to any Keycloak account", "basic-flow", []execDef{
+	{"first broker login", "Actions taken after first broker login with identity provider account, which is not yet linked to any gocloak account", "basic-flow", []execDef{
 		{authenticator: "idp-review-profile", requirement: model.Required,
 			config: &model.AuthenticatorConfig{Alias: "review profile config", Config: map[string]string{"update.profile.on.first.login": "missing"}}},
 		{requirement: model.Required, sub: &flowDef{"User creation or linking", "Flow for the existing/non-existing user alternatives", "basic-flow", []execDef{
@@ -181,7 +181,7 @@ func (s *Service) ProvisionAuthentication(ctx context.Context, st *store.Store, 
 
 // User profile component, as stored by Keycloak.
 const (
-	UserProfileProviderType = "org.keycloak.userprofile.UserProfileProvider"
+	UserProfileProviderType = "org.gocloak.userprofile.UserProfileProvider"
 	UserProfileProviderID   = "declarative-user-profile"
 	UserProfileConfigKey    = "kc.user.profile.config"
 )
